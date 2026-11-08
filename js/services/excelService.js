@@ -146,13 +146,16 @@ function handleExcelImport(event) {
             rows.forEach(r => { if (r['JSON']) fullJson += r['JSON']; });
             if (fullJson) {
               const parsedDb = JSON.parse(fullJson);
-              if (parsedDb && parsedDb.months) {
-                appDb = parsedDb;
-                saveDatabase();
-                renderAll();
-                restored = true;
-                showToast('Base restaurada integralmente pelo backup do Excel!', 'success');
-              }
+              validateBackupDatabase(parsedDb);
+              showModal('Restaurar backup do Excel?', 'Esta operacao substituira todos os dados financeiros atuais pelos dados do arquivo. Confirme somente se possui um backup seguro.', () => {
+                try {
+                  restoreBackupDatabase(parsedDb);
+                  showToast('Backup do Excel restaurado com sucesso!', 'success');
+                } catch (restoreError) {
+                  showToast('Falha ao restaurar: ' + restoreError.message, 'error');
+                }
+              });
+              restored = true;
             }
           } catch (errJson) {
             console.warn('Backup JSON direto falhou, processando por linhas...');
@@ -265,4 +268,31 @@ function exportData() {
   a.click();
   a.remove();
   showToast('Backup JSON baixado com sucesso!', 'success');
+}
+function handleJsonImport(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const candidate = validateBackupDatabase(JSON.parse(e.target.result));
+      showModal('Restaurar backup JSON?', 'Todos os dados financeiros atuais serao substituidos pelo conteudo do backup. Esta operacao nao pode ser desfeita sem outro backup.', () => {
+        try {
+          restoreBackupDatabase(candidate);
+          showToast('Backup JSON restaurado com sucesso!', 'success');
+        } catch (err) {
+          showToast('Falha ao restaurar: ' + err.message, 'error');
+        }
+      });
+    } catch (err) {
+      showToast('Arquivo JSON invalido: ' + err.message, 'error');
+    } finally {
+      event.target.value = '';
+    }
+  };
+  reader.onerror = () => {
+    showToast('Nao foi possivel ler o arquivo JSON.', 'error');
+    event.target.value = '';
+  };
+  reader.readAsText(file);
 }

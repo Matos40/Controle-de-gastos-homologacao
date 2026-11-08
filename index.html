@@ -586,6 +586,11 @@
                 <i class="fa-solid fa-download text-blue-400 text-sm"></i>
                 <span class="text-[10px] font-semibold leading-tight">Backup JSON</span>
               </button>
+              <input type="file" id="jsonImportInput" accept=".json,application/json" class="hidden" onchange="handleJsonImport(event)">
+              <button type="button" onclick="document.getElementById('jsonImportInput').click(); closeHeaderDrawer();" class="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 transition flex flex-col items-center justify-center gap-1 text-center">
+                <i class="fa-solid fa-file-import text-blue-400 text-sm"></i>
+                <span class="text-[10px] font-semibold leading-tight">Restaurar JSON</span>
+              </button>
             </div>
           </div>
 

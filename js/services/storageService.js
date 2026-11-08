@@ -156,6 +156,57 @@
       }
     }
 
+
+    function validateBackupDatabase(db) {
+      if (!db || typeof db !== 'object' || Array.isArray(db) ||
+          !db.months || typeof db.months !== 'object' || Array.isArray(db.months) ||
+          typeof db.selectedMonth !== 'string' ||
+          !/^\d{4}-(0[1-9]|1[0-2])$/.test(db.selectedMonth) ||
+          !Object.prototype.hasOwnProperty.call(db.months, db.selectedMonth)) {
+        throw new Error('Backup invalido: estrutura de meses ou mes selecionado ausente.');
+      }
+      const keys = Object.keys(db.months);
+      if (!keys.length) throw new Error('Backup invalido: nenhum mes encontrado.');
+      for (const ym of keys) {
+        const m = db.months[ym];
+        if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(ym) ||
+            !m || typeof m !== 'object' || Array.isArray(m) ||
+            !Array.isArray(m.expenses) || !Array.isArray(m.cardExpenses) ||
+            (m.extraIncomes !== undefined && !Array.isArray(m.extraIncomes)) ||
+            (m.salary !== undefined && (!Number.isFinite(m.salary) || m.salary < 0)) ||
+            (m.budgetLimit !== undefined && (!Number.isFinite(m.budgetLimit) || m.budgetLimit < 0))) {
+          throw new Error('Backup invalido: dados inconsistentes em ' + ym);
+        }
+        for (const item of m.expenses) {
+          if (!item || typeof item.title !== 'string' || !Number.isFinite(item.amount) || item.amount < 0)
+            throw new Error('Backup invalido: despesa inconsistente em ' + ym);
+        }
+        for (const item of m.cardExpenses) {
+          if (!item || typeof item.title !== 'string' || !Number.isFinite(item.installmentValue) ||
+              item.installmentValue < 0 || (item.isInstallment &&
+              (!Number.isInteger(item.installments) || item.installments < 2 ||
+               !Number.isInteger(item.currentInstallment) || item.currentInstallment < 1 ||
+               item.currentInstallment > item.installments)))
+            throw new Error('Backup invalido: parcela inconsistente em ' + ym);
+        }
+      }
+      return db;
+    }
+
+    function restoreBackupDatabase(candidate) {
+      const restored = validateBackupDatabase(candidate);
+      const previous = appDb;
+      appDb = restored;
+      try {
+        saveDatabase();
+      } catch (err) {
+        appDb = previous;
+        throw err;
+      }
+      updateMonthHeader();
+      renderAll();
+    }
+
     function loadDatabase() {
       try {
         const saved = localStorage.getItem(STORAGE_DATABASE_KEY);

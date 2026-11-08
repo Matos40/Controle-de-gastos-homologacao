@@ -8,7 +8,7 @@ function setup(initial) {
   const memory = new Map();
   if (initial !== undefined) memory.set('controle_gastos_multimonth_v3', JSON.stringify(initial));
   const context = vm.createContext({
-    console, Date, Math, setTimeout, renderAll: () => {}, showToast: () => {},
+    console, Date, Math, setTimeout, renderAll: () => {}, updateMonthHeader: () => {}, showToast: () => {},
     document: { getElementById: () => null },
     localStorage: {
       getItem: key => memory.get(key) ?? null,
@@ -90,4 +90,33 @@ test('sincronizacao nao sobrescreve parcela existente editada', () => {
   t.run('loadDatabase(); syncFromPreviousMonth(true)');
   assert.equal(t.run('appDb.months["2026-11"].cardExpenses.length'), 1);
   assert.equal(t.run('appDb.months["2026-11"].cardExpenses[0].installmentValue'), 80);
+});
+
+test('backup integral preserva meses, receitas, despesas e parcelas', () => {
+  const original = {selectedMonth:'2026-11',months:{
+    '2026-10':{salary:3000,budgetLimit:1000,extraIncomes:[{id:'r',amount:50}],expenses:[{id:'e',title:'Luz',amount:120,type:'fixed'}],cardExpenses:[]},
+    '2026-11':{salary:3200,budgetLimit:1500,extraIncomes:[],expenses:[],cardExpenses:[{id:'c',title:'Compra',isInstallment:true,installments:3,currentInstallment:2,installmentValue:100,paid:true}]}
+  }};
+  const t=setup(original);
+  t.run('loadDatabase()');
+  const normalized = JSON.parse(t.run('JSON.stringify(appDb)'));
+  t.run('restoreBackupDatabase(JSON.parse(JSON.stringify(appDb)))');
+  const saved=JSON.parse(t.memory.get('controle_gastos_multimonth_v3'));
+  assert.deepEqual(saved, normalized);
+});
+
+test('backup corrompido e rejeitado sem alterar dados salvos', () => {
+  const t=setup();
+  t.run('loadDatabase()');
+  const before=t.memory.get('controle_gastos_multimonth_v3');
+  assert.throws(()=>t.run('restoreBackupDatabase({selectedMonth:"2026-11",months:{"2026-11":{expenses:[],cardExpenses:[{title:"X",installmentValue:100,isInstallment:true,installments:2,currentInstallment:9}]}}})'),/Backup invalido/);
+  assert.equal(t.memory.get('controle_gastos_multimonth_v3'),before);
+});
+
+test('backup sem mes selecionado valido nao substitui o banco', () => {
+  const t=setup();
+  t.run('loadDatabase()');
+  const before=t.memory.get('controle_gastos_multimonth_v3');
+  assert.throws(()=>t.run('restoreBackupDatabase({selectedMonth:"2026-12",months:{"2026-11":{expenses:[],cardExpenses:[]}}})'),/Backup invalido/);
+  assert.equal(t.memory.get('controle_gastos_multimonth_v3'),before);
 });
