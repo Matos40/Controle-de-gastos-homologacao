@@ -60,6 +60,12 @@ jobs:
           while IFS= read -r -d '' f; do node --check "$f"; done < <(find homologacao/js -name '*.js' -type f -print0)
           node --check homologacao/sw.js
           node -e "JSON.parse(require('fs').readFileSync('homologacao/manifest.json','utf8'))"
+      - name: Executar testes funcionais da develop antes da publicacao
+        working-directory: origem
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/*.test.cjs
       - name: Atualizar apenas homologacao
         working-directory: homologacao
         shell: bash
