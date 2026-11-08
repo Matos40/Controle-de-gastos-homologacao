@@ -137,7 +137,7 @@
             }
           });
         } else {
-          inheritedCardExpenses = getRayCardExpenses();
+          inheritedCardExpenses = [];
         }
 
         appDb.months[ym] = {
@@ -168,7 +168,7 @@
             m.cardExpenses.forEach(c => { if (!c.category) c.category = inferCategoryFromTitle(c.title); });
           });
           if (appDb.months && appDb.months['2026-10'] && (!appDb.months['2026-10'].cardExpenses || appDb.months['2026-10'].cardExpenses.length === 0)) {
-            appDb.months['2026-10'].cardExpenses = getRayCardExpenses();
+            appDb.months['2026-10'].cardExpenses = [];
             saveDatabase();
           }
         } else {
@@ -183,7 +183,7 @@
                 { id: '1', title: 'Conta de Luz', category: 'moradia', amount: 180.00, type: 'fixed', date: `${ym}-10`, paid: false },
                 { id: '2', title: 'Água e Esgoto', category: 'moradia', amount: 95.50, type: 'fixed', date: `${ym}-12`, paid: false }
               ],
-              cardExpenses: getRayCardExpenses(),
+              cardExpenses: [],
               closed: false,
               closedAt: null
             }
