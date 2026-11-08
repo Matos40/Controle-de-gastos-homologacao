@@ -643,6 +643,12 @@ async function triggerNativePwaInstall() {
       const currentData = getCurrentMonthData();
       const item = currentData.cardExpenses.find(e => e.id === id);
       if (!item) return;
+      if (item.isInstallment) {
+        if (!Array.isArray(currentData.deletedInstallmentOrigins)) currentData.deletedInstallmentOrigins = [];
+        const origin = item.installmentOriginId || item.id;
+        const key = String(origin) + ':' + String(item.currentInstallment || 1);
+        if (!currentData.deletedInstallmentOrigins.includes(key)) currentData.deletedInstallmentOrigins.push(key);
+      }
       currentData.cardExpenses = currentData.cardExpenses.filter(e => e.id !== id);
       saveDatabase();
       renderAll();
@@ -691,6 +697,12 @@ async function triggerNativePwaInstall() {
           'Deseja zerar todas as compras da fatura do cartão para este mês?',
           () => {
             const currentData = getCurrentMonthData();
+            if (!Array.isArray(currentData.deletedInstallmentOrigins)) currentData.deletedInstallmentOrigins = [];
+            currentData.cardExpenses.forEach(item => {
+              if (!item.isInstallment) return;
+              const key = String(item.installmentOriginId || item.id) + ':' + String(item.currentInstallment || 1);
+              if (!currentData.deletedInstallmentOrigins.includes(key)) currentData.deletedInstallmentOrigins.push(key);
+            });
             currentData.cardExpenses = [];
             saveDatabase();
             renderAll();

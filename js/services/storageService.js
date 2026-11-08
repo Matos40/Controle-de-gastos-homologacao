@@ -26,10 +26,7 @@
       prevFixed.forEach(pItem => {
         const existingIndex = currentData.expenses.findIndex(e => e.title.trim().toLowerCase() === pItem.title.trim().toLowerCase());
         if (existingIndex !== -1) {
-          if (currentData.expenses[existingIndex].amount !== pItem.amount) {
-            currentData.expenses[existingIndex].amount = pItem.amount;
-            updatedFixedCount++;
-          }
+          // Uma despesa ja existente pode ter sido editada neste mes: preservar seu valor.
         } else {
           currentData.expenses.push({
             id: 'exp_sync_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
@@ -60,6 +57,9 @@
             const originId = pCard.installmentOriginId || pCard.id;
             // Parcelas antigas nao possuem identificador de origem.
             // Nesse caso, evita duplicacao pelo conjunto titulo + parcela + valor.
+            const deletedOrigins = currentData.deletedInstallmentOrigins || [];
+            const deletedKey = String(originId) + ':' + String(nextInstallmentNum);
+            if (deletedOrigins.includes(deletedKey)) return;
             const cardExists = currentData.cardExpenses.some(c => {
               if (!c.isInstallment || Number(c.currentInstallment) !== Number(nextInstallmentNum)) return false;
               if (c.installmentOriginId && originId) return c.installmentOriginId === originId;
@@ -150,6 +150,7 @@
           extraIncomes: [],
           expenses: inheritedFixedExpenses,
           cardExpenses: inheritedCardExpenses,
+          deletedInstallmentOrigins: [],
           closed: false,
           closedAt: null
         };

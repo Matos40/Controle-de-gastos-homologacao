@@ -120,3 +120,22 @@ test('backup sem mes selecionado valido nao substitui o banco', () => {
   assert.throws(()=>t.run('restoreBackupDatabase({selectedMonth:"2026-12",months:{"2026-11":{expenses:[],cardExpenses:[]}}})'),/Backup invalido/);
   assert.equal(t.memory.get('controle_gastos_multimonth_v3'),before);
 });
+
+test('sincronizacao preserva valor de despesa fixa editada no mes atual', () => {
+  const t=setup({selectedMonth:'2026-11',months:{
+    '2026-10':{salary:0,expenses:[{id:'a',title:'Luz',type:'fixed',amount:100}],cardExpenses:[]},
+    '2026-11':{salary:0,expenses:[{id:'b',title:'Luz',type:'fixed',amount:180}],cardExpenses:[]}
+  }});
+  t.run('loadDatabase(); syncFromPreviousMonth(true)');
+  assert.equal(t.run('appDb.months["2026-11"].expenses[0].amount'),180);
+  assert.equal(t.run('appDb.months["2026-11"].expenses.length'),1);
+});
+
+test('sincronizacao nao recria parcela excluida com marcador de exclusao', () => {
+  const t=setup({selectedMonth:'2026-11',months:{
+    '2026-10':{salary:0,expenses:[],cardExpenses:[{id:'compra1',title:'Notebook',isInstallment:true,installments:3,currentInstallment:1,installmentValue:100}]},
+    '2026-11':{salary:0,expenses:[],cardExpenses:[],deletedInstallmentOrigins:['compra1:2']}
+  }});
+  t.run('loadDatabase(); syncFromPreviousMonth(true)');
+  assert.equal(t.run('appDb.months["2026-11"].cardExpenses.length'),0);
+});
