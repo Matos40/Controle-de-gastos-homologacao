@@ -193,17 +193,26 @@
     function changeMonth(delta) {
       const [year, month] = appDb.selectedMonth.split('-').map(Number);
       const d = new Date(year, month - 1 + delta, 1);
-      appDb.selectedMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      ensureMonthExists(appDb.selectedMonth);
+      const targetYM = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
-      const curData = appDb.months[appDb.selectedMonth];
-      if (curData && (!curData.expenses || curData.expenses.length === 0)) {
-        syncFromPreviousMonth(false);
+      const navigate = () => {
+        appDb.selectedMonth = targetYM;
+        ensureMonthExists(targetYM);
+        saveDatabase();
+        updateMonthHeader();
+        renderAll();
+      };
+
+      if (appDb.months[targetYM]) {
+        navigate();
+        return;
       }
 
-      saveDatabase();
-      updateMonthHeader();
-      renderAll();
+      showModal(
+        `Criar ${formatMonthYear(targetYM)}?`,
+        `Este mês ainda não foi cadastrado. Deseja criá-lo agora? As despesas fixas e parcelas pendentes poderão ser herdadas do mês anterior.`,
+        navigate
+      );
     }
 
     function updateMonthHeader() {
