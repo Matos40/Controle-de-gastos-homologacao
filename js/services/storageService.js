@@ -101,7 +101,7 @@
         const prevYM = getPreviousMonthYM(ym);
         
         const prevData = appDb.months[prevYM] || (monthKeys.length > 0 ? appDb.months[monthKeys[monthKeys.length - 1]] : null);
-        const prevSalary = prevData ? (prevData.salary || 0) : 3500;
+        const prevSalary = prevData ? (prevData.salary || 0) : 0;
         const prevBudget = prevData ? (prevData.budgetLimit || 0) : 0;
         const todayDayStr = String(new Date().getDate()).padStart(2, '0');
 
@@ -136,8 +136,6 @@
               }
             }
           });
-        } else {
-          inheritedCardExpenses = [];
         }
 
         appDb.months[ym] = {
@@ -157,7 +155,7 @@
         const saved = localStorage.getItem(STORAGE_DATABASE_KEY);
         if (saved) {
           appDb = JSON.parse(saved);
-          if (!appDb.selectedMonth) appDb.selectedMonth = '2026-10';
+          if (!appDb.selectedMonth) appDb.selectedMonth = getTodayYM();
           Object.keys(appDb.months || {}).forEach(k => {
             const m = appDb.months[k];
             if (!m.extraIncomes) m.extraIncomes = [];
@@ -167,22 +165,15 @@
             m.expenses.forEach(e => { if (!e.category) e.category = inferCategoryFromTitle(e.title); });
             m.cardExpenses.forEach(c => { if (!c.category) c.category = inferCategoryFromTitle(c.title); });
           });
-          if (appDb.months && appDb.months['2026-10'] && (!appDb.months['2026-10'].cardExpenses || appDb.months['2026-10'].cardExpenses.length === 0)) {
-            appDb.months['2026-10'].cardExpenses = [];
-            saveDatabase();
-          }
         } else {
-          const ym = '2026-10';
+          const ym = getTodayYM();
           appDb.selectedMonth = ym;
           appDb.months = {
             [ym]: {
-              salary: 3500.00,
-              budgetLimit: 3200.00,
+              salary: 0,
+              budgetLimit: 0,
               extraIncomes: [],
-              expenses: [
-                { id: '1', title: 'Conta de Luz', category: 'moradia', amount: 180.00, type: 'fixed', date: `${ym}-10`, paid: false },
-                { id: '2', title: 'Água e Esgoto', category: 'moradia', amount: 95.50, type: 'fixed', date: `${ym}-12`, paid: false }
-              ],
+              expenses: [],
               cardExpenses: [],
               closed: false,
               closedAt: null
