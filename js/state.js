@@ -138,7 +138,7 @@
 
     function getCurrentMonthData() {
       if (!appDb.selectedMonth) {
-        appDb.selectedMonth = '2026-10';
+        appDb.selectedMonth = getTodayYM();
       }
       ensureMonthExists(appDb.selectedMonth);
       return appDb.months[appDb.selectedMonth];
