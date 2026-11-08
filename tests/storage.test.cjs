@@ -8,7 +8,7 @@ function setup(initial) {
   const memory = new Map();
   if (initial !== undefined) memory.set('controle_gastos_multimonth_v3', JSON.stringify(initial));
   const context = vm.createContext({
-    console, Date, Math, setTimeout,
+    console, Date, Math, setTimeout, renderAll: () => {}, showToast: () => {},
     document: { getElementById: () => null },
     localStorage: {
       getItem: key => memory.get(key) ?? null,
@@ -70,4 +70,24 @@ test('saldo considera renda, despesas e cartao', () => {
   } } });
   t.run('loadDatabase()');
   assert.equal(t.run('calculateMonthNetBalance("2026-11")'), 70);
+});
+
+test('sincronizacao manual acrescenta parcela em mes ja existente sem duplicar', () => {
+  const t = setup({ selectedMonth:'2026-11', months: {
+    '2026-10': {salary:0, expenses:[], cardExpenses:[{id:'compra1',title:'Notebook',isInstallment:true,installments:2,currentInstallment:1,installmentValue:100}]},
+    '2026-11': {salary:0, expenses:[], cardExpenses:[]}
+  }});
+  t.run('loadDatabase(); syncFromPreviousMonth(true); syncFromPreviousMonth(true)');
+  assert.equal(t.run('appDb.months["2026-11"].cardExpenses.length'), 1);
+  assert.equal(t.run('appDb.months["2026-11"].cardExpenses[0].currentInstallment'), 2);
+});
+
+test('sincronizacao nao sobrescreve parcela existente editada', () => {
+  const t = setup({ selectedMonth:'2026-11', months: {
+    '2026-10': {salary:0, expenses:[], cardExpenses:[{id:'compra1',title:'Notebook',isInstallment:true,installments:2,currentInstallment:1,installmentValue:100}]},
+    '2026-11': {salary:0, expenses:[], cardExpenses:[{id:'editado',installmentOriginId:'compra1',title:'Notebook editado',isInstallment:true,installments:2,currentInstallment:2,installmentValue:80}]}
+  }});
+  t.run('loadDatabase(); syncFromPreviousMonth(true)');
+  assert.equal(t.run('appDb.months["2026-11"].cardExpenses.length'), 1);
+  assert.equal(t.run('appDb.months["2026-11"].cardExpenses[0].installmentValue'), 80);
 });

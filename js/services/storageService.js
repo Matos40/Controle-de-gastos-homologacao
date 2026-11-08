@@ -57,16 +57,21 @@
           const totalInst = pCard.installments || 1;
 
           if (nextInstallmentNum <= totalInst) {
-            const cardExists = currentData.cardExpenses.some(c => 
-              c.title.trim().toLowerCase() === pCard.title.trim().toLowerCase() && 
-              c.isInstallment && 
-              c.currentInstallment === nextInstallmentNum
-            );
+            const originId = pCard.installmentOriginId || pCard.id;
+            // Parcelas antigas nao possuem identificador de origem.
+            // Nesse caso, evita duplicacao pelo conjunto titulo + parcela + valor.
+            const cardExists = currentData.cardExpenses.some(c => {
+              if (!c.isInstallment || Number(c.currentInstallment) !== Number(nextInstallmentNum)) return false;
+              if (c.installmentOriginId && originId) return c.installmentOriginId === originId;
+              return String(c.title || '').trim().toLowerCase() === String(pCard.title || '').trim().toLowerCase()
+                && Number(c.installments) === Number(totalInst);
+            });
 
             if (!cardExists) {
               currentData.cardExpenses.push({
                 ...pCard,
                 id: 'card_sync_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                installmentOriginId: originId,
                 category: pCard.category || inferCategoryFromTitle(pCard.title),
                 currentInstallment: nextInstallmentNum,
                 date: `${currentYM}-${todayDayStr}`,
@@ -128,6 +133,7 @@
                 inheritedCardExpenses.push({
                   ...item,
                   id: 'card_inherited_' + Date.now() + '_' + idx + '_' + Math.random().toString(36).substr(2, 4),
+                  installmentOriginId: item.installmentOriginId || item.id,
                   category: item.category || inferCategoryFromTitle(item.title),
                   currentInstallment: currentInst + 1,
                   date: `${ym}-${todayDayStr}`,
