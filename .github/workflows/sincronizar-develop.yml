@@ -1,0 +1,76 @@
+name: Sincronizar develop para homologacao
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17,47 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: homologacao-sync
+  cancel-in-progress: false
+
+jobs:
+  sincronizar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obter homologacao
+        uses: actions/checkout@v4
+        with:
+          path: homologacao
+          persist-credentials: true
+      - name: Obter develop do aplicativo original
+        uses: actions/checkout@v4
+        with:
+          repository: Matos40/Controle-de-gastos-2.0
+          ref: develop
+          path: origem
+          persist-credentials: false
+      - name: Preparar arquivos sem afetar dados de producao
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Preserva o workflow, o historico Git e o service worker isolado.
+          rsync -a --delete --exclude='.git/' --exclude='.github/' --exclude='sw.js' \
+            origem/ homologacao/
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('homologacao/js/state.js')
+          s = p.read_text()
+          keys = {
+              "'controle_gastos_multimonth_v3'": "'homolog_controle_gastos_multimonth_v3'",
+              "'gemini_user_api_key'": "'homolog_gemini_user_api_key'",
+              "'controle_gastos_pin_lock'": "'homolog_controle_gastos_pin_lock'",
+          }
+          for old, new in keys.items():
+              if s.count(old) != 1:
+                  raise SystemExit(f'ERRO: chave inesperada ou ausente: {old}')
+              s = s.replace(old, new)
+          p.write_text(s)
+          sw = Path('homologacao/sw.js').read_text()
+          if "homolog-controle-gastos-shell-" not in sw or "key.startsWith('homolog-controle-gastos-shell-')" not in sw:
+              raise SystemExit('ERRO: cache PWA sem isolamento esperado')
+          PY
+      - name: Validar JavaScript e manifesto
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' f; do node --check "$f"; done < <(find homologacao/js -name '*.js' -type f -print0)
+          node --check homologacao/sw.js
+          node -e "JSON.parse(require('fs').readFileSync('homologacao/manifest.json','utf8'))"
+      - name: Atualizar apenas homologacao
+        working-directory: homologacao
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Homologacao ja esta atualizada."
+            exit 0
+          fi
+          git commit -m "ci: sincronizar develop na homologacao"
+          git push origin HEAD:main
