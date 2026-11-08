@@ -385,13 +385,22 @@ async function triggerNativePwaInstall() {
               paid: false
             }));
 
-          const nextCardExpenses = [];
+          // Nao sobrescrever um mes ja existente nem ressuscitar parcelas excluidas.
+          const existingNext = appDb.months[nextYM];
+          const nextCardExpenses = existingNext ? [...(existingNext.cardExpenses || [])] : [];
+          const deletedNext = existingNext && Array.isArray(existingNext.deletedInstallmentOrigins) ? existingNext.deletedInstallmentOrigins : [];
           currentData.cardExpenses.forEach(item => {
             if (item.isInstallment) {
               const currentInst = item.currentInstallment || 1;
-              if (currentInst < item.installments) {
+              const originId = item.installmentOriginId || item.id;
+              const nextNum = currentInst + 1;
+              const alreadyPresent = nextCardExpenses.some(c => c.isInstallment && Number(c.currentInstallment) === nextNum &&
+                (String(c.installmentOriginId || c.id) === String(originId) ||
+                  (String(c.title || '').trim().toLowerCase() === String(item.title || '').trim().toLowerCase() && Number(c.installments) === Number(item.installments))));
+              if (currentInst < item.installments && !deletedNext.includes(String(originId) + ':' + nextNum) && !alreadyPresent) {
                 nextCardExpenses.push({
                   ...item,
+                  installmentOriginId: originId,
                   id: 'card_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
                   currentInstallment: currentInst + 1,
                   date: `${nextYM}-${todayDayStr}`,
@@ -402,11 +411,13 @@ async function triggerNativePwaInstall() {
           });
 
           appDb.months[nextYM] = {
-            salary: currentData.salary,
-            budgetLimit: currentData.budgetLimit || 0,
-            extraIncomes: [],
-            expenses: nextExpenses,
+            ...(existingNext || {}),
+            salary: existingNext ? existingNext.salary : currentData.salary,
+            budgetLimit: existingNext ? existingNext.budgetLimit : (currentData.budgetLimit || 0),
+            extraIncomes: existingNext ? (existingNext.extraIncomes || []) : [],
+            expenses: existingNext ? (existingNext.expenses || []) : nextExpenses,
             cardExpenses: nextCardExpenses,
+            deletedInstallmentOrigins: [...deletedNext],
             closed: false,
             closedAt: null
           };
@@ -546,8 +557,10 @@ async function triggerNativePwaInstall() {
         }
       }
 
+      const newCardId = 'card_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
       currentData.cardExpenses.unshift({
-        id: 'card_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        id: newCardId,
+        installmentOriginId: isInstallment ? newCardId : undefined,
         title,
         category,
         isInstallment,

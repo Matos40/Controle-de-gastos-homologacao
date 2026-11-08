@@ -139,3 +139,65 @@ test('sincronizacao nao recria parcela excluida com marcador de exclusao', () =>
   t.run('loadDatabase(); syncFromPreviousMonth(true)');
   assert.equal(t.run('appDb.months["2026-11"].cardExpenses.length'),0);
 });
+
+test('mes criado automaticamente preserva origem e sincronizacao nao duplica parcela', () => {
+  const t=setup({selectedMonth:'2026-11',months:{
+    '2026-11':{salary:0,expenses:[],cardExpenses:[{id:'compra1',title:'Notebook',isInstallment:true,installments:3,currentInstallment:1,installmentValue:300}]}
+  }});
+  t.run('loadDatabase(); ensureMonthExists("2026-12"); appDb.selectedMonth="2026-12"; syncFromPreviousMonth(true); syncFromPreviousMonth(true)');
+  assert.equal(t.run('getCurrentMonthData().cardExpenses.length'),1);
+  assert.equal(t.run('getCurrentMonthData().cardExpenses[0].currentInstallment'),2);
+  assert.equal(t.run('getCurrentMonthData().cardExpenses[0].installmentOriginId'),'compra1');
+});
+
+test('parcela excluida em mes criado automaticamente nao reaparece na sincronizacao', () => {
+  const t=setup({selectedMonth:'2026-11',months:{
+    '2026-11':{salary:0,expenses:[],cardExpenses:[{id:'compra1',title:'Notebook',isInstallment:true,installments:3,currentInstallment:1,installmentValue:300}]}
+  }});
+  t.run('loadDatabase(); ensureMonthExists("2026-12"); appDb.selectedMonth="2026-12"; getCurrentMonthData().cardExpenses=[]; getCurrentMonthData().deletedInstallmentOrigins=["compra1:2"]; syncFromPreviousMonth(true)');
+  assert.equal(t.run('getCurrentMonthData().cardExpenses.length'),0);
+});
+
+function setupAdvance(initial) {
+  const t = setup(initial);
+  t.context.window = { addEventListener: () => {} };
+  vm.runInContext(fs.readFileSync('js/app.js', 'utf8'), t.context, {filename:'js/app.js'});
+  // Sobrescrever o modal definido no app: confirmar diretamente sem DOM.
+  t.context.showModal = (_title, _message, confirm) => confirm();
+  // Funcoes de UI do app nao devem acessar o DOM real durante o teste.
+  t.run('showToast = () => {}; renderAll = () => {}; updateMonthHeader = () => {};');
+  return t;
+}
+
+test('promptAdvanceMonth preserva mes existente, despesas editadas e receitas', () => {
+  const t = setupAdvance({selectedMonth:'2026-11',months:{
+    '2026-11':{salary:3000,budgetLimit:1000,expenses:[{id:'luz',title:'Luz',type:'fixed',amount:100}],extraIncomes:[],cardExpenses:[{id:'compra1',installmentOriginId:'compra1',title:'Notebook',isInstallment:true,installments:3,currentInstallment:1,installmentValue:300}]},
+    '2026-12':{salary:4500,budgetLimit:1200,expenses:[{id:'luz2',title:'Luz',type:'fixed',amount:180}],extraIncomes:[{id:'bonus',amount:100}],cardExpenses:[]}
+  }});
+  t.run('loadDatabase(); promptAdvanceMonth()');
+  assert.equal(t.run('appDb.selectedMonth'),'2026-12');
+  assert.equal(t.run('appDb.months["2026-12"].expenses[0].amount'),180);
+  assert.equal(t.run('appDb.months["2026-12"].extraIncomes.length'),1);
+  assert.equal(t.run('appDb.months["2026-12"].salary'),4500);
+  assert.equal(t.run('appDb.months["2026-12"].cardExpenses.length'),1);
+  assert.equal(t.run('appDb.months["2026-12"].cardExpenses[0].currentInstallment'),2);
+});
+
+test('promptAdvanceMonth nao duplica parcela ja existente', () => {
+  const t = setupAdvance({selectedMonth:'2026-11',months:{
+    '2026-11':{salary:0,expenses:[],cardExpenses:[{id:'compra1',installmentOriginId:'compra1',title:'Notebook',isInstallment:true,installments:3,currentInstallment:1,installmentValue:300}]},
+    '2026-12':{salary:0,expenses:[],cardExpenses:[{id:'parcela2',installmentOriginId:'compra1',title:'Notebook',isInstallment:true,installments:3,currentInstallment:2,installmentValue:300}]}
+  }});
+  t.run('loadDatabase(); promptAdvanceMonth()');
+  assert.equal(t.run('appDb.months["2026-12"].cardExpenses.length'),1);
+});
+
+test('promptAdvanceMonth respeita exclusao registrada da parcela seguinte', () => {
+  const t = setupAdvance({selectedMonth:'2026-11',months:{
+    '2026-11':{salary:0,expenses:[],cardExpenses:[{id:'compra1',installmentOriginId:'compra1',title:'Notebook',isInstallment:true,installments:3,currentInstallment:1,installmentValue:300}]},
+    '2026-12':{salary:0,expenses:[],cardExpenses:[],deletedInstallmentOrigins:['compra1:2']}
+  }});
+  t.run('loadDatabase(); promptAdvanceMonth()');
+  assert.equal(t.run('appDb.months["2026-12"].cardExpenses.length'),0);
+  assert.deepEqual(Array.from(t.run('appDb.months["2026-12"].deletedInstallmentOrigins')),['compra1:2']);
+});
