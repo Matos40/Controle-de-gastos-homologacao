@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Controle de Gastos Mensais</title>
+  
+  <!-- Metadata PWA / Mobile Nativo -->
+  <meta name="theme-color" content="#020617">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Meus Gastos">
+  <meta name="application-name" content="Controle Financeiro">
+  <meta name="description" content="Controle financeiro mensal organizado com salário, gastos fixos, cartão e leitor IA.">
+
+  <!-- Ícone SVG Embutido para Favoritos e Apple Touch Icon -->
+  <link id="faviconLink" rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='128' fill='%23020617'/%3E%3Crect x='24' y='24' width='464' height='464' rx='108' fill='%230f172a' stroke='%2310b981' stroke-width='16'/%3E%3Cpath d='M384 160H128c-17.7 0-32-14.3-32-32s14.3-32 32-32h256c8.8 0 16-7.2 16-16s-7.2-16-16-16H128C92.7 64 64 92.7 64 128v256c0 35.3 28.7 64 64 64h256c35.3 0 64-28.7 64-64V224c0-35.3-28.7-64-64-64zm-32 168c-22.1 0-40-17.9-40-40s17.9-40 40-40 40 17.9 40 40-17.9 40-40 40z' fill='%2310b981'/%3E%3C/svg%3E">
+  <link id="appleTouchIconLink" rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='120' fill='%23020617'/%3E%3Cpath d='M384 160H128c-17.7 0-32-14.3-32-32s14.3-32 32-32h256c8.8 0 16-7.2 16-16s-7.2-16-16-16H128C92.7 64 64 92.7 64 128v256c0 35.3 28.7 64 64 64h256c35.3 0 64-28.7 64-64V224c0-35.3-28.7-64-64-64zm-32 168c-22.1 0-40-17.9-40-40s17.9-40 40-40 40 17.9 40 40-17.9 40-40 40z' fill='%2310b981'/%3E%3C/svg%3E">
+  <!-- Link dinâmico para o Web App Manifest -->
+  <link id="pwaManifestLink" rel="manifest" href="./manifest.json">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- SheetJS para importação e exportação em Excel (XLSX) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Chart.js para Gráficos Financeiros -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="./css/styles.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased flex flex-col selection:bg-emerald-500 selection:text-slate-950 pb-20 sm:pb-0">
+
+  <!-- Barra de Status Offline (Exibida automaticamente quando sem internet) -->
+  <div id="offlineBanner" class="hidden bg-amber-500/15 border-b border-amber-500/30 text-amber-300 text-xs font-semibold py-2 px-4 text-center items-center justify-center gap-2 z-50">
+    <i class="fa-solid fa-wifi-slash text-amber-400"></i>
+    <span>Modo Offline Ativo — Seus dados continuam salvos no dispositivo normalmente.</span>
+  </div>
+
+  <!-- Tela de Bloqueio por PIN (Opcional) -->
+  <div id="pinLockOverlay" class="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 p-8 rounded-3xl max-w-sm w-full shadow-2xl text-center space-y-6">
+      <div class="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-2xl shadow-inner">
+        <i class="fa-solid fa-lock"></i>
+      </div>
+      <div>
+        <h2 class="text-xl font-bold text-white">Aplicativo Protegido</h2>
+        <p class="text-xs text-slate-400 mt-1">Digite seu PIN de 4 dígitos para acessar seus dados financeiros</p>
+      </div>
+      <form onsubmit="handleUnlockPin(event)" class="space-y-4">
+        <input 
+          type="password" 
+          id="unlockPinInput" 
+          maxlength="4" 
+          inputmode="numeric" 
+          placeholder="••••" 
+          class="w-40 text-center tracking-[0.6em] text-2xl font-extrabold bg-slate-950 border border-slate-700 rounded-2xl py-3 text-emerald-400 focus:outline-none focus:border-emerald-500 mx-auto block"
+        >
+        <p id="unlockPinError" class="text-xs text-rose-400 hidden font-semibold">PIN incorreto! Tente novamente.</p>
+        <button type="submit" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition shadow-lg shadow-emerald-950/50">
+          Desbloquear Acesso
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal PWA: Instalar Aplicativo no Celular / Computador -->
+  <div id="pwaInstallModal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-emerald-500/30 p-6 rounded-2xl max-w-md w-full shadow-2xl relative space-y-5">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-lg border border-emerald-500/30">
+            <i class="fa-solid fa-mobile-screen-button"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base">Instalar como Aplicativo (PWA)</h3>
+            <p class="text-xs text-slate-400">Acesso rápido na tela inicial e 100% offline</p>
+          </div>
+        </div>
+        <button onclick="closePwaModal()" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Botão de Instalação Direta (quando suportado pelo Chrome/Edge/Android) -->
+      <div id="directInstallSection" class="hidden p-4 rounded-xl bg-emerald-950/30 border border-emerald-500/40 text-center space-y-3">
+        <p class="text-xs text-emerald-200 font-medium">Seu navegador suporta instalação direta com 1 clique!</p>
+        <button 
+          type="button" 
+          onclick="triggerNativePwaInstall()" 
+          class="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/50 transition flex items-center justify-center gap-2"
+        >
+          <i class="fa-solid fa-download"></i> Instalar Aplicativo Agora
+        </button>
+      </div>
+
+      <!-- Instruções passo a passo para Android e iPhone (iOS) -->
+      <div class="space-y-3 text-xs">
+        <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+          <div class="font-bold text-white flex items-center gap-2 text-sm">
+            <i class="fa-brands fa-android text-emerald-400 text-base"></i> No Android (Chrome / Samsung)
+          </div>
+          <ol class="list-decimal list-inside text-slate-400 space-y-1 leading-relaxed">
+            <li>Toque nos <strong class="text-slate-200">3 pontinhos (⋮)</strong> no canto superior do navegador.</li>
+            <li>Selecione <strong class="text-emerald-400">"Adicionar à tela inicial"</strong> ou <strong class="text-emerald-400">"Instalar aplicativo"</strong>.</li>
+            <li>Pronto! Ele abrirá em tela cheia como um app nativo.</li>
+          </ol>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+          <div class="font-bold text-white flex items-center gap-2 text-sm">
+            <i class="fa-brands fa-apple text-slate-200 text-base"></i> No iPhone / iPad (Safari)
+          </div>
+          <ol class="list-decimal list-inside text-slate-400 space-y-1 leading-relaxed">
+            <li>Toque no botão <strong class="text-slate-200">Compartilhar <i class="fa-solid fa-arrow-up-from-bracket text-blue-400"></i></strong> na barra inferior do Safari.</li>
+            <li>Role para baixo e toque em <strong class="text-emerald-400">"Adicionar à Tela de Início"</strong>.</li>
+            <li>Toque em <strong class="text-slate-200">Adicionar</strong> no canto superior direito.</li>
+          </ol>
+        </div>
+
+        <div class="flex items-center gap-2.5 p-3 rounded-xl bg-indigo-950/20 border border-indigo-500/20 text-indigo-200">
+          <i class="fa-solid fa-bolt text-indigo-400 text-base shrink-0"></i>
+          <span><strong>Modo 100% Offline:</strong> Como seus dados ficam salvos na memória segura do aparelho, você pode consultar e lançar gastos na rua mesmo sem internet!</span>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-1">
+        <button type="button" onclick="closePwaModal()" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition">
+          Entendi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Configurar PIN de Segurança -->
+  <div id="pinSetupModal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-sm w-full shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <h3 class="font-bold text-white text-base">Bloqueio por PIN</h3>
+        </div>
+        <button onclick="closePinModal()" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="space-y-4">
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Defina uma senha rápida de 4 números para solicitar sempre que o aplicativo for aberto neste navegador.
+        </p>
+        <div>
+          <label for="newPinInput" class="block text-xs font-semibold text-slate-300 mb-1.5">Novo PIN (4 dígitos numéricos)</label>
+          <input 
+            type="password" 
+            id="newPinInput" 
+            maxlength="4" 
+            inputmode="numeric" 
+            placeholder="Ex: 1234" 
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-center text-lg font-bold tracking-widest text-white focus:outline-none focus:border-emerald-500"
+          >
+        </div>
+        <div class="flex items-center justify-between gap-2 pt-2">
+          <button type="button" id="removePinBtn" onclick="removePinLock()" class="px-3 py-2 rounded-xl border border-rose-500/30 bg-rose-950/30 text-rose-300 hover:bg-rose-900/40 text-xs font-semibold transition hidden">
+            Desativar PIN
+          </button>
+          <div class="flex items-center gap-2 ml-auto">
+            <button type="button" onclick="closePinModal()" class="px-4 py-2 rounded-xl border border-slate-700 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition">
+              Cancelar
+            </button>
+            <button type="button" onclick="savePinLock()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition">
+              Salvar PIN
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Customizado de Confirmação -->
+  <div id="confirmModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md w-full shadow-2xl transform transition-all">
+      <div class="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mb-4 text-xl">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <h3 id="modalTitle" class="text-lg font-bold text-slate-100 mb-2">Confirmar ação</h3>
+      <p id="modalDesc" class="text-slate-400 text-sm mb-6">Tem certeza que deseja executar esta ação?</p>
+      <div class="flex items-center justify-end gap-3">
+        <button id="modalCancelBtn" class="px-4 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-sm font-semibold transition text-slate-300">
+          Cancelar
+        </button>
+        <button id="modalConfirmBtn" class="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition shadow-lg shadow-rose-900/30">
+          Confirmar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Customizado: Editar Despesa Geral -->
+  <div id="editExpenseModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md w-full shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </div>
+          <h3 class="font-bold text-white text-base">Editar Despesa</h3>
+        </div>
+        <button onclick="closeEditExpenseModal()" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="editExpenseForm" onsubmit="handleEditExpenseSubmit(event)" class="space-y-4">
+        <input type="hidden" id="editExpenseId">
+        
+        <div>
+          <label for="editExpenseTitle" class="block text-xs font-semibold text-slate-300 mb-1.5">Nome do Gasto</label>
+          <input type="text" id="editExpenseTitle" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="editExpenseAmount" class="block text-xs font-semibold text-slate-300 mb-1.5">Valor (R$)</label>
+            <input type="text" inputmode="decimal" id="editExpenseAmount" required placeholder="0,00" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-semibold focus:outline-none focus:border-emerald-500">
+          </div>
+          <div>
+            <label for="editExpenseDate" class="block text-xs font-semibold text-slate-300 mb-1.5">Data</label>
+            <div class="relative cursor-pointer" onclick="openDatePicker('editExpenseDate')">
+              <input type="date" id="editExpenseDate" onclick="openDatePicker('editExpenseDate')" class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-3 pr-9 py-2 text-xs text-slate-200 cursor-pointer focus:outline-none focus:border-emerald-500">
+              <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">
+                <i class="fa-regular fa-calendar-days"></i>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label for="editExpenseCategory" class="block text-xs font-semibold text-slate-300 mb-1.5">Categoria</label>
+          <select id="editExpenseCategory" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+            <option value="moradia">🏠 Moradia & Contas</option>
+            <option value="alimentacao">🍔 Alimentação & Mercado</option>
+            <option value="transporte">🚗 Transporte & Uber</option>
+            <option value="compras">🛍️ Compras & Vestuário</option>
+            <option value="lazer">🎮 Lazer & Assinaturas</option>
+            <option value="saude">🩺 Saúde & Farmácia</option>
+            <option value="outros">📦 Outros</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-2">Tipo da Conta</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="relative flex items-center justify-center p-2.5 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-950/20 text-xs font-semibold text-slate-300">
+              <input type="radio" name="editExpenseType" value="fixed" class="sr-only">
+              <span>Fixo Mensal</span>
+            </label>
+            <label class="relative flex items-center justify-center p-2.5 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer has-[:checked]:border-amber-500 has-[:checked]:bg-amber-950/20 text-xs font-semibold text-slate-300">
+              <input type="radio" name="editExpenseType" value="one-time" class="sr-only">
+              <span>Único / Avulso</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button type="button" onclick="closeEditExpenseModal()" class="px-4 py-2 rounded-xl border border-slate-700 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition shadow-lg shadow-emerald-950/30">
+            Salvar Alterações
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Customizado: Editar Compra no Cartão -->
+  <div id="editCardModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md w-full shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </div>
+          <h3 class="font-bold text-white text-base">Editar Compra do Cartão</h3>
+        </div>
+        <button onclick="closeEditCardModal()" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="editCardForm" onsubmit="handleEditCardSubmit(event)" class="space-y-4">
+        <input type="hidden" id="editCardId">
+        
+        <div>
+          <label for="editCardTitle" class="block text-xs font-semibold text-slate-300 mb-1.5">O que comprou?</label>
+          <input type="text" id="editCardTitle" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-purple-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="editCardInstallmentValue" class="block text-xs font-semibold text-slate-300 mb-1.5">Valor da Parcela/Mês (R$)</label>
+            <input type="text" inputmode="decimal" id="editCardInstallmentValue" required placeholder="0,00" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-semibold focus:outline-none focus:border-purple-500">
+          </div>
+          <div>
+            <label for="editCardDate" class="block text-xs font-semibold text-slate-300 mb-1.5">Data Fatura</label>
+            <div class="relative cursor-pointer" onclick="openDatePicker('editCardDate')">
+              <input type="date" id="editCardDate" onclick="openDatePicker('editCardDate')" class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-3 pr-9 py-2 text-xs text-slate-200 cursor-pointer focus:outline-none focus:border-purple-500">
+              <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">
+                <i class="fa-regular fa-calendar-days"></i>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label for="editCardCategory" class="block text-xs font-semibold text-slate-300 mb-1.5">Categoria</label>
+          <select id="editCardCategory" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+            <option value="compras">🛍️ Compras & Vestuário</option>
+            <option value="alimentacao">🍔 Alimentação & Mercado</option>
+            <option value="transporte">🚗 Transporte & Uber</option>
+            <option value="moradia">🏠 Moradia & Contas</option>
+            <option value="lazer">🎮 Lazer & Assinaturas</option>
+            <option value="saude">🩺 Saúde & Farmácia</option>
+            <option value="outros">📦 Outros</option>
+          </select>
+        </div>
+
+        <div id="editCardInstallmentsSection" class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="editCardCurrentInstallment" class="block text-xs font-semibold text-slate-300 mb-1.5">Parcela Atual</label>
+            <input type="number" min="1" id="editCardCurrentInstallment" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500">
+          </div>
+          <div>
+            <label for="editCardTotalInstallments" class="block text-xs font-semibold text-slate-300 mb-1.5">Total de Parcelas</label>
+            <input type="number" min="1" id="editCardTotalInstallments" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500">
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button type="button" onclick="closeEditCardModal()" class="px-4 py-2 rounded-xl border border-slate-700 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold transition shadow-lg shadow-purple-950/30">
+            Salvar Alterações
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Customizado: Adicionar / Editar Entrada Extra de Dinheiro -->
+  <div id="incomeModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-emerald-500/30 p-6 rounded-2xl max-w-md w-full shadow-2xl relative">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-base border border-emerald-500/30">
+            <i class="fa-solid fa-hand-holding-dollar"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base" id="incomeModalTitle">Adicionar Entrada Extra</h3>
+            <p class="text-xs text-slate-400">Pix, freela, reembolso, venda, bônus, etc.</p>
+          </div>
+        </div>
+        <button onclick="closeIncomeModal()" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="incomeForm" onsubmit="handleIncomeSubmit(event)" class="space-y-4">
+        <input type="hidden" id="incomeEditId">
+
+        <div>
+          <label for="incomeDesc" class="block text-xs font-semibold text-slate-300 mb-1.5">Descrição do Recebimento <span class="text-rose-400">*</span></label>
+          <input 
+            type="text" 
+            id="incomeDesc" 
+            required 
+            placeholder="Ex: Pix do João, Venda OLX, Restituição, Bônus..." 
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition"
+          >
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="incomeAmount" class="block text-xs font-semibold text-slate-300 mb-1.5">Valor Recebido (R$) <span class="text-rose-400">*</span></label>
+            <div class="relative">
+              <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-semibold select-none">R$</span>
+              <input 
+                type="text" 
+                inputmode="decimal" 
+                id="incomeAmount" 
+                required 
+                placeholder="0,00" 
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-3 py-2.5 text-sm text-emerald-400 font-bold placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition"
+              >
+            </div>
+          </div>
+
+          <div>
+            <label for="incomeDate" class="block text-xs font-semibold text-slate-300 mb-1.5">Data do Recebimento</label>
+            <div class="relative cursor-pointer" onclick="openDatePicker('incomeDate')">
+              <input 
+                type="date" 
+                id="incomeDate" 
+                onclick="openDatePicker('incomeDate')" 
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-3 pr-9 py-2.5 text-xs text-slate-200 cursor-pointer focus:outline-none focus:border-emerald-500"
+              >
+              <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">
+                <i class="fa-regular fa-calendar-days"></i>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button type="button" onclick="closeIncomeModal()" class="px-4 py-2 rounded-xl border border-slate-700 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-lg shadow-emerald-950/30 flex items-center gap-1.5">
+            <i class="fa-solid fa-check"></i> Salvar Recebimento
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Notificação Toast -->
+  <div id="toast" class="fixed bottom-20 sm:bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium pointer-events-none">
+    <i id="toastIcon" class="fa-solid"></i>
+    <span id="toastMsg">Mensagem</span>
+  </div>
+
+  <!-- Header Principal Minimalista & Expansível por Categorias -->
+  <header class="border-b border-slate-800/80 bg-slate-900/75 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-3.5 sm:px-6 py-3">
+      
+      <!-- Barra Principal Enxuta -->
+      <div class="flex items-center justify-between gap-2">
+        <!-- Logo e Título -->
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-base sm:text-lg font-bold shadow-inner shrink-0">
+            <i class="fa-solid fa-wallet"></i>
+          </div>
+          <div class="truncate">
+            <div class="flex items-center gap-1.5">
+              <h1 class="text-sm sm:text-lg font-bold tracking-tight text-white truncate">
+                Controle Financeiro
+              </h1>
+              <span id="pwaInstalledBadge" class="hidden text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
+                App
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-400 hidden sm:block">Salário, contas fixas, cartão e modo offline</p>
+          </div>
+        </div>
+
+        <!-- Controles Centrais / Direita: Seletor de Mês + Olho Privacidade + Botão Menu Expansível -->
+        <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <!-- Navegador de Meses Compacto -->
+          <div class="flex items-center bg-slate-950 border border-slate-800 rounded-xl px-1 py-1 text-xs">
+            <button onclick="changeMonth(-1)" title="Mês Anterior" class="w-7 h-7 flex items-center justify-center hover:text-white text-slate-400 rounded-lg hover:bg-slate-800 transition">
+              <i class="fa-solid fa-chevron-left text-[11px]"></i>
+            </button>
+            <span id="currentMonthDisplay" class="px-2 font-bold text-slate-200 capitalize select-none min-w-[100px] sm:min-w-[120px] text-center text-[11px] sm:text-xs">
+              Novembro 2026
+            </span>
+            <button onclick="changeMonth(1)" title="Próximo Mês" class="w-7 h-7 flex items-center justify-center hover:text-white text-slate-400 rounded-lg hover:bg-slate-800 transition">
+              <i class="fa-solid fa-chevron-right text-[11px]"></i>
+            </button>
+          </div>
+
+          <!-- Botão Rápido: Olho Mágico (Privacidade) -->
+          <button 
+            onclick="togglePrivacyMode()" 
+            title="Ocultar ou mostrar valores monetários" 
+            class="w-9 h-9 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition flex items-center justify-center text-xs shrink-0"
+          >
+            <i class="fa-solid fa-eye text-emerald-400" id="privacyIcon"></i>
+          </button>
+
+          <!-- Botão Expansor de Ferramentas & Categorias -->
+          <button 
+            type="button"
+            id="headerToolsToggleBtn"
+            onclick="toggleHeaderDrawer(event)" 
+            title="Abrir Menu de Ferramentas e Opções" 
+            class="h-9 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/70 transition flex items-center gap-2 text-xs font-semibold shadow-sm shrink-0"
+          >
+            <i class="fa-solid fa-sliders text-emerald-400 text-xs" id="headerToolsIcon"></i>
+            <span class="hidden md:inline">Opções</span>
+            <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform duration-200" id="headerToolsArrow"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Painel Expansível de Ferramentas Organizado por Categorias (Oculto por padrão) -->
+      <div id="headerToolsDrawer" class="hidden pt-3 mt-3 border-t border-slate-800/80 transition-all">
+        <!-- Input oculto para o arquivo Excel -->
+        <input type="file" id="excelImportInput" accept=".xlsx, .xls, .xlsm" class="sr-only" onchange="handleExcelImport(event)">
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+          
+          <!-- Categoria 1: Ações do Mês & IA -->
+          <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-2.5 space-y-2">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 px-1">
+              <i class="fa-solid fa-wand-magic-sparkles text-purple-400"></i> Ações do Mês & IA
+            </div>
+            <div class="grid grid-cols-1 gap-1.5">
+              <button 
+                onclick="openOcrModal(); closeHeaderDrawer();" 
+                class="w-full px-3 py-2 rounded-lg bg-gradient-to-r from-purple-600/90 to-indigo-600/90 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition flex items-center justify-between shadow-sm"
+              >
+                <span class="flex items-center gap-2"><i class="fa-solid fa-camera"></i> Ler Print da Fatura com IA</span>
+                <i class="fa-solid fa-chevron-right text-[10px] opacity-75"></i>
+              </button>
+
+              <div class="grid grid-cols-2 gap-1.5">
+                <button 
+                  onclick="syncFromPreviousMonth(true); closeHeaderDrawer();" 
+                  class="px-2.5 py-2 rounded-lg bg-indigo-950/60 hover:bg-indigo-900/70 text-indigo-200 border border-indigo-500/30 text-[11px] font-semibold transition flex items-center justify-center gap-1.5"
+                >
+                  <i class="fa-solid fa-arrows-rotate text-indigo-400" id="syncBtnIcon"></i>
+                  <span>Sincronizar Mês</span>
+                </button>
+
+                <button 
+                  onclick="promptAdvanceMonth(); closeHeaderDrawer();" 
+                  class="px-2.5 py-2 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/70 text-emerald-200 border border-emerald-500/30 text-[11px] font-semibold transition flex items-center justify-center gap-1.5"
+                >
+                  <i class="fa-solid fa-calendar-check text-emerald-400"></i>
+                  <span>Fechar Mês</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Categoria 2: Planilhas & Backup -->
+          <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-2.5 space-y-2">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 px-1">
+              <i class="fa-solid fa-file-excel text-emerald-400"></i> Planilhas & Backup
+            </div>
+            <div class="grid grid-cols-3 gap-1.5">
+              <button 
+                type="button"
+                onclick="triggerExcelInput(); closeHeaderDrawer();"
+                class="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 transition flex flex-col items-center justify-center gap-1 text-center"
+              >
+                <i class="fa-solid fa-file-arrow-up text-emerald-400 text-sm"></i>
+                <span class="text-[10px] font-semibold leading-tight">Importar Excel</span>
+              </button>
+
+              <button 
+                type="button"
+                onclick="exportToExcel(); closeHeaderDrawer();"
+                class="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 transition flex flex-col items-center justify-center gap-1 text-center"
+              >
+                <i class="fa-solid fa-file-excel text-emerald-300 text-sm"></i>
+                <span class="text-[10px] font-semibold leading-tight">Exportar Excel</span>
+              </button>
+
+              <button 
+                type="button"
+                onclick="exportData(); closeHeaderDrawer();"
+                class="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 transition flex flex-col items-center justify-center gap-1 text-center"
+              >
+                <i class="fa-solid fa-download text-blue-400 text-sm"></i>
+                <span class="text-[10px] font-semibold leading-tight">Backup JSON</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Categoria 3: Segurança & Aplicativo -->
+          <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-2.5 space-y-2">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 px-1">
+              <i class="fa-solid fa-shield-halved text-amber-400"></i> Segurança & App
+            </div>
+            <div class="grid grid-cols-3 gap-1.5">
+              <button 
+                type="button"
+                onclick="openApiKeyModal(); closeHeaderDrawer();"
+                class="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 transition flex flex-col items-center justify-center gap-1 text-center"
+              >
+                <i class="fa-solid fa-key text-amber-400 text-sm"></i>
+                <span id="apiKeyBtnLabel" class="text-[10px] font-semibold leading-tight">Chave API</span>
+              </button>
+
+              <button 
+                type="button"
+                onclick="openPinModal(); closeHeaderDrawer();"
+                class="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 transition flex flex-col items-center justify-center gap-1 text-center"
+              >
+                <i class="fa-solid fa-lock text-slate-400 text-sm" id="pinHeaderIcon"></i>
+                <span class="text-[10px] font-semibold leading-tight">Senha PIN</span>
+              </button>
+
+              <button 
+                type="button"
+                id="pwaHeaderBtn"
+                onclick="openPwaModal(); closeHeaderDrawer();"
+                class="p-2 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-500/30 text-emerald-300 transition flex flex-col items-center justify-center gap-1 text-center"
+              >
+                <i class="fa-solid fa-mobile-screen-button text-emerald-400 text-sm"></i>
+                <span class="text-[10px] font-semibold leading-tight">Instalar App</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Modal Chave da API Gemini -->
+  <div id="apiKeyModal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-amber-500/30 p-6 rounded-2xl max-w-md w-full shadow-2xl relative">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center text-base border border-amber-500/20">
+            <i class="fa-solid fa-key"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base">Chave Gemini API (Google AI)</h3>
+            <p class="text-xs text-slate-400">Necessária para ler imagens e prints com IA</p>
+          </div>
+        </div>
+        <button onclick="closeApiKeyModal()" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        <div class="p-3 bg-amber-950/20 border border-amber-500/30 rounded-xl text-xs text-amber-200/90 leading-relaxed space-y-1.5">
+          <p>O Google disponibiliza uma cota gratuita oficial para uso de visão computacional da Gemini API.</p>
+          <p>Você pode gerar a sua chave gratuita em menos de 1 minuto em: 
+            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" class="text-amber-400 font-bold underline hover:text-amber-300">
+              Google AI Studio (Clique aqui) <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+            </a>
+          </p>
+        </div>
+
+        <div>
+          <label for="geminiApiKeyInput" class="block text-xs font-semibold text-slate-300 mb-1.5">Cole sua chave (API Key)</label>
+          <input 
+            type="password" 
+            id="geminiApiKeyInput" 
+            placeholder="AIzaSy..." 
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 font-mono transition"
+          >
+          <p class="text-[11px] text-slate-500 mt-1">A chave é guardada apenas no armazenamento local do seu próprio navegador (localStorage).</p>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button type="button" onclick="closeApiKeyModal()" class="px-4 py-2 rounded-xl border border-slate-700 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition">
+            Cancelar
+          </button>
+          <button type="button" onclick="saveApiKey()" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition shadow-lg shadow-amber-950/30">
+            Salvar Chave
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal IA Leitor de Fatura por Print -->
+  <div id="ocrModal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-purple-500/30 p-6 rounded-2xl max-w-xl w-full shadow-2xl relative max-h-[90vh] overflow-y-auto">
+      
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center text-base border border-purple-500/30">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base">Escanear Fatura com IA</h3>
+            <p class="text-xs text-slate-400">Carregue ou cole o print de qualquer fatura ou tabela</p>
+          </div>
+        </div>
+        <button onclick="closeOcrModal()" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+
+
+      <!-- Área de Drop/Upload do Print -->
+      <div class="space-y-4">
+        <label 
+          id="ocrDropZone"
+          for="invoiceFileInput" 
+          class="border-2 border-dashed border-purple-500/40 hover:border-purple-400 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer bg-purple-950/10 hover:bg-purple-950/20 transition group"
+        >
+          <input type="file" id="invoiceFileInput" accept="image/*" class="sr-only" onchange="handleInvoiceImageSelected(event)">
+          <div class="w-12 h-12 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center text-xl mb-3 group-hover:scale-110 transition pointer-events-none">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+          </div>
+          <span class="text-sm font-bold text-slate-200 pointer-events-none">Toque para enviar o print ou arraste a imagem</span>
+          <span class="text-xs text-slate-400 mt-1 pointer-events-none">Aceita PNG, JPG, WEBP ou cole diretamente (Ctrl + V)</span>
+        </label>
+
+        <!-- Preview da Imagem Selecionada -->
+        <div id="ocrPreviewContainer" class="hidden flex-col items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800">
+          <img id="ocrImagePreview" src="" alt="Print da fatura" class="max-h-56 rounded-lg object-contain border border-slate-800 shadow">
+          <span id="ocrImageInfo" class="text-xs text-slate-400">Imagem pronta para análise</span>
+        </div>
+
+        <!-- Indicador de Carregamento / Progresso -->
+        <div id="ocrLoading" class="hidden flex-col items-center justify-center p-6 space-y-3 bg-slate-950/60 rounded-xl border border-purple-500/20">
+          <div class="w-8 h-8 border-3 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+          <p id="ocrLoadingText" class="text-xs text-purple-300 font-semibold animate-pulse">A IA está lendo todas as linhas, valores e parcelas...</p>
+        </div>
+
+        <!-- Mensagem de Status/Erro -->
+        <div id="ocrErrorBox" class="hidden p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs"></div>
+
+        <!-- Botões de Ação -->
+        <div class="flex items-center justify-between gap-3 pt-2">
+          <button type="button" onclick="closeOcrModal()" class="px-4 py-2.5 rounded-xl border border-slate-700 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition">
+            Cancelar
+          </button>
+          
+          <button 
+            id="ocrProcessBtn" 
+            type="button" 
+            disabled
+            onclick="processInvoiceWithGemini()"
+            class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-purple-950/50"
+          >
+            <i class="fa-solid fa-magnifying-glass-dollar"></i> Extrair Gastos com IA
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <main class="max-w-6xl w-full mx-auto px-3.5 sm:px-6 py-5 sm:py-8 flex-1 flex flex-col gap-5 sm:gap-8">
+    
+    <!-- Configuração do Salário -->
+    <section class="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800/80 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl relative overflow-hidden">
+      <div class="absolute -top-12 -right-12 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
+      
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-5 sm:gap-6">
+        <!-- Lado Esquerdo: Textos e Badges -->
+        <div class="space-y-2 max-w-xl">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20 shadow-sm">
+              <i class="fa-solid fa-money-bill-trend-up"></i> Renda Base
+            </span>
+            <!-- Indicador do Saldo Anterior Herdado -->
+            <span id="previousBalanceHeaderBadge" class="hidden items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg border shadow-sm"></span>
+          </div>
+          <h2 class="text-lg sm:text-2xl font-bold text-white tracking-tight">Qual é o seu salário mensal?</h2>
+          <p class="text-xs sm:text-sm text-slate-400 leading-relaxed">
+            Insira sua renda líquida mensal. Recebeu um Pix, bônus ou freela? Use o botão ao lado para somar à renda.
+          </p>
+        </div>
+
+        <!-- Lado Direito: Input Salário e Botão de Entrada Extra alinhados -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-end gap-2.5 sm:gap-3 shrink-0">
+          <!-- Campo de Salário -->
+          <div class="w-full sm:w-64">
+            <label for="salaryInput" class="block text-xs font-semibold text-slate-400 mb-1.5">
+              Salário Mensal (R$)
+            </label>
+            <div class="relative">
+              <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base select-none">R$</span>
+              <input 
+                type="text" 
+                inputmode="decimal" 
+                id="salaryInput" 
+                placeholder="0,00" 
+                class="w-full h-12 bg-slate-950 border border-slate-700/80 rounded-xl pl-11 pr-4 text-lg font-bold text-emerald-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition placeholder-slate-600 shadow-inner"
+              >
+            </div>
+            <div class="h-4 mt-1 hidden sm:block">
+              <span id="salarySavedNotice" class="text-[11px] text-emerald-400 font-medium opacity-0 transition-opacity flex items-center gap-1">
+                <i class="fa-solid fa-check"></i> Salvo automaticamente
+              </span>
+            </div>
+          </div>
+
+          <!-- Botão + Entrada Extra com mesma altura (h-12) e nivelado ao campo -->
+          <div class="w-full sm:w-auto">
+            <div class="hidden sm:block h-[18px] mb-1.5"></div>
+            <button 
+              type="button" 
+              onclick="openIncomeModal()" 
+              class="w-full sm:w-auto h-11 sm:h-12 px-4 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm active:scale-95 whitespace-nowrap"
+              title="Registrar valores extras recebidos como Pix, freelas ou reembolsos"
+            >
+              <i class="fa-solid fa-circle-plus text-emerald-400 text-sm"></i>
+              <span>+ Adicionar Entrada Extra</span>
+            </button>
+            <div class="h-4 mt-1 hidden sm:block"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Barra de Entradas Extras Registradas no Mês -->
+      <div id="incomesListContainer" class="hidden mt-4 pt-4 border-t border-slate-800/80">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+            <i class="fa-solid fa-money-bill-transfer"></i> Entradas Extras Registradas no Mês:
+          </span>
+          <span id="incomesTotalBadge" class="text-xs font-bold text-white bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+            Total Extra: R$ 0,00
+          </span>
+        </div>
+        <div id="incomesChips" class="flex flex-wrap gap-2"></div>
+      </div>
+    </section>
+
+    <!-- Cards de Resumo & Saldo -->
+    <section class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-4">
+      
+      <!-- Card: Salário Total & Saldo Anterior -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between shadow-lg">
+        <div class="flex items-center justify-between text-slate-400 mb-1.5 sm:mb-2">
+          <span class="text-[11px] sm:text-xs font-medium uppercase tracking-wider">Renda Total</span>
+          <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-hand-holding-dollar"></i>
+          </div>
+        </div>
+        <div>
+          <div id="cardSalaryValue" class="text-base sm:text-xl font-extrabold text-white truncate">R$ 0,00</div>
+          <p id="cardIncomeExtrasSub" class="text-[10px] sm:text-[11px] text-emerald-400 mt-0.5 hidden items-center gap-1">
+            <i class="fa-solid fa-plus-circle text-[9px]"></i> <span id="cardIncomeExtrasText">R$ 0,00 extras</span>
+          </p>
+          <p id="cardPreviousBalanceSub" class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 flex items-center gap-1 flex-wrap">
+            <span>Mês ant.:</span> <span id="cardPrevBalValue" class="font-bold text-slate-300">R$ 0,00</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Card: Gastos Fixos -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between shadow-lg">
+        <div class="flex items-center justify-between text-slate-400 mb-1.5 sm:mb-2">
+          <span class="text-[11px] sm:text-xs font-medium uppercase tracking-wider">Fixas</span>
+          <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-repeat"></i>
+          </div>
+        </div>
+        <div>
+          <div id="cardFixedValue" class="text-base sm:text-xl font-extrabold text-indigo-300 truncate">R$ 0,00</div>
+          <p id="cardFixedSub" class="text-[10px] sm:text-[11px] text-slate-500 mt-1 truncate">0 itens</p>
+        </div>
+      </div>
+
+      <!-- Card: Gastos Únicos -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between shadow-lg">
+        <div class="flex items-center justify-between text-slate-400 mb-1.5 sm:mb-2">
+          <span class="text-[11px] sm:text-xs font-medium uppercase tracking-wider">Únicas</span>
+          <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-bolt"></i>
+          </div>
+        </div>
+        <div>
+          <div id="cardOneTimeValue" class="text-base sm:text-xl font-extrabold text-amber-300 truncate">R$ 0,00</div>
+          <p id="cardOneTimeSub" class="text-[10px] sm:text-[11px] text-slate-500 mt-1 truncate">0 itens</p>
+        </div>
+      </div>
+
+      <!-- Card: Cartão de Crédito -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between shadow-lg">
+        <div class="flex items-center justify-between text-slate-400 mb-1.5 sm:mb-2">
+          <span class="text-[11px] sm:text-xs font-medium uppercase tracking-wider">Cartão</span>
+          <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-credit-card"></i>
+          </div>
+        </div>
+        <div>
+          <div id="cardCreditValue" class="text-base sm:text-xl font-extrabold text-purple-300 truncate">R$ 0,00</div>
+          <p id="cardCreditSub" class="text-[10px] sm:text-[11px] text-slate-500 mt-1 truncate">Fatura atual</p>
+        </div>
+      </div>
+
+      <!-- Card: Saldo Restante -->
+      <div id="balanceCard" class="bg-slate-900 border-2 rounded-2xl p-4 flex flex-col justify-between shadow-xl relative overflow-hidden transition-all duration-300 col-span-2 lg:col-span-1">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Saldo Restante</span>
+          <span id="balanceBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase flex items-center gap-1">
+            Neutro
+          </span>
+        </div>
+        
+        <div class="my-0.5">
+          <div id="cardBalanceValue" class="text-2xl font-black tracking-tight">R$ 0,00</div>
+          <p id="balanceTip" class="text-[10px] mt-0.5 font-medium">Digite o salário</p>
+        </div>
+
+        <div class="mt-2 pt-1 border-t border-slate-800/80">
+          <div class="flex justify-between items-center text-[10px] text-slate-400 mb-1">
+            <span>Comprometido</span>
+            <span id="spentPercent" class="font-bold text-slate-300">0%</span>
+          </div>
+          <div class="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
+            <div id="spentProgressBar" class="h-full bg-emerald-500 transition-all duration-500 rounded-full" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Navegação por Abas Principais (Desktop) -->
+    <div class="hidden sm:flex border-b border-slate-800 gap-2 sm:gap-4 overflow-x-auto">
+      <button 
+        onclick="switchTab('general')" 
+        id="tabBtnGeneral" 
+        class="pb-3 px-4 font-bold text-sm sm:text-base border-b-2 border-emerald-500 text-emerald-400 flex items-center gap-2 transition whitespace-nowrap"
+      >
+        <i class="fa-solid fa-receipt"></i>
+        Despesas Mensais
+      </button>
+
+      <button 
+        onclick="switchTab('card')" 
+        id="tabBtnCard" 
+        class="pb-3 px-4 font-bold text-sm sm:text-base border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition whitespace-nowrap"
+      >
+        <i class="fa-solid fa-credit-card"></i>
+        Cartão de Crédito
+      </button>
+
+      <button 
+        onclick="switchTab('analytics')" 
+        id="tabBtnAnalytics" 
+        class="pb-3 px-4 font-bold text-sm sm:text-base border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition whitespace-nowrap"
+      >
+        <i class="fa-solid fa-chart-pie"></i>
+        Gráficos & Metas
+      </button>
+
+      <button 
+        onclick="switchTab('history')" 
+        id="tabBtnHistory" 
+        class="pb-3 px-4 font-bold text-sm sm:text-base border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition whitespace-nowrap"
+      >
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        Histórico dos Meses
+      </button>
+    </div>
+
+    <!-- ABA 1: DESPESAS MENSAIS (FIXAS E ÚNICAS) -->
+    <div id="tabContentGeneral" class="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+      <!-- Formulário -->
+      <section class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4 sm:space-y-5 lg:sticky lg:top-24">
+        <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-plus"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base">Nova Despesa Geral</h3>
+            <p class="text-xs text-slate-400">Luz, telefone, água, mercado, combustível, etc.</p>
+          </div>
+        </div>
+
+        <form id="expenseForm" onsubmit="handleFormSubmit(event)" class="space-y-4">
+          <!-- Nome da despesa -->
+          <div>
+            <label for="expenseTitle" class="block text-xs font-semibold text-slate-300 mb-1.5">
+              Nome do Gasto <span class="text-rose-400">*</span>
+            </label>
+            <input 
+              type="text" 
+              id="expenseTitle" 
+              required
+              placeholder="Ex: Conta de Luz, Água, Internet, Combustível..." 
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+            >
+          </div>
+
+          <!-- Valor e Data -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="expenseAmount" class="block text-xs font-semibold text-slate-300 mb-1.5">
+                Valor (R$) <span class="text-rose-400">*</span>
+              </label>
+              <div class="relative">
+                <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-semibold select-none">R$</span>
+                <input 
+                  type="text" 
+                  inputmode="decimal"
+                  id="expenseAmount" 
+                  required
+                  placeholder="0,00" 
+                  class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 font-semibold focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                >
+              </div>
+            </div>
+
+            <div>
+              <label for="expenseDate" class="block text-xs font-semibold text-slate-300 mb-1.5">
+                Data de Pagamento
+              </label>
+              <div class="relative cursor-pointer" onclick="openDatePicker('expenseDate')">
+                <input 
+                  type="date" 
+                  id="expenseDate" 
+                  onclick="openDatePicker('expenseDate')"
+                  class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-3 pr-8 py-2.5 text-xs text-slate-200 cursor-pointer focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                >
+                <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-400 transition pointer-events-none text-xs">
+                  <i class="fa-regular fa-calendar-days"></i>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Categoria da Despesa -->
+          <div>
+            <label for="expenseCategory" class="block text-xs font-semibold text-slate-300 mb-1.5">
+              Categoria
+            </label>
+            <select 
+              id="expenseCategory" 
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-200 focus:outline-none focus:border-emerald-500 transition"
+            >
+              <option value="moradia">🏠 Moradia & Contas (Luz, Água, Net)</option>
+              <option value="alimentacao">🍔 Alimentação & Supermercado</option>
+              <option value="transporte">🚗 Transporte & Combustível</option>
+              <option value="compras">🛍️ Compras & Pessoal</option>
+              <option value="lazer">🎮 Lazer & Assinaturas</option>
+              <option value="saude">🩺 Saúde & Farmácia</option>
+              <option value="outros">📦 Outros Gastos</option>
+            </select>
+          </div>
+
+          <!-- Tipo de Gasto -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-2">
+              Tipo da Conta <span class="text-rose-400">*</span>
+            </label>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="relative flex items-center justify-center p-3 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-950/20 transition group">
+                <input type="radio" name="expenseType" value="fixed" checked class="sr-only">
+                <div class="flex items-center gap-2 text-xs font-semibold text-slate-300 group-hover:text-white">
+                  <i class="fa-solid fa-repeat text-indigo-400"></i>
+                  <span>Fixo Mensal</span>
+                </div>
+              </label>
+
+              <label class="relative flex items-center justify-center p-3 rounded-xl border border-slate-800 bg-slate-950 cursor-pointer has-[:checked]:border-amber-500 has-[:checked]:bg-amber-950/20 transition group">
+                <input type="radio" name="expenseType" value="one-time" class="sr-only">
+                <div class="flex items-center gap-2 text-xs font-semibold text-slate-300 group-hover:text-white">
+                  <i class="fa-solid fa-bolt text-amber-400"></i>
+                  <span>Único / Avulso</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Botão Submeter -->
+          <button 
+            type="submit" 
+            class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-bold rounded-xl shadow-lg shadow-emerald-950/40 transition flex items-center justify-center gap-2 text-sm"
+          >
+            <i class="fa-solid fa-plus-circle"></i>
+            Adicionar Despesa
+          </button>
+        </form>
+      </section>
+
+      <!-- Tabela em Linhas -->
+      <section class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col min-h-[460px]">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4 mb-3">
+          <div>
+            <h3 class="font-bold text-white text-base flex items-center gap-2">
+              <i class="fa-solid fa-list text-slate-400"></i>
+              Linhas de Gastos
+            </h3>
+            <p id="countSummary" class="text-xs text-slate-400">0 contas registradas</p>
+          </div>
+
+          <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold self-start sm:self-auto">
+            <button onclick="setFilter('all')" id="filterAll" class="px-3 py-1.5 rounded-lg bg-slate-800 text-white transition">Todos</button>
+            <button onclick="setFilter('fixed')" id="filterFixed" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Fixos</button>
+            <button onclick="setFilter('one-time')" id="filterOneTime" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Únicos</button>
+          </div>
+        </div>
+
+        <!-- Barra de Busca Rápida e Ordenação de Despesas -->
+        <div class="mb-3 flex flex-col sm:flex-row gap-2">
+          <div class="relative flex-1">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+            <input 
+              type="text" 
+              id="generalSearchInput" 
+              oninput="renderExpensesList()" 
+              placeholder="Buscar despesa pelo nome (ex: Luz, Internet)..." 
+              class="w-full bg-slate-950 border border-slate-800/90 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+            >
+          </div>
+          <select 
+            id="generalSortSelect" 
+            onchange="renderExpensesList()" 
+            class="bg-slate-950 border border-slate-800/90 rounded-xl px-3 py-2 text-xs font-semibold text-slate-300 focus:outline-none focus:border-emerald-500"
+          >
+            <option value="recent">Ordenar: Padrão</option>
+            <option value="amount_desc">Maior Valor</option>
+            <option value="amount_asc">Menor Valor</option>
+            <option value="pending">Pendentes Primeiro</option>
+          </select>
+        </div>
+
+        <div class="flex-1 overflow-y-auto max-h-[560px] pr-0.5 sm:pr-1 space-y-2.5" id="expensesContainer"></div>
+
+        <div id="emptyState" class="hidden flex-1 flex-col items-center justify-center py-12 text-center text-slate-500">
+          <div class="w-14 h-14 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center text-2xl text-slate-600 mb-3">
+            <i class="fa-solid fa-receipt"></i>
+          </div>
+          <h4 class="text-slate-300 font-semibold text-sm">Nenhuma despesa mensal encontrada</h4>
+          <p class="text-xs text-slate-500 max-w-xs mt-1">Insira suas contas como luz, internet ou mercado ao lado.</p>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
+          <div class="flex items-center gap-3">
+            <span>Total filtrado: <strong id="totalFilteredText" class="text-slate-200">R$ 0,00</strong></span>
+            <span class="text-slate-600">•</span>
+            <span id="paidSummaryGeneral" class="text-emerald-400 font-medium">0 pagas</span>
+          </div>
+          <button onclick="promptClearAll('expenses')" class="hover:text-rose-400 transition flex items-center gap-1.5 text-slate-500">
+            <i class="fa-regular fa-trash-can"></i> Limpar despesas gerais
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <!-- ABA 2: CARTÃO DE CRÉDITO -->
+    <div id="tabContentCard" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+      <!-- Formulário do Cartão -->
+      <section class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4 sm:space-y-5 lg:sticky lg:top-24">
+        <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
+          <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-credit-card"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base">Nova Compra no Cartão</h3>
+            <p class="text-xs text-slate-400">Lançamento de compras à vista ou parceladas</p>
+          </div>
+        </div>
+
+        <form id="cardExpenseForm" onsubmit="handleCardFormSubmit(event)" class="space-y-4">
+          <!-- O que comprou -->
+          <div>
+            <label for="cardItemTitle" class="block text-xs font-semibold text-slate-300 mb-1.5">
+              O que você comprou? <span class="text-rose-400">*</span>
+            </label>
+            <input 
+              type="text" 
+              id="cardItemTitle" 
+              required
+              placeholder="Ex: Tênis novo, Supermercado, Peça do carro..." 
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition"
+            >
+          </div>
+
+          <!-- Categoria da Compra no Cartão -->
+          <div>
+            <label for="cardItemCategory" class="block text-xs font-semibold text-slate-300 mb-1.5">
+              Categoria da Compra
+            </label>
+            <select 
+              id="cardItemCategory" 
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-200 focus:outline-none focus:border-purple-500 transition"
+            >
+              <option value="compras">🛍️ Compras & Vestuário (Shopee, Shein, ML)</option>
+              <option value="alimentacao">🍔 Alimentação & Delivery</option>
+              <option value="transporte">🚗 Transporte & Uber</option>
+              <option value="moradia">🏠 Casa, Móveis & Serviços</option>
+              <option value="lazer">🎮 Lazer, Viagens & Assinaturas</option>
+              <option value="saude">🩺 Saúde, Suplementos & Farmácia</option>
+              <option value="outros">📦 Outros</option>
+            </select>
+          </div>
+
+          <!-- Checkbox Parcelamento -->
+          <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 flex items-center justify-between">
+            <div>
+              <span class="text-xs font-bold text-slate-200">Compra Parcelada?</span>
+              <p class="text-[11px] text-slate-400">Marque se dividiu em 2x ou mais</p>
+            </div>
+            <input 
+              type="checkbox" 
+              id="isInstallmentCheckbox" 
+              onchange="toggleInstallmentFields()"
+              class="w-5 h-5 accent-purple-500 rounded cursor-pointer"
+            >
+          </div>
+
+          <!-- Campos para compra À VISTA -->
+          <div id="oneTimeCardFields" class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="cardTotalAmount" class="block text-xs font-semibold text-slate-300 mb-1.5">
+                Valor Total (R$) <span class="text-rose-400">*</span>
+              </label>
+              <div class="relative">
+                <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-semibold select-none">R$</span>
+                <input 
+                  type="text" 
+                  inputmode="decimal"
+                  id="cardTotalAmount" 
+                  placeholder="0,00" 
+                  class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 font-semibold focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition"
+                >
+              </div>
+            </div>
+
+            <div>
+              <label for="cardDate" class="block text-xs font-semibold text-slate-300 mb-1.5">
+                Data Fatura
+              </label>
+              <div class="relative cursor-pointer" onclick="openDatePicker('cardDate')">
+                <input 
+                  type="date" 
+                  id="cardDate" 
+                  onclick="openDatePicker('cardDate')"
+                  class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-3 pr-8 py-2.5 text-xs text-slate-200 cursor-pointer focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition"
+                >
+                <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-400 transition pointer-events-none text-xs">
+                  <i class="fa-regular fa-calendar-days"></i>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Campos para compra PARCELADA (Oculto inicialmente) -->
+          <div id="installmentCardFields" class="hidden space-y-3">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label for="cardInstallmentValue" class="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Valor Parcela (R$) <span class="text-rose-400">*</span>
+                </label>
+                <div class="relative">
+                  <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-semibold select-none">R$</span>
+                  <input 
+                    type="text" 
+                    inputmode="decimal"
+                    id="cardInstallmentValue" 
+                    placeholder="0,00" 
+                    oninput="calcInstallmentTotal()"
+                    class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 font-semibold focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition"
+                  >
+                </div>
+              </div>
+
+              <div>
+                <label for="cardInstallmentCount" class="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Nº de Parcelas <span class="text-rose-400">*</span>
+                </label>
+                <input 
+                  type="number" 
+                  min="2" 
+                  max="48" 
+                  value="2" 
+                  id="cardInstallmentCount" 
+                  oninput="calcInstallmentTotal()"
+                  class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-100 font-semibold focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition"
+                >
+              </div>
+            </div>
+
+            <!-- Resumo do cálculo parcelado -->
+            <div class="p-3 bg-purple-950/20 border border-purple-800/40 rounded-xl flex items-center justify-between text-xs">
+              <span class="text-slate-400">Total da compra:</span>
+              <strong id="installmentTotalPreview" class="text-purple-300 font-bold">R$ 0,00</strong>
+            </div>
+
+            <div>
+              <label for="cardInstallmentDate" class="block text-xs font-semibold text-slate-300 mb-1.5">
+                Data do Pagamento/Vencimento
+              </label>
+              <div class="relative cursor-pointer" onclick="openDatePicker('cardInstallmentDate')">
+                <input 
+                  type="date" 
+                  id="cardInstallmentDate" 
+                  onclick="openDatePicker('cardInstallmentDate')"
+                  class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-3 pr-9 py-2.5 text-xs text-slate-200 cursor-pointer focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition"
+                >
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-400 transition pointer-events-none text-xs">
+                  <i class="fa-regular fa-calendar-days"></i>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <button 
+            type="submit" 
+            class="w-full py-3 px-4 bg-purple-600 hover:bg-purple-500 active:scale-[0.99] text-white font-bold rounded-xl shadow-lg shadow-purple-950/40 transition flex items-center justify-center gap-2 text-sm"
+          >
+            <i class="fa-solid fa-credit-card"></i>
+            Adicionar Compra ao Cartão
+          </button>
+        </form>
+      </section>
+
+      <!-- Lista de Compras do Cartão -->
+      <section class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col min-h-[460px]">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4 mb-3">
+          <div>
+            <h3 class="font-bold text-white text-base flex items-center gap-2">
+              <i class="fa-solid fa-receipt text-purple-400"></i>
+              Extrato do Cartão de Crédito
+            </h3>
+            <p id="cardCountSummary" class="text-xs text-slate-400">0 compras registradas</p>
+          </div>
+          
+          <div class="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
+            <!-- Filtro de Compras do Cartão -->
+            <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+              <button onclick="setCardFilter('all')" id="cardFilterAll" class="px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-800 text-white transition">Todos</button>
+              <button onclick="setCardFilter('fixed')" id="cardFilterFixed" class="px-2.5 sm:px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Fixos</button>
+              <button onclick="setCardFilter('one-time')" id="cardFilterOneTime" class="px-2.5 sm:px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Únicos</button>
+            </div>
+
+            <div class="text-right">
+              <span class="text-[10px] uppercase font-bold text-slate-400 block" id="cardMonthlyHeaderLabel">Fatura Total deste Mês</span>
+              <div id="cardMonthlyTotalHeader" class="text-sm sm:text-base font-extrabold text-purple-300">R$ 0,00</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra de Busca Rápida e Ordenação do Cartão -->
+        <div class="mb-3 flex flex-col sm:flex-row gap-2">
+          <div class="relative flex-1">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+            <input 
+              type="text" 
+              id="cardSearchInput" 
+              oninput="renderCardExpensesList()" 
+              placeholder="Filtrar compra na fatura (ex: Uber, Shopee, Mercado Livre)..." 
+              class="w-full bg-slate-950 border border-slate-800/90 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500 transition"
+            >
+          </div>
+          <select 
+            id="cardSortSelect" 
+            onchange="renderCardExpensesList()" 
+            class="bg-slate-950 border border-slate-800/90 rounded-xl px-3 py-2 text-xs font-semibold text-slate-300 focus:outline-none focus:border-purple-500"
+          >
+            <option value="recent">Ordenar: Padrão</option>
+            <option value="amount_desc">Maior Valor</option>
+            <option value="amount_asc">Menor Valor</option>
+            <option value="pending">Não Conferidos</option>
+          </select>
+        </div>
+
+        <div class="flex-1 overflow-y-auto max-h-[560px] pr-0.5 sm:pr-1 space-y-2.5" id="cardExpensesContainer"></div>
+
+        <div id="cardEmptyState" class="hidden flex-1 flex-col items-center justify-center py-12 text-center text-slate-500">
+          <div class="w-14 h-14 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center text-2xl text-slate-600 mb-3">
+            <i class="fa-solid fa-credit-card"></i>
+          </div>
+          <h4 class="text-slate-300 font-semibold text-sm">Nenhuma compra encontrada</h4>
+          <p class="text-xs text-slate-500 max-w-xs mt-1">Lance compras à vista ou parceladas no formulário ao lado.</p>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
+          <span>O valor da fatura é <strong>automaticamente subtraído do salário</strong>.</span>
+          <button onclick="promptClearAll('card')" class="hover:text-rose-400 transition flex items-center gap-1.5 text-slate-500">
+            <i class="fa-regular fa-trash-can"></i> Limpar fatura do cartão
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <!-- ABA 3: GRÁFICOS & METAS DE ORÇAMENTO -->
+    <div id="tabContentAnalytics" class="hidden flex-col gap-6 sm:gap-8">
+      
+      <!-- Seção de Meta / Teto de Gastos Mensal -->
+      <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6">
+          <div class="space-y-1 max-w-xl">
+            <span class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+              <i class="fa-solid fa-bullseye"></i> Meta & Orçamento do Mês
+            </span>
+            <h3 class="text-lg font-bold text-white">Teto Máximo de Gastos Planejado</h3>
+            <p class="text-xs text-slate-400">Defina quanto você planeja gastar no máximo neste mês (somando contas e cartão) para receber alertas visuais.</p>
+          </div>
+
+          <div class="w-full md:w-64 shrink-0">
+            <label for="budgetLimitInput" class="block text-xs font-semibold text-slate-400 mb-1.5">Meta / Limite Mensal (R$)</label>
+            <div class="relative">
+              <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm select-none">R$</span>
+              <input 
+                type="text" 
+                inputmode="decimal" 
+                id="budgetLimitInput" 
+                oninput="handleBudgetLimitInput(event)"
+                placeholder="Ex: 3.000,00" 
+                class="w-full h-11 bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 text-sm font-bold text-amber-300 focus:outline-none focus:border-amber-500 transition"
+              >
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra de Progresso do Teto de Gastos -->
+        <div class="mt-6 pt-5 border-t border-slate-800/80">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div class="flex items-center gap-2">
+              <span id="budgetStatusBadge" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400">
+                Sem meta definida
+              </span>
+              <span id="budgetStatusText" class="text-xs text-slate-400">Digite um valor acima para monitorar seu limite</span>
+            </div>
+            <div class="text-xs font-bold text-slate-200">
+              Gasto Atual: <span id="budgetCurrentSpent" class="text-white">R$ 0,00</span> / <span id="budgetTargetDisplay" class="text-amber-300">R$ 0,00</span>
+            </div>
+          </div>
+          <div class="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800 p-0.5">
+            <div id="budgetProgressBar" class="h-full bg-emerald-500 transition-all duration-500 rounded-full" style="width: 0%"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Grid de Gráficos Interativos -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
+        <!-- Gráfico 1: Distribuição por Categoria (Rosca) -->
+        <div class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col justify-between">
+          <div>
+            <h3 class="font-bold text-white text-base flex items-center gap-2 mb-1">
+              <i class="fa-solid fa-chart-pie text-amber-400"></i>
+              Gastos por Categoria
+            </h3>
+            <p class="text-xs text-slate-400 mb-4">Soma das Despesas Mensais + Cartão de Crédito neste mês</p>
+          </div>
+
+          <div class="relative h-64 flex items-center justify-center">
+            <canvas id="categoryDonutChart"></canvas>
+          </div>
+
+          <!-- Lista detalhada por categoria -->
+          <div id="categoryBreakdownList" class="mt-6 pt-4 border-t border-slate-800 space-y-2 text-xs"></div>
+        </div>
+
+        <!-- Gráfico 2: Evolução Mensal (Barras) -->
+        <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col justify-between">
+          <div>
+            <h3 class="font-bold text-white text-base flex items-center gap-2 mb-1">
+              <i class="fa-solid fa-chart-column text-emerald-400"></i>
+              Comparativo: Renda vs. Gastos por Mês
+            </h3>
+            <p class="text-xs text-slate-400 mb-4">Acompanhe a evolução da sua renda total, despesas e sobra nos meses registrados</p>
+          </div>
+
+          <div class="relative h-80 w-full">
+            <canvas id="monthlyEvolutionChart"></canvas>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+            <span><i class="fa-solid fa-circle-info text-emerald-400 mr-1"></i> Os gráficos atualizam automaticamente conforme você lança gastos.</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ABA 4: HISTÓRICO DOS MESES -->
+    <div id="tabContentHistory" class="hidden flex-col gap-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 rounded-2xl p-5">
+        <div>
+          <h3 class="font-bold text-white text-lg flex items-center gap-2">
+            <i class="fa-solid fa-clock-rotate-left text-emerald-400"></i>
+            Histórico e Balanço Mensal
+          </h3>
+          <p class="text-xs text-slate-400 mt-1">Consulte o balanço de cada mês, status final e extrato detalhado dos períodos gravados.</p>
+        </div>
+        <div class="text-xs text-slate-400">
+          Total de meses salvos: <strong id="historyCountBadge" class="text-slate-200">0</strong>
+        </div>
+      </div>
+
+      <div id="historyGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Renderizado dinamicamente via JS -->
+      </div>
+
+      <div id="historyEmptyState" class="hidden flex-col items-center justify-center py-16 text-center text-slate-500 bg-slate-900/40 border border-slate-800 rounded-2xl">
+        <div class="w-14 h-14 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center text-2xl text-slate-600 mb-3">
+          <i class="fa-solid fa-calendar-xmark"></i>
+        </div>
+        <h4 class="text-slate-300 font-semibold text-sm">Nenhum histórico registrado ainda</h4>
+        <p class="text-xs text-slate-500 max-w-sm mt-1">Ao final de cada mês, clique em <strong>"Fechar & Avançar Mês"</strong> no topo para salvar o registro consolidado e preparar o mês seguinte.</p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Barra de Navegação Inferior Fixa para Celular (Mobile App Bar) -->
+  <nav class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-2xl">
+    <button onclick="switchTab('general')" id="mobTabGeneral" class="flex flex-col items-center justify-center py-1 px-3 rounded-xl text-emerald-400 transition">
+      <i class="fa-solid fa-receipt text-base"></i>
+      <span class="text-[10px] font-bold mt-0.5">Contas</span>
+    </button>
+    <button onclick="switchTab('card')" id="mobTabCard" class="flex flex-col items-center justify-center py-1 px-3 rounded-xl text-slate-400 transition">
+      <i class="fa-solid fa-credit-card text-base"></i>
+      <span class="text-[10px] font-bold mt-0.5">Cartão</span>
+    </button>
+    <button onclick="switchTab('analytics')" id="mobTabAnalytics" class="flex flex-col items-center justify-center py-1 px-3 rounded-xl text-slate-400 transition">
+      <i class="fa-solid fa-chart-pie text-base"></i>
+      <span class="text-[10px] font-bold mt-0.5">Gráficos</span>
+    </button>
+    <button onclick="switchTab('history')" id="mobTabHistory" class="flex flex-col items-center justify-center py-1 px-3 rounded-xl text-slate-400 transition">
+      <i class="fa-solid fa-clock-rotate-left text-base"></i>
+      <span class="text-[10px] font-bold mt-0.5">Histórico</span>
+    </button>
+  </nav>
+
+  <footer class="hidden sm:block border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-600">
+    <p>Controle de Gastos Mensais • Aplicativo Web Progressivo (PWA) 100% Offline • Salvo no seu dispositivo</p>
+  </footer>
+
+  <!-- Lógica da Aplicação e Engine PWA -->
+  <script src="./js/state.js"></script>
+  <script src="./js/services/storageService.js"></script>
+  <script src="./js/services/geminiService.js"></script>
+  <script src="./js/services/excelService.js"></script>
+  <script src="./js/ui/renderSummary.js"></script>
+  <script src="./js/ui/renderExpenses.js"></script>
+  <script src="./js/ui/renderCards.js"></script>
+  <script src="./js/ui/renderAnalytics.js"></script>
+  <script src="./js/ui/renderHistory.js"></script>
+  <script src="./js/app.js"></script>
+
+</body>
+</html>

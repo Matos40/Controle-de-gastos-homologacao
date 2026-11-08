@@ -1,0 +1,43 @@
+body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Estilização para o calendário nativo escuro */
+    input[type="date"] {
+      color-scheme: dark;
+      cursor: pointer;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      cursor: pointer;
+      opacity: 0.85;
+      filter: invert(0.85) sepia(10%) saturate(300%) hue-rotate(180deg);
+      transition: transform 0.15s ease, opacity 0.15s ease;
+      padding: 4px;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator:hover {
+      transform: scale(1.15);
+      opacity: 1;
+    }
+
+    /* Ajustes quando instalado em tela cheia (Standalone PWA) */
+    @media all and (display-mode: standalone) {
+      header {
+        padding-top: env(safe-area-inset-top);
+      }
+    }
