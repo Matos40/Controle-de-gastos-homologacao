@@ -1,8 +1,8 @@
 /* Estado compartilhado da aplicação. Scripts clássicos são carregados em ordem no index.html. */
     // Chaves de armazenamento
-    const STORAGE_DATABASE_KEY = 'controle_gastos_multimonth_v3';
-    const STORAGE_GEMINI_KEY = 'gemini_user_api_key';
-    const STORAGE_PIN_KEY = 'controle_gastos_pin_lock';
+    const STORAGE_DATABASE_KEY = 'homolog_controle_gastos_multimonth_v3';
+    const STORAGE_GEMINI_KEY = 'homolog_gemini_user_api_key';
+    const STORAGE_PIN_KEY = 'homolog_controle_gastos_pin_lock';
     const DEFAULT_API_KEY = '';
     let base64InvoiceImage = null;
     let isPrivacyMode = false;
