@@ -18,6 +18,7 @@
       compras:     { label: 'Compras',          icon: '🛍️', color: '#a855f7', badgeClass: 'text-purple-300 bg-purple-950/60 border-purple-500/30' },
       lazer:       { label: 'Lazer',            icon: '🎮', color: '#ec4899', badgeClass: 'text-pink-300 bg-pink-950/60 border-pink-500/30' },
       saude:       { label: 'Saúde',            icon: '🩺', color: '#06b6d4', badgeClass: 'text-cyan-300 bg-cyan-950/60 border-cyan-500/30' },
+      investimentos: { label: 'Investimentos', icon: '📈', color: '#14b8a6', badgeClass: 'text-teal-300 bg-teal-950/60 border-teal-500/30' },
       outros:      { label: 'Outros',           icon: '📦', color: '#64748b', badgeClass: 'text-slate-300 bg-slate-800 border-slate-700' }
     };
 
