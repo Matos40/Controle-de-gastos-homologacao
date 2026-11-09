@@ -6,7 +6,7 @@
   const PIN_KEY = 'controle_gastos_pin_lock';
   const hadDatabaseBeforeStartup = localStorage.getItem(DB_KEY) !== null;
   const steps = [
-    { icon: 'fa-wallet', title: 'Bem-vindo ao Controle de Gastos 2.0', body: 'Organize seu dinheiro, acompanhe seus gastos e planeje seus próximos meses com tranquilidade.' },
+    { icon: 'fa-wallet', title: 'Bem-vindo ao Raytech CG', body: 'Organize seu dinheiro, acompanhe seus gastos e planeje seus próximos meses com tranquilidade.' },
     { icon: 'fa-money-bill-wave', title: 'Comece pelas receitas', body: 'Na aba Contas, informe seu salário mensal e registre outras receitas. Você pode fazer isso depois.' },
     { icon: 'fa-receipt', title: 'Cadastre suas despesas', body: 'Adicione contas fixas e despesas do dia a dia. Os totais e o saldo são calculados a partir dos lançamentos.' },
     { icon: 'fa-credit-card', title: 'Acompanhe as parcelas', body: 'Na aba Cartão, registre compras parceladas e acompanhe cada parcela nos meses correspondentes.' },
@@ -77,7 +77,7 @@
     modal.innerHTML = '<section class="w-full max-w-md rounded-2xl border border-emerald-500/30 bg-slate-900 text-white shadow-2xl p-5 sm:p-7 space-y-5">'
       + '<div class="flex items-center justify-between gap-3"><span id="onboardingProgress" class="text-xs font-semibold text-emerald-300"></span><button type="button" id="onboardingClose" aria-label="Fechar tutorial" class="text-slate-300 hover:text-white p-2 rounded-lg focus:ring-2 focus:ring-emerald-300"><i class="fa-solid fa-xmark"></i></button></div>'
       + '<div class="flex gap-1.5" id="onboardingDots" aria-hidden="true"></div>'
-      + '<div class="text-center space-y-4 py-4"><div class="mx-auto w-20 h-20 flex items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400"><i id="onboardingIcon" class="fa-solid fa-wallet text-4xl"></i></div><h2 id="onboardingTitle" class="text-xl font-bold"></h2><p id="onboardingBody" class="text-sm text-slate-300 leading-relaxed"></p></div>'
+      + '<div class="text-center space-y-4 py-4"><div class="mx-auto w-20 h-20 flex items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400"><img id="onboardingBrandLogo" src="./raytech-icon-192.png" alt="Raytech CG" class="w-16 h-16 object-contain hidden"><i id="onboardingIcon" class="fa-solid fa-wallet text-4xl"></i></div><h2 id="onboardingTitle" class="text-xl font-bold"></h2><p id="onboardingBody" class="text-sm text-slate-300 leading-relaxed"></p></div>'
       + '<div class="flex items-center gap-2"><button type="button" id="onboardingSkip" class="text-sm text-slate-300 hover:text-white px-3 py-3">Pular</button><button type="button" id="onboardingBack" class="rounded-lg border border-slate-700 px-3 py-3 text-sm">Voltar</button><button type="button" id="onboardingNext" class="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-3 font-bold text-sm">Próximo</button></div>'
       + '</section>';
     document.body.appendChild(modal);
@@ -100,7 +100,10 @@
     document.getElementById('onboardingProgress').textContent = 'Etapa ' + (step + 1) + ' de ' + steps.length;
     document.getElementById('onboardingTitle').textContent = current.title;
     document.getElementById('onboardingBody').textContent = current.body;
-    document.getElementById('onboardingIcon').className = 'fa-solid ' + current.icon + ' text-4xl';
+    const brandLogo = document.getElementById('onboardingBrandLogo');
+    const stepIcon = document.getElementById('onboardingIcon');
+    brandLogo.classList.toggle('hidden', step !== 0);
+    stepIcon.className = 'fa-solid ' + current.icon + ' text-4xl' + (step === 0 ? ' hidden' : '');
     document.getElementById('onboardingDots').innerHTML = steps.map((_, i) => '<span class="h-1.5 flex-1 rounded-full ' + (i <= step ? 'bg-emerald-500' : 'bg-slate-700') + '"></span>').join('');
     document.getElementById('onboardingBack').disabled = step === 0;
     document.getElementById('onboardingBack').classList.toggle('opacity-40', step === 0);

@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Controle de Gastos Mensais</title>
+  <title>Raytech CG | Controle de Gastos</title>
   
   <!-- Metadata PWA / Mobile Nativo -->
   <meta name="theme-color" content="#020617">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Meus Gastos">
-  <meta name="application-name" content="Controle Financeiro">
+  <meta name="apple-mobile-web-app-title" content="Raytech CG">
+  <meta name="application-name" content="Raytech CG">
   <meta name="description" content="Controle financeiro mensal organizado com salário, gastos fixos, cartão e leitor IA.">
 
   <!-- Ícone SVG Embutido para Favoritos e Apple Touch Icon -->
-  <link id="faviconLink" rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='128' fill='%23020617'/%3E%3Crect x='24' y='24' width='464' height='464' rx='108' fill='%230f172a' stroke='%2310b981' stroke-width='16'/%3E%3Cpath d='M384 160H128c-17.7 0-32-14.3-32-32s14.3-32 32-32h256c8.8 0 16-7.2 16-16s-7.2-16-16-16H128C92.7 64 64 92.7 64 128v256c0 35.3 28.7 64 64 64h256c35.3 0 64-28.7 64-64V224c0-35.3-28.7-64-64-64zm-32 168c-22.1 0-40-17.9-40-40s17.9-40 40-40 40 17.9 40 40-17.9 40-40 40z' fill='%2310b981'/%3E%3C/svg%3E">
-  <link id="appleTouchIconLink" rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='120' fill='%23020617'/%3E%3Cpath d='M384 160H128c-17.7 0-32-14.3-32-32s14.3-32 32-32h256c8.8 0 16-7.2 16-16s-7.2-16-16-16H128C92.7 64 64 92.7 64 128v256c0 35.3 28.7 64 64 64h256c35.3 0 64-28.7 64-64V224c0-35.3-28.7-64-64-64zm-32 168c-22.1 0-40-17.9-40-40s17.9-40 40-40 40 17.9 40 40-17.9 40-40 40z' fill='%2310b981'/%3E%3C/svg%3E">
+  <link id="faviconLink" rel="icon" type="image/x-icon" href="./favicon.ico">
+  <link id="appleTouchIconLink" rel="apple-touch-icon" href="./raytech-icon-192.png">
   <!-- Link dinâmico para o Web App Manifest -->
   <link id="pwaManifestLink" rel="manifest" href="./manifest.json">
 
@@ -460,13 +460,13 @@
       <div class="flex items-center justify-between gap-2">
         <!-- Logo e Título -->
         <div class="flex items-center gap-2.5 min-w-0">
-          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-base sm:text-lg font-bold shadow-inner shrink-0">
-            <i class="fa-solid fa-wallet"></i>
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 border border-cyan-500/30 flex items-center justify-center shadow-inner shrink-0 overflow-hidden">
+            <img src="./raytech-icon-192.png" alt="Logo Raytech CG" class="w-full h-full object-contain">
           </div>
           <div class="truncate">
             <div class="flex items-center gap-1.5">
               <h1 class="text-sm sm:text-lg font-bold tracking-tight text-white truncate">
-                Controle Financeiro
+                Raytech CG
               </h1>
               <span id="pwaInstalledBadge" class="hidden text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
                 App
