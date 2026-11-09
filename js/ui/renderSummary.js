@@ -33,9 +33,20 @@
           .map(item => ({ ...item, investedAmount: Number(item.installmentValue) || 0, source: 'card' }))
       ];
       const investedTotal = investments.reduce((sum, item) => sum + item.investedAmount, 0);
-      container.classList.remove('hidden');
-      const mobileTotals = document.getElementById('mobileMovementTotals');
-      if (mobileTotals) mobileTotals.textContent = 'Entradas: +' + formatBRL(totalExtras) + ' · Investimentos: -' + formatBRL(investedTotal);
+      // O painel só aparece quando há lançamentos de extras ou investimentos.
+      const hasMovements = incomes.length > 0 || investments.length > 0;
+      container.classList.toggle('hidden', !hasMovements);
+      if (!hasMovements) return;
+      const mobileExtra = document.getElementById('mobileExtraTotal');
+      const mobileInvestment = document.getElementById('mobileInvestmentTotal');
+      if (mobileExtra) {
+        mobileExtra.textContent = 'Entradas: +' + formatBRL(totalExtras);
+        mobileExtra.classList.toggle('hidden', incomes.length === 0);
+      }
+      if (mobileInvestment) {
+        mobileInvestment.textContent = 'Investimentos: -' + formatBRL(investedTotal);
+        mobileInvestment.classList.toggle('hidden', investments.length === 0);
+      }
       const mobileToggle = document.getElementById('mobileMovementToggle');
       const mobileDetails = document.getElementById('mobileMovementDetails');
       if (mobileToggle && mobileDetails && !mobileToggle.dataset.initialized) {

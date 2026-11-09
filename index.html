@@ -846,7 +846,10 @@
         <div class="md:hidden flex items-center justify-between gap-2 mb-2">
           <div class="min-w-0 flex-1">
             <p class="text-xs font-bold text-slate-200">Extras e investimentos</p>
-            <p id="mobileMovementTotals" class="text-[11px] text-slate-400 mt-0.5">Entradas: R$ 0,00 · Investimentos: R$ 0,00</p>
+            <div id="mobileMovementTotals" class="flex flex-col gap-0.5 mt-1 text-[11px]">
+              <p id="mobileExtraTotal" class="text-emerald-300">Entradas: +R$ 0,00</p>
+              <p id="mobileInvestmentTotal" class="text-teal-300">Investimentos: -R$ 0,00</p>
+            </div>
           </div>
           <button id="mobileMovementToggle" type="button" aria-expanded="false" aria-controls="mobileMovementDetails" class="shrink-0 flex items-center gap-1.5 rounded-lg border border-teal-500/40 bg-slate-800 px-3 py-2 text-xs font-bold text-teal-200">
             <span id="mobileMovementToggleLabel">Ver detalhes</span><i id="mobileMovementToggleIcon" class="fa-solid fa-chevron-down"></i>
