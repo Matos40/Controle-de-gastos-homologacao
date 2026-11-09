@@ -16,19 +16,12 @@
   let modal = null;
   let previousFocus = null;
   let checklist = null;
+  let forceChecklist = false;
   const CHECK_KEY = 'controle_gastos_checklist_v1';
   const ELIGIBLE_KEY = 'controle_gastos_checklist_eligible_v1';
   function saved() { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (_) { return {}; } }
   function store(data) { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (_) {} }
   function build() {
-    const help = document.createElement('button');
-    help.type = 'button';
-    help.id = 'onboardingHelpButton';
-    help.setAttribute('aria-label', 'Abrir tutorial de ajuda');
-    help.className = 'fixed right-4 bottom-20 sm:bottom-5 z-40 bg-emerald-700 hover:bg-emerald-600 text-white rounded-full shadow-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-300';
-    help.innerHTML = '<i class="fa-solid fa-circle-question" aria-hidden="true"></i> <span>Ajuda</span>';
-    help.addEventListener('click', () => open(0));
-    document.body.appendChild(help);
     checklist = document.createElement('section');
     checklist.id = 'onboardingChecklist';
     checklist.className = 'hidden max-w-6xl mx-auto px-3.5 sm:px-6 mt-5';
@@ -41,6 +34,7 @@
     else document.body.appendChild(checklist);
     document.getElementById('onboardingChecklistHide').addEventListener('click', () => {
       try { localStorage.setItem(CHECK_KEY, 'hidden'); } catch (_) {}
+      forceChecklist = false;
       checklist.classList.add('hidden');
     });
     checklist.addEventListener('click', event => {
@@ -120,7 +114,7 @@
     try { checkState = localStorage.getItem(CHECK_KEY) || ''; } catch (_) {}
     let eligible = false;
     try { eligible = localStorage.getItem(ELIGIBLE_KEY) === 'yes'; } catch (_) {}
-    if (!eligible || !state.completed || checkState === 'hidden') {
+    if (!forceChecklist && (!eligible || !state.completed || checkState === 'hidden')) {
       checklist.classList.add('hidden');
       return;
     }
@@ -134,7 +128,7 @@
       { title: 'Conheça o backup JSON', done: hasBackupKnowledge, action: 'backup', label: 'Entendi como proteger meus dados' }
     ];
     const doneCount = items.filter(item => item.done).length;
-    if (doneCount === items.length) {
+    if (doneCount === items.length && !forceChecklist) {
       checklist.classList.add('hidden');
       return;
     }
@@ -160,6 +154,12 @@
       grid.appendChild(card);
     });
   }
+  window.openOnboardingTutorial = function () { open(0); };
+  window.openOnboardingChecklist = function () {
+    forceChecklist = true;
+    renderChecklist();
+    checklist?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   document.addEventListener('DOMContentLoaded', () => {
     build();
     if (!hadDatabaseBeforeStartup) {

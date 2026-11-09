@@ -554,6 +554,23 @@
             </div>
           </div>
 
+          <!-- Ajuda acessível pelo menu Opções, sem botão flutuante -->
+          <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-2.5 space-y-2">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 px-1">
+              <i class="fa-solid fa-circle-question text-emerald-400"></i> Ajuda
+            </div>
+            <div class="grid grid-cols-2 gap-1.5">
+              <button type="button" onclick="closeHeaderDrawer(); window.openOnboardingTutorial?.();" class="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 transition flex flex-col items-center justify-center gap-1 text-center">
+                <i class="fa-solid fa-book-open text-emerald-400 text-sm"></i>
+                <span class="text-[10px] font-semibold leading-tight">Tutorial</span>
+              </button>
+              <button type="button" onclick="closeHeaderDrawer(); window.openOnboardingChecklist?.();" class="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 transition flex flex-col items-center justify-center gap-1 text-center">
+                <i class="fa-solid fa-list-check text-emerald-400 text-sm"></i>
+                <span class="text-[10px] font-semibold leading-tight">Primeiros passos</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Categoria 2: Planilhas & Backup -->
           <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-2.5 space-y-2">
             <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 px-1">
