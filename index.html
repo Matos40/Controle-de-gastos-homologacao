@@ -841,17 +841,39 @@
         </div>
       </div>
 
-      <!-- Barra de Entradas Extras Registradas no Mês -->
+      <!-- Movimentações do mês: entradas extras e investimentos -->
       <div id="incomesListContainer" class="hidden mt-4 pt-4 border-t border-slate-800/80">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-            <i class="fa-solid fa-money-bill-transfer"></i> Entradas Extras Registradas no Mês:
-          </span>
-          <span id="incomesTotalBadge" class="text-xs font-bold text-white bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
-            Total Extra: R$ 0,00
-          </span>
+        <div class="md:hidden flex items-center justify-between gap-2 mb-2">
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-bold text-slate-200">Extras e investimentos</p>
+            <p id="mobileMovementTotals" class="text-[11px] text-slate-400 mt-0.5">Entradas: R$ 0,00 · Investimentos: R$ 0,00</p>
+          </div>
+          <button id="mobileMovementToggle" type="button" aria-expanded="false" aria-controls="mobileMovementDetails" class="shrink-0 flex items-center gap-1.5 rounded-lg border border-teal-500/40 bg-slate-800 px-3 py-2 text-xs font-bold text-teal-200">
+            <span id="mobileMovementToggleLabel">Ver detalhes</span><i id="mobileMovementToggleIcon" class="fa-solid fa-chevron-down"></i>
+          </button>
         </div>
-        <div id="incomesChips" class="flex flex-wrap gap-2"></div>
+        <div id="mobileMovementDetails" class="hidden md:grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+          <div class="min-w-0 rounded-xl border border-emerald-500/20 bg-slate-950/40 p-3 sm:p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                <i class="fa-solid fa-money-bill-transfer"></i> Entradas Extras Registradas no Mês
+              </span>
+              <span id="incomesTotalBadge" class="text-xs font-bold text-white bg-emerald-950/80 px-2.5 py-1 rounded-full border border-emerald-500/30">Total Extra: R$ 0,00</span>
+            </div>
+            <div id="incomesChips" class="flex flex-col gap-2 min-w-0"></div>
+            <p id="incomesEmptyState" class="text-xs text-slate-500">Nenhuma entrada extra neste mês.</p>
+          </div>
+          <div class="min-w-0 rounded-xl border border-teal-500/20 bg-slate-950/40 p-3 sm:p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <span class="text-xs font-bold text-teal-300 flex items-center gap-1.5">
+                <i class="fa-solid fa-chart-line"></i> Destinado a Investimentos
+              </span>
+              <span id="investmentsTotalBadge" class="text-xs font-bold text-white bg-teal-950/80 px-2.5 py-1 rounded-full border border-teal-500/30">Total: R$ 0,00</span>
+            </div>
+            <div id="investmentsChips" class="flex flex-col gap-2 min-w-0"></div>
+            <p id="investmentsEmptyState" class="text-xs text-slate-500">Nenhum investimento registrado neste mês.</p>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -870,9 +892,6 @@
           <div id="cardSalaryValue" class="text-base sm:text-xl font-extrabold text-white truncate">R$ 0,00</div>
           <p id="cardIncomeExtrasSub" class="text-[10px] sm:text-[11px] text-emerald-400 mt-0.5 hidden items-center gap-1">
             <i class="fa-solid fa-plus-circle text-[9px]"></i> <span id="cardIncomeExtrasText">R$ 0,00 extras</span>
-          </p>
-          <p id="cardInvestmentsSub" class="text-[10px] sm:text-[11px] text-teal-300 mt-0.5 hidden items-center gap-1">
-            <i class="fa-solid fa-chart-line text-[9px]"></i> <span id="cardInvestmentsText">R$ 0,00 destinados a investimentos</span>
           </p>
           <p id="cardPreviousBalanceSub" class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 flex items-center gap-1 flex-wrap">
             <span>Mês ant.:</span> <span id="cardPrevBalValue" class="font-bold text-slate-300">R$ 0,00</span>

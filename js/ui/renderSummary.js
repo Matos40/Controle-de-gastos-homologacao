@@ -22,40 +22,74 @@
       }
 
       if (!container || !chipsEl || !totalBadge) return;
-
-      if (incomes.length === 0) {
-        container.classList.add('hidden');
-        chipsEl.innerHTML = '';
-        return;
-      }
-
+      const investmentsChips = document.getElementById('investmentsChips');
+      const investmentsBadge = document.getElementById('investmentsTotalBadge');
+      const incomeEmpty = document.getElementById('incomesEmptyState');
+      const investmentsEmpty = document.getElementById('investmentsEmptyState');
+      const investments = [
+        ...(currentData.expenses || []).filter(item => item.category === 'investimentos')
+          .map(item => ({ ...item, investedAmount: Number(item.amount) || 0, source: 'general' })),
+        ...(currentData.cardExpenses || []).filter(item => item.category === 'investimentos')
+          .map(item => ({ ...item, investedAmount: Number(item.installmentValue) || 0, source: 'card' }))
+      ];
+      const investedTotal = investments.reduce((sum, item) => sum + item.investedAmount, 0);
       container.classList.remove('hidden');
-      totalBadge.textContent = `Total Extra: ${formatBRL(totalExtras)}`;
-
+      const mobileTotals = document.getElementById('mobileMovementTotals');
+      if (mobileTotals) mobileTotals.textContent = 'Entradas: +' + formatBRL(totalExtras) + ' · Investimentos: -' + formatBRL(investedTotal);
+      const mobileToggle = document.getElementById('mobileMovementToggle');
+      const mobileDetails = document.getElementById('mobileMovementDetails');
+      if (mobileToggle && mobileDetails && !mobileToggle.dataset.initialized) {
+        mobileToggle.dataset.initialized = 'true';
+        mobileToggle.addEventListener('click', () => {
+          const expanded = mobileToggle.getAttribute('aria-expanded') === 'true';
+          mobileToggle.setAttribute('aria-expanded', String(!expanded));
+          mobileDetails.classList.toggle('hidden', expanded);
+          mobileDetails.classList.toggle('grid', !expanded);
+          document.getElementById('mobileMovementToggleLabel').textContent = expanded ? 'Ver detalhes' : 'Ocultar';
+          document.getElementById('mobileMovementToggleIcon').className = 'fa-solid ' + (expanded ? 'fa-chevron-down' : 'fa-chevron-up');
+        });
+      }
+      totalBadge.textContent = 'Total Extra: ' + formatBRL(totalExtras);
+      if (investmentsBadge) investmentsBadge.textContent = 'Total: ' + formatBRL(investedTotal);
+      incomeEmpty?.classList.toggle('hidden', incomes.length > 0);
+      investmentsEmpty?.classList.toggle('hidden', investments.length > 0);
       chipsEl.innerHTML = incomes.map(item => {
-        let dateFormatted = '';
-        if (item.date) {
-          const parts = item.date.split('-');
-          dateFormatted = parts.length === 3 ? `${parts[2]}/${parts[1]}` : item.date;
-        }
-
+        const dateFormatted = item.date && /^\\d{4}-\\d{2}-\\d{2}$/.test(item.date)
+          ? item.date.slice(8, 10) + '/' + item.date.slice(5, 7) : (item.date || '');
         return `
-          <div class="inline-flex items-center gap-2 bg-slate-950/80 border border-emerald-500/30 rounded-xl px-3 py-1.5 text-xs text-slate-200 shadow-sm">
-            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-            <span class="font-bold text-white">${escapeHtml(item.description)}</span>
-            <span class="text-emerald-400 font-bold">${formatBRL(item.amount)}</span>
-            ${dateFormatted ? `<span class="text-[10px] text-slate-500">(${dateFormatted})</span>` : ''}
-            <div class="flex items-center gap-1 ml-1 pl-1 border-l border-slate-800">
-              <button onclick="openIncomeModal('${item.id}')" title="Editar entrada" class="text-slate-400 hover:text-emerald-300 p-0.5 transition">
-                <i class="fa-solid fa-pen text-[10px]"></i>
-              </button>
-              <button onclick="promptDeleteIncome('${item.id}')" title="Excluir entrada" class="text-slate-400 hover:text-rose-400 p-0.5 transition">
-                <i class="fa-regular fa-trash-can text-[10px]"></i>
-              </button>
+          <div class="flex flex-wrap items-center gap-2 bg-slate-950/80 border border-emerald-500/30 rounded-xl px-3 py-2 text-xs text-slate-200 min-w-0">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+            <span class="font-bold text-white break-words min-w-0">${escapeHtml(item.description)}</span>
+            <span class="text-emerald-400 font-bold whitespace-nowrap">${formatBRL(item.amount)}</span>
+            ${dateFormatted ? `<span class="text-[10px] text-slate-500">(${escapeHtml(dateFormatted)})</span>` : ''}
+            <div class="flex items-center gap-1 ml-auto">
+              <button onclick="openIncomeModal('${item.id}')" title="Editar entrada" aria-label="Editar entrada" class="text-slate-400 hover:text-emerald-300 p-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
+              <button onclick="promptDeleteIncome('${item.id}')" title="Excluir entrada" aria-label="Excluir entrada" class="text-slate-400 hover:text-rose-400 p-1"><i class="fa-regular fa-trash-can"></i></button>
             </div>
-          </div>
-        `;
+          </div>`;
       }).join('');
+      if (investmentsChips) {
+        investmentsChips.innerHTML = investments.map(item => {
+          const dateFormatted = item.date && /^\\d{4}-\\d{2}-\\d{2}$/.test(item.date)
+            ? item.date.slice(8, 10) + '/' + item.date.slice(5, 7) : (item.date || '');
+          return `
+            <div class="flex flex-wrap items-center gap-2 bg-slate-950/80 border border-teal-500/30 rounded-xl px-3 py-2 text-xs text-slate-200 min-w-0">
+              <span class="w-2 h-2 rounded-full bg-teal-400 shrink-0"></span>
+              <span class="font-bold text-white break-words min-w-0">${escapeHtml(item.title || 'Investimento')}</span>
+              <span class="text-teal-300 font-bold whitespace-nowrap">-${formatBRL(item.investedAmount)}</span>
+              ${dateFormatted ? `<span class="text-[10px] text-slate-500">(${escapeHtml(dateFormatted)})</span>` : ''}
+              <span class="text-[10px] text-slate-400">${item.source === 'card' ? 'Cartão' : 'Mensal'}</span>
+              <button type="button" data-investment-source="${item.source}" data-investment-id="${escapeHtml(String(item.id || ''))}" class="ml-auto text-teal-300 hover:text-teal-200 underline text-[11px]">Ver lançamento</button>
+            </div>`;
+        }).join('');
+        investmentsChips.querySelectorAll('button[data-investment-source]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const tab = btn.dataset.investmentSource === 'card' ? 'card' : 'general';
+            if (typeof switchTab === 'function') switchTab(tab);
+            document.getElementById(tab === 'card' ? 'cardExpensesContainer' : 'expensesContainer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+        });
+      }
     }
     function renderSummaryOnly() {
       const currentData = getCurrentMonthData();
@@ -88,23 +122,6 @@
 
       const totalCreditMonthly = (currentData.cardExpenses || []).reduce((sum, item) => sum + (Number(item.installmentValue) || 0), 0);
       const countCreditTotal = (currentData.cardExpenses || []).length;
-
-      // Investimentos já fazem parte das despesas existentes: exibir o subtotal
-      // informativo sem subtraí-lo novamente do saldo.
-      const investedInExpenses = (currentData.expenses || [])
-        .filter(item => item.category === 'investimentos')
-        .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-      const investedOnCard = (currentData.cardExpenses || [])
-        .filter(item => item.category === 'investimentos')
-        .reduce((sum, item) => sum + (Number(item.installmentValue) || 0), 0);
-      const investedTotal = investedInExpenses + investedOnCard;
-      const investmentsSub = document.getElementById('cardInvestmentsSub');
-      const investmentsText = document.getElementById('cardInvestmentsText');
-      if (investmentsSub && investmentsText) {
-        investmentsSub.classList.toggle('hidden', investedTotal <= 0);
-        investmentsSub.classList.toggle('flex', investedTotal > 0);
-        investmentsText.textContent = formatBRL(investedTotal) + ' destinados a investimentos';
-      }
 
       const totalSpent = totalFixed + totalOneTime;
       
