@@ -89,6 +89,23 @@
       const totalCreditMonthly = (currentData.cardExpenses || []).reduce((sum, item) => sum + (Number(item.installmentValue) || 0), 0);
       const countCreditTotal = (currentData.cardExpenses || []).length;
 
+      // Investimentos já fazem parte das despesas existentes: exibir o subtotal
+      // informativo sem subtraí-lo novamente do saldo.
+      const investedInExpenses = (currentData.expenses || [])
+        .filter(item => item.category === 'investimentos')
+        .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+      const investedOnCard = (currentData.cardExpenses || [])
+        .filter(item => item.category === 'investimentos')
+        .reduce((sum, item) => sum + (Number(item.installmentValue) || 0), 0);
+      const investedTotal = investedInExpenses + investedOnCard;
+      const investmentsSub = document.getElementById('cardInvestmentsSub');
+      const investmentsText = document.getElementById('cardInvestmentsText');
+      if (investmentsSub && investmentsText) {
+        investmentsSub.classList.toggle('hidden', investedTotal <= 0);
+        investmentsSub.classList.toggle('flex', investedTotal > 0);
+        investmentsText.textContent = formatBRL(investedTotal) + ' destinados a investimentos';
+      }
+
       const totalSpent = totalFixed + totalOneTime;
       
       const totalAvailable = totalMonthIncome + prevBalance;
