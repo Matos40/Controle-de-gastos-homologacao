@@ -15,6 +15,9 @@
   let step = 0;
   let modal = null;
   let previousFocus = null;
+  let checklist = null;
+  const CHECK_KEY = 'controle_gastos_checklist_v1';
+  const ELIGIBLE_KEY = 'controle_gastos_checklist_eligible_v1';
   function saved() { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (_) { return {}; } }
   function store(data) { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (_) {} }
   function build() {
@@ -26,6 +29,34 @@
     help.innerHTML = '<i class="fa-solid fa-circle-question" aria-hidden="true"></i> <span>Ajuda</span>';
     help.addEventListener('click', () => open(0));
     document.body.appendChild(help);
+    checklist = document.createElement('section');
+    checklist.id = 'onboardingChecklist';
+    checklist.className = 'hidden max-w-6xl mx-auto px-3.5 sm:px-6 mt-5';
+    checklist.innerHTML = '<div class="rounded-2xl bg-slate-900 border border-emerald-500/30 p-4 sm:p-5 text-slate-100 shadow-lg">'
+      + '<div class="flex justify-between items-start gap-3"><div><h2 class="font-bold text-base"><i class="fa-solid fa-list-check text-emerald-400 mr-2"></i>Primeiros passos</h2><p id="onboardingChecklistProgress" class="text-xs text-slate-400 mt-1"></p></div><button id="onboardingChecklistHide" type="button" class="text-slate-300 text-xs hover:text-white px-2 py-1" aria-label="Ocultar primeiros passos">Ocultar</button></div>'
+      + '<div id="onboardingChecklistItems" class="grid sm:grid-cols-3 gap-2 mt-4"></div>'
+      + '<p class="text-xs text-slate-400 mt-3">O checklist é opcional. Nenhuma despesa de exemplo será criada.</p></div>';
+    const main = document.querySelector('main');
+    if (main && main.parentNode) main.parentNode.insertBefore(checklist, main);
+    else document.body.appendChild(checklist);
+    document.getElementById('onboardingChecklistHide').addEventListener('click', () => {
+      try { localStorage.setItem(CHECK_KEY, 'hidden'); } catch (_) {}
+      checklist.classList.add('hidden');
+    });
+    checklist.addEventListener('click', event => {
+      const target = event.target.closest('button[data-check-action]');
+      if (!target) return;
+      const action = target.dataset.checkAction;
+      if (action === 'backup') {
+        try { localStorage.setItem(CHECK_KEY, 'backup-reviewed'); } catch (_) {}
+        renderChecklist();
+      } else if (action === 'income' || action === 'expense') {
+        if (typeof switchTab === 'function') switchTab('general');
+        const element = document.getElementById(action === 'income' ? 'salaryInput' : 'expensesContainer');
+        element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (action === 'income') element?.focus();
+      }
+    });
     modal = document.createElement('div');
     modal.id = 'onboardingModal';
     modal.className = 'hidden fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-sm p-4 flex items-center justify-center';
@@ -80,10 +111,64 @@
   function finish() {
     store({ completed: true });
     close();
+    renderChecklist();
+  }
+  function renderChecklist() {
+    if (!checklist) return;
+    const state = saved();
+    let checkState = '';
+    try { checkState = localStorage.getItem(CHECK_KEY) || ''; } catch (_) {}
+    let eligible = false;
+    try { eligible = localStorage.getItem(ELIGIBLE_KEY) === 'yes'; } catch (_) {}
+    if (!eligible || !state.completed || checkState === 'hidden') {
+      checklist.classList.add('hidden');
+      return;
+    }
+    const months = (typeof appDb !== 'undefined' && appDb && appDb.months) ? Object.values(appDb.months) : [];
+    const hasIncome = months.some(m => m && (Number(m.salary) > 0 || (Array.isArray(m.extraIncomes) && m.extraIncomes.length > 0)));
+    const hasExpense = months.some(m => m && ((Array.isArray(m.expenses) && m.expenses.length > 0) || (Array.isArray(m.cardExpenses) && m.cardExpenses.length > 0)));
+    const hasBackupKnowledge = checkState === 'backup-reviewed';
+    const items = [
+      { title: 'Cadastre sua primeira receita', done: hasIncome, action: 'income', label: 'Ir para receitas' },
+      { title: 'Registre uma despesa', done: hasExpense, action: 'expense', label: 'Ir para despesas' },
+      { title: 'Conheça o backup JSON', done: hasBackupKnowledge, action: 'backup', label: 'Entendi como proteger meus dados' }
+    ];
+    const doneCount = items.filter(item => item.done).length;
+    if (doneCount === items.length) {
+      checklist.classList.add('hidden');
+      return;
+    }
+    checklist.classList.remove('hidden');
+    document.getElementById('onboardingChecklistProgress').textContent = doneCount + ' de 3 etapas concluídas';
+    const grid = document.getElementById('onboardingChecklistItems');
+    grid.replaceChildren();
+    items.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'rounded-xl bg-slate-950 border border-slate-800 p-3 flex flex-col gap-2';
+      const label = document.createElement('p');
+      label.className = 'text-sm font-semibold';
+      label.textContent = (item.done ? '✓ ' : '○ ') + item.title;
+      card.appendChild(label);
+      if (!item.done) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.checkAction = item.action;
+        btn.className = 'text-left text-xs text-emerald-300 hover:text-emerald-200 underline';
+        btn.textContent = item.label;
+        card.appendChild(btn);
+      }
+      grid.appendChild(card);
+    });
   }
   document.addEventListener('DOMContentLoaded', () => {
     build();
+    if (!hadDatabaseBeforeStartup) {
+      try { localStorage.setItem(ELIGIBLE_KEY, 'yes'); } catch (_) {}
+    }
     // Bancos preexistentes não recebem tutorial automático; não interferir no bloqueio por PIN.
     if (!hadDatabaseBeforeStartup && !saved().completed && !localStorage.getItem(PIN_KEY)) open(0);
+    renderChecklist();
+    document.addEventListener('input', () => setTimeout(renderChecklist, 0));
+    document.addEventListener('click', () => setTimeout(renderChecklist, 0));
   });
 })();
