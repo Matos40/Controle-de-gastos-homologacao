@@ -17,17 +17,28 @@
   let previousFocus = null;
   let checklist = null;
   let forceChecklist = false;
+  let highlightedElement = null;
   const CHECK_KEY = 'controle_gastos_checklist_v1';
   const ELIGIBLE_KEY = 'controle_gastos_checklist_eligible_v1';
   function saved() { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (_) { return {}; } }
   function store(data) { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (_) {} }
+  function highlightTarget(element) {
+    if (!element) return;
+    if (highlightedElement) highlightedElement.classList.remove('onboarding-target-pulse');
+    highlightedElement = element;
+    element.classList.add('onboarding-target-pulse');
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
   function build() {
+    const style = document.createElement('style');
+    style.textContent = '@keyframes onboardingBorderPulse{0%,100%{box-shadow:0 0 0 1px #fbbf24,0 0 4px #f59e0b66;border-color:#fbbf24}50%{box-shadow:0 0 0 4px #f59e0b,0 0 20px #f59e0baa;border-color:#f59e0b}}.onboarding-step-pulse,.onboarding-target-pulse{border:2px solid #fbbf24!important;animation:onboardingBorderPulse 1.7s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.onboarding-step-pulse,.onboarding-target-pulse{animation:none;box-shadow:0 0 0 2px #fbbf24}}';
+    document.head.appendChild(style);
     checklist = document.createElement('section');
     checklist.id = 'onboardingChecklist';
     checklist.className = 'hidden max-w-6xl mx-auto px-3.5 sm:px-6 mt-5';
     checklist.innerHTML = '<div class="rounded-2xl bg-slate-900 border border-emerald-500/30 p-4 sm:p-5 text-slate-100 shadow-lg">'
       + '<div class="flex justify-between items-start gap-3"><div><h2 class="font-bold text-base"><i class="fa-solid fa-list-check text-emerald-400 mr-2"></i>Primeiros passos</h2><p id="onboardingChecklistProgress" class="text-xs text-slate-400 mt-1"></p></div><button id="onboardingChecklistHide" type="button" class="text-slate-300 text-xs hover:text-white px-2 py-1" aria-label="Ocultar primeiros passos">Ocultar</button></div>'
-      + '<div id="onboardingChecklistItems" class="grid sm:grid-cols-3 gap-2 mt-4"></div>'
+      + '<div id="onboardingChecklistItems" class="grid sm:grid-cols-2 gap-3 mt-4"></div>'
       + '<p class="text-xs text-slate-400 mt-3">O checklist é opcional. Nenhuma despesa de exemplo será criada.</p></div>';
     const main = document.querySelector('main');
     if (main && main.parentNode) main.parentNode.insertBefore(checklist, main);
@@ -41,14 +52,20 @@
       const target = event.target.closest('button[data-check-action]');
       if (!target) return;
       const action = target.dataset.checkAction;
+      if (highlightedElement) highlightedElement.classList.remove('onboarding-target-pulse');
       if (action === 'backup') {
-        try { localStorage.setItem(CHECK_KEY, 'backup-reviewed'); } catch (_) {}
-        renderChecklist();
-      } else if (action === 'income' || action === 'expense') {
-        if (typeof switchTab === 'function') switchTab('general');
-        const element = document.getElementById(action === 'income' ? 'salaryInput' : 'expensesContainer');
-        element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        if (action === 'income') element?.focus();
+        event.stopPropagation();
+        const drawerElement = document.getElementById('headerToolsDrawer');
+        if (drawerElement?.classList.contains('hidden') && typeof toggleHeaderDrawer === 'function') toggleHeaderDrawer(event);
+        const drawer = document.getElementById('headerToolsDrawer');
+        const backup = Array.from(drawer?.querySelectorAll('button') || []).find(btn => btn.textContent.includes('Backup JSON'));
+        highlightTarget(backup || drawer);
+      } else {
+        if (typeof switchTab === 'function') switchTab(action === 'card' ? 'card' : 'general');
+        const targetId = { income: 'salaryInput', expense: 'expenseForm', card: 'cardExpenseForm' }[action];
+        const element = document.getElementById(targetId);
+        highlightTarget(element);
+        if (action === 'income') element?.focus({ preventScroll: true });
       }
     });
     modal = document.createElement('div');
@@ -120,25 +137,26 @@
     }
     const months = (typeof appDb !== 'undefined' && appDb && appDb.months) ? Object.values(appDb.months) : [];
     const hasIncome = months.some(m => m && (Number(m.salary) > 0 || (Array.isArray(m.extraIncomes) && m.extraIncomes.length > 0)));
-    const hasExpense = months.some(m => m && ((Array.isArray(m.expenses) && m.expenses.length > 0) || (Array.isArray(m.cardExpenses) && m.cardExpenses.length > 0)));
-    const hasBackupKnowledge = checkState === 'backup-reviewed';
+    const hasExpense = months.some(m => m && Array.isArray(m.expenses) && m.expenses.length > 0);
+    const hasCard = months.some(m => m && Array.isArray(m.cardExpenses) && m.cardExpenses.length > 0);
     const items = [
-      { title: 'Cadastre sua primeira receita', done: hasIncome, action: 'income', label: 'Ir para receitas' },
-      { title: 'Registre uma despesa', done: hasExpense, action: 'expense', label: 'Ir para despesas' },
-      { title: 'Conheça o backup JSON', done: hasBackupKnowledge, action: 'backup', label: 'Entendi como proteger meus dados' }
+      { title: 'Primeira receita', done: hasIncome, action: 'income', label: 'Cadastrar receita' },
+      { title: 'Despesas mensais', done: hasExpense, action: 'expense', label: 'Cadastrar despesa' },
+      { title: 'Cartão de crédito', done: hasCard, action: 'card', label: 'Cadastrar compra no cartão' },
+      { title: 'Backup dos dados', done: false, action: 'backup', label: 'Opções → Planilhas & Backup → Backup JSON' }
     ];
     const doneCount = items.filter(item => item.done).length;
-    if (doneCount === items.length && !forceChecklist) {
+    if (doneCount === 3 && !forceChecklist) {
       checklist.classList.add('hidden');
       return;
     }
     checklist.classList.remove('hidden');
-    document.getElementById('onboardingChecklistProgress').textContent = doneCount + ' de 3 etapas concluídas';
+    document.getElementById('onboardingChecklistProgress').textContent = doneCount + ' de 3 cadastros concluídos · backup recomendado';
     const grid = document.getElementById('onboardingChecklistItems');
     grid.replaceChildren();
     items.forEach(item => {
       const card = document.createElement('div');
-      card.className = 'rounded-xl bg-slate-950 border border-slate-800 p-3 flex flex-col gap-2';
+      card.className = 'rounded-xl bg-slate-950 border border-slate-800 p-3 flex flex-col gap-2' + (!item.done && item === items.find(entry => !entry.done) ? ' onboarding-step-pulse' : '');
       const label = document.createElement('p');
       label.className = 'text-sm font-semibold';
       label.textContent = (item.done ? '✓ ' : '○ ') + item.title;
