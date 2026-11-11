@@ -7,6 +7,7 @@ import {
 import { getFirestore, doc, setDoc, getDocFromServer, serverTimestamp, onSnapshot, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
 
 import { initializeExpenseLab } from './firebaseExpenseLab.js';
+import { initializeOfflineQueue } from './firebaseOfflineQueue.js';
 
 const firebaseConfig = Object.freeze({
   apiKey: 'AIzaSyAlOok-2bV9QigR6PyjRgHMLjFLIoPDWpw',
@@ -208,3 +209,5 @@ if (syncSave) syncSave.addEventListener('click', () => demoWrite(false));
 if (syncDelete) syncDelete.addEventListener('click', () => demoWrite(true));
 
 initializeExpenseLab(auth, firestore, onAuthStateChanged);
+
+initializeOfflineQueue(auth, firestore, onAuthStateChanged);
