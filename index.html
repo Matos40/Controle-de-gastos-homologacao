@@ -1142,10 +1142,16 @@
             <p id="countSummary" class="text-xs text-slate-400">0 contas registradas</p>
           </div>
 
-          <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold self-start sm:self-auto">
-            <button onclick="setFilter('all')" id="filterAll" class="px-3 py-1.5 rounded-lg bg-slate-800 text-white transition">Todos</button>
-            <button onclick="setFilter('fixed')" id="filterFixed" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Fixos</button>
-            <button onclick="setFilter('one-time')" id="filterOneTime" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Únicos</button>
+          <div class="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
+            <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+              <button onclick="setFilter('all')" id="filterAll" class="px-3 py-1.5 rounded-lg bg-slate-800 text-white transition">Todos</button>
+              <button onclick="setFilter('fixed')" id="filterFixed" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Fixos</button>
+              <button onclick="setFilter('one-time')" id="filterOneTime" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Únicos</button>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] uppercase font-bold text-slate-400 block">Total de Gastos</span>
+              <div id="totalFilteredText" class="text-sm sm:text-base font-extrabold text-emerald-300">R$ 0,00</div>
+            </div>
           </div>
         </div>
 
@@ -1185,8 +1191,7 @@
 
         <div class="mt-4 pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
           <div class="flex items-center gap-3">
-            <span>Total filtrado: <strong id="totalFilteredText" class="text-slate-200">R$ 0,00</strong></span>
-            <span class="text-slate-600">•</span>
+            
             <span id="paidSummaryGeneral" class="text-emerald-400 font-medium">0 pagas</span>
           </div>
           <button onclick="promptClearAll('expenses')" class="hover:text-rose-400 transition flex items-center gap-1.5 text-slate-500">
