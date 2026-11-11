@@ -556,6 +556,20 @@
             </div>
           </div>
 
+          <!-- Firebase Authentication de homologação: independente do banco financeiro local -->
+          <section class="bg-slate-950/80 border border-cyan-500/30 rounded-xl p-2.5 space-y-2" aria-label="Conta na nuvem">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5 px-1">
+              <i class="fa-solid fa-cloud"></i> Conta na nuvem (teste)
+            </div>
+            <p id="firebaseAuthStatus" role="status" aria-live="polite" class="text-[11px] text-slate-400 px-1">Carregando autenticação…</p>
+            <p id="firebaseAccount" class="text-[11px] text-slate-200 px-1 break-words"></p>
+            <button id="firebaseLoginButton" type="button" class="w-full px-3 py-2 rounded-lg bg-cyan-800 hover:bg-cyan-700 text-white text-xs font-bold transition">
+              <i class="fa-brands fa-google mr-1"></i> Entrar com Google
+            </button>
+            <button id="firebaseLogoutButton" type="button" class="hidden w-full px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition">Sair da conta Google</button>
+            <p class="text-[10px] text-amber-200/80 px-1">Teste de login apenas. Os lançamentos continuam salvos neste dispositivo e ainda não são sincronizados.</p>
+          </section>
+
           <!-- Ajuda acessível pelo menu Opções, sem botão flutuante -->
           <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-2.5 space-y-2">
             <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 px-1">
@@ -1596,6 +1610,7 @@
   <script src="./js/ui/renderHistory.js"></script>
   <script src="./js/app.js"></script>
   <script src="./js/onboarding.js"></script>
+  <script type="module" src="./js/services/firebaseAuth.js"></script>
 
 </body>
 </html>
