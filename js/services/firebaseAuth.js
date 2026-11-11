@@ -6,6 +6,8 @@ import {
 
 import { getFirestore, doc, setDoc, getDocFromServer, serverTimestamp, onSnapshot, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
 
+import { initializeExpenseLab } from './firebaseExpenseLab.js';
+
 const firebaseConfig = Object.freeze({
   apiKey: 'AIzaSyAlOok-2bV9QigR6PyjRgHMLjFLIoPDWpw',
   authDomain: 'raytech-cg-homologacao.firebaseapp.com',
@@ -204,3 +206,5 @@ async function demoWrite(remove) {
 }
 if (syncSave) syncSave.addEventListener('click', () => demoWrite(false));
 if (syncDelete) syncDelete.addEventListener('click', () => demoWrite(true));
+
+initializeExpenseLab(auth, firestore, onAuthStateChanged);
