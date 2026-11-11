@@ -1,4 +1,4 @@
-const CACHE_NAME = 'homolog-controle-gastos-shell-v4';
+const CACHE_NAME = 'homolog-controle-gastos-shell-v5';
 const APP_SHELL = [
   './', './index.html', './manifest.json', './css/styles.css',
   './js/state.js', './js/app.js',
