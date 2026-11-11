@@ -10,6 +10,8 @@ export function initializeExpenseLab(auth, db, onAuthStateChanged) {
   const amount = document.getElementById('firebaseExpenseLabAmount');
   const save = document.getElementById('firebaseExpenseLabSave');
   const cancel = document.getElementById('firebaseExpenseLabCancel');
+  const draftButton = document.getElementById('firebaseExpenseLabDraft');
+  const draftStatus = document.getElementById('firebaseExpenseLabDraftStatus');
   const list = document.getElementById('firebaseExpenseLabList');
   const status = document.getElementById('firebaseExpenseLabStatus');
   if (!root || !title || !amount || !save || !cancel || !list || !status) return;
@@ -19,6 +21,9 @@ export function initializeExpenseLab(auth, db, onAuthStateChanged) {
   let busy = false;
   let rows = new Map();
   let serverReady = false;
+  const draftKey = uid => 'raytech_homolog_expense_draft_v1_' + uid;
+  const draftMessage = value => { if (draftStatus) draftStatus.textContent = value; };
+  const readDraft = uid => { try { return JSON.parse(sessionStorage.getItem(draftKey(uid)) || 'null'); } catch { return null; } };
   const message = text => { status.textContent = text; };
   const path = user => collection(db, 'users', user.uid, 'syncTests', 'expense-lab', 'items');
   const reset = () => {
@@ -32,6 +37,7 @@ export function initializeExpenseLab(auth, db, onAuthStateChanged) {
     save.disabled = busy || !auth.currentUser || !serverReady;
     title.disabled = busy;
     amount.disabled = busy;
+    if (draftButton) draftButton.disabled = busy || !auth.currentUser;
   };
   const money = cents => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   function render() {
@@ -78,7 +84,7 @@ export function initializeExpenseLab(auth, db, onAuthStateChanged) {
   }
   async function mutate(action, target = editing) {
     const user = auth.currentUser;
-    if (!user || busy || !serverReady) return;
+    if (!user || busy || !serverReady) { if (!serverReady) message('Sem confirmação do servidor. A operação não foi enviada.'); return; }
     const session = generation;
     const titleValue = title.value.trim();
     const rawAmount = amount.value.trim();
@@ -130,13 +136,65 @@ export function initializeExpenseLab(auth, db, onAuthStateChanged) {
       if (session === generation) { busy = false; controls(); render(); }
     }
   }
-  save.addEventListener('click', () => mutate(editing ? 'update' : 'create'));
+  if (draftButton) draftButton.addEventListener('click', () => {
+    const user = auth.currentUser;
+    if (!user || busy) return;
+    if (editing) {
+      draftMessage('Rascunho offline de edição não é permitido neste teste. Cancele a edição para criar um novo.');
+      return;
+    }
+    const draftTitle = title.value.trim();
+    const draftAmount = amount.value.trim();
+    const validMoney = /^\d{1,7}(?:[,.]\d{1,2})?$/.test(draftAmount);
+    const cents = validMoney ? Math.round(Number(draftAmount.replace(',', '.')) * 100) : NaN;
+    if (!draftTitle || draftTitle.length > 60 || !Number.isSafeInteger(cents) || cents <= 0) {
+      draftMessage('Preencha descrição e valor fictícios válidos antes de guardar o rascunho.');
+      return;
+    }
+    try {
+      sessionStorage.setItem(draftKey(user.uid), JSON.stringify({ title: draftTitle, amountCents: cents }));
+      draftMessage('Rascunho salvo somente nesta aba. Não foi enviado ao Firebase. Ao reconectar, revise e cadastre manualmente.');
+    } catch {
+      draftMessage('Não foi possível guardar o rascunho neste navegador.');
+    }
+  });
+  save.addEventListener('click', async () => {
+    const user = auth.currentUser;
+    const draft = user && readDraft(user.uid);
+    const matchesDraft = !editing && draft && draft.title === title.value.trim() &&
+      draft.amountCents === Math.round(Number(amount.value.trim().replace(',', '.')) * 100);
+    if (!serverReady) {
+      message('Aguardando servidor. O rascunho permanece somente neste dispositivo.');
+      return;
+    }
+    await mutate(editing ? 'update' : 'create');
+    // O rascunho é mantido até o usuário limpá-lo manualmente; evita perda em falhas.
+    if (matchesDraft) draftMessage('Confira se o registro foi confirmado na lista. O rascunho continua disponível até ser descartado.');
+  });
   cancel.addEventListener('click', () => { reset(); message('Edição cancelada.'); });
+  const recover = document.getElementById('firebaseExpenseLabRecover');
+  const discard = document.getElementById('firebaseExpenseLabDiscard');
+  if (recover) recover.addEventListener('click', () => {
+    const user = auth.currentUser;
+    const draft = user && readDraft(user.uid);
+    if (!draft || editing) { draftMessage('Nenhum rascunho recuperável ou edição em andamento.'); return; }
+    title.value = draft.title;
+    amount.value = (draft.amountCents / 100).toFixed(2).replace('.', ',');
+    draftMessage('Rascunho recuperado. Revise e cadastre quando houver conexão com o servidor.');
+  });
+  if (discard) discard.addEventListener('click', () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    sessionStorage.removeItem(draftKey(user.uid));
+    draftMessage('Rascunho descartado deste navegador.');
+  });
   onAuthStateChanged(auth, user => {
     generation++;
     if (unsubscribe) { unsubscribe(); unsubscribe = null; }
     rows = new Map(); serverReady = false; busy = false; reset();
     root.classList.toggle('hidden', !user);
+    const draft = user ? readDraft(user.uid) : null;
+    draftMessage(draft ? 'Rascunho local disponível. Use “Recuperar rascunho” para revisar.' : 'Nenhum rascunho local pendente.');
     controls(); render();
     if (!user) return;
     const session = generation;

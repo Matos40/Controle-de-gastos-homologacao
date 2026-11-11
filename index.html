@@ -592,6 +592,16 @@
                 <button id="firebaseExpenseLabSave" type="button" class="px-3 py-2 rounded-lg bg-cyan-800 hover:bg-cyan-700 text-white text-xs font-bold">Cadastrar despesa fictícia</button>
                 <button id="firebaseExpenseLabCancel" type="button" class="hidden px-3 py-2 rounded-lg bg-slate-800 text-white text-xs">Cancelar edição</button>
               </div>
+              <div class="border border-amber-500/30 rounded-lg p-2 space-y-2">
+                <p class="text-[11px] font-bold text-amber-200">Teste offline seguro (somente rascunho)</p>
+                <p class="text-[11px] text-slate-400">O rascunho fica nesta aba e não é enviado automaticamente. Após reconectar, recupere, revise e cadastre uma única vez.</p>
+                <div class="flex flex-wrap gap-2">
+                  <button id="firebaseExpenseLabDraft" type="button" class="px-2 py-2 rounded-lg bg-amber-800 text-white text-xs">Guardar rascunho</button>
+                  <button id="firebaseExpenseLabRecover" type="button" class="px-2 py-2 rounded-lg bg-slate-800 text-white text-xs">Recuperar rascunho</button>
+                  <button id="firebaseExpenseLabDiscard" type="button" class="px-2 py-2 rounded-lg bg-slate-800 text-white text-xs">Descartar rascunho</button>
+                </div>
+                <p id="firebaseExpenseLabDraftStatus" role="status" aria-live="polite" class="text-[11px] text-amber-200"></p>
+              </div>
               <div id="firebaseExpenseLabList" class="space-y-2"></div>
               <p id="firebaseExpenseLabStatus" role="status" aria-live="polite" class="text-[11px] text-emerald-300">Aguardando login.</p>
             </div>
