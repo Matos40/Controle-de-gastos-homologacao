@@ -604,8 +604,8 @@
                 <p id="firebaseExpenseLabDraftStatus" role="status" aria-live="polite" class="text-[11px] text-amber-200"></p>
               </div>
               <div id="firebaseExpenseQueue" class="hidden border border-cyan-500/30 rounded-lg p-2 space-y-2">
-                <p class="text-[11px] font-bold text-cyan-200">Fila offline persistente (teste de criação)</p>
-                <p class="text-[11px] text-slate-400">Preencha a descrição e o valor fictícios acima e clique abaixo. A operação será guardada no IndexedDB, mesmo sem internet, e reenviada quando houver conexão. Não use também o botão “Cadastrar despesa fictícia” para o mesmo teste.</p>
+                <p class="text-[11px] font-bold text-cyan-200">Fila offline persistente (cadastro, edição e exclusão)</p>
+                <p class="text-[11px] text-slate-400">Para criar offline, preencha a descrição e o valor fictícios acima e clique abaixo. Para editar ou excluir offline, use os controles de cada despesa. A fila persiste no IndexedDB. Não cadastre a mesma despesa também pelo botão online.</p>
                 <button id="firebaseExpenseQueueAdd" type="button" class="px-3 py-2 rounded-lg bg-cyan-800 text-white text-xs font-bold">Adicionar à fila offline</button>
                 <p id="firebaseExpenseQueueStatus" role="status" aria-live="polite" class="text-[11px] text-cyan-200">Aguardando conta.</p>
                 <div id="firebaseExpenseQueueConflicts" class="space-y-2"></div>

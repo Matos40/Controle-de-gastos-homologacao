@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    function expenseFields() {
+      return ['title', 'amountCents', 'version', 'deleted', 'marker', 'updatedAt', 'operationId'];
+    }
+    function validExpense(d) {
+      return d.keys().hasOnly(expenseFields())
+        && d.keys().hasAll(['title', 'amountCents', 'version', 'deleted', 'marker', 'updatedAt'])
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 60
+        && d.amountCents is int && d.amountCents > 0 && d.amountCents <= 999999999
+        && d.version is int && d.version >= 1
+        && d.deleted is bool
+        && d.marker == 'fictitious-expense-v1'
+        && d.updatedAt is timestamp
+        && (!d.keys().hasAny(['operationId']) || d.operationId is string);
+    }
+    match /users/{uid}/syncTests/connection-check {
+      allow get, create, update: if owner(uid)
+        && request.resource.data.keys().hasOnly(['marker', 'nonce', 'testedAt'])
+        && request.resource.data.keys().hasAll(['marker', 'nonce', 'testedAt'])
+        && request.resource.data.marker == 'raytech-cg-homologacao-test-v1'
+        && request.resource.data.nonce is string
+        && request.resource.data.testedAt is timestamp;
+    }
+    match /users/{uid}/syncTests/cross-device-demo {
+      allow get, create, update: if owner(uid)
+        && request.resource.data.keys().hasOnly(['value', 'marker', 'updatedAt'])
+        && request.resource.data.keys().hasAll(['value', 'marker', 'updatedAt'])
+        && request.resource.data.value is string
+        && request.resource.data.value.size() > 0
+        && request.resource.data.value.size() <= 80
+        && request.resource.data.marker == 'raytech-cg-cross-device-demo-v1'
+        && request.resource.data.updatedAt is timestamp;
+      allow delete: if owner(uid);
+    }
+    match /users/{uid}/syncTests/expense-lab/items/{itemId} {
+      allow get, list: if owner(uid);
+      allow create: if owner(uid) && validExpense(request.resource.data)
+        && request.resource.data.version == 1
+        && request.resource.data.deleted == false;
+      allow update: if owner(uid) && validExpense(request.resource.data)
+        && validExpense(resource.data)
+        && request.resource.data.version == resource.data.version + 1
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['title', 'amountCents', 'version', 'deleted', 'updatedAt'])
+        && resource.data.deleted == false
+        && (request.resource.data.deleted == false || request.resource.data.deleted == true);
+      allow delete: if false; // Tombstones permanecem.
+    }
+    match /users/{uid}/syncTests/expense-lab/receipts/{receiptId} {
+      allow get: if owner(uid);
+      allow create: if owner(uid)
+        && request.resource.data.keys().hasOnly(['targetId', 'kind', 'marker', 'confirmedAt'])
+        && request.resource.data.keys().hasAll(['targetId', 'kind', 'marker', 'confirmedAt'])
+        && request.resource.data.targetId is string
+        && request.resource.data.kind in ['update', 'delete']
+        && request.resource.data.marker == 'expense-lab-receipt-v1'
+        && request.resource.data.confirmedAt is timestamp;
+      allow update, delete, list: if false;
+    }
+    // Nenhum outro documento é acessível por este conjunto de regras.
+  }
+}
