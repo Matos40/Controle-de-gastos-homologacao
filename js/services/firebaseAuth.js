@@ -4,6 +4,8 @@ import {
   getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 
+import { getFirestore, doc, setDoc, getDocFromServer, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
+
 const firebaseConfig = Object.freeze({
   apiKey: 'AIzaSyAlOok-2bV9QigR6PyjRgHMLjFLIoPDWpw',
   authDomain: 'raytech-cg-homologacao.firebaseapp.com',
@@ -15,6 +17,7 @@ const firebaseConfig = Object.freeze({
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const firestore = getFirestore(app);
 auth.languageCode = 'pt-BR';
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' });
@@ -23,6 +26,8 @@ const status = document.getElementById('firebaseAuthStatus');
 const login = document.getElementById('firebaseLoginButton');
 const logout = document.getElementById('firebaseLogoutButton');
 const account = document.getElementById('firebaseAccount');
+const firestoreTestButton = document.getElementById('firebaseFirestoreTestButton');
+const firestoreTestStatus = document.getElementById('firebaseFirestoreTestStatus');
 let busy = false;
 
 function render(user, message) {
@@ -30,6 +35,10 @@ function render(user, message) {
   if (account) account.textContent = user ? (user.displayName || user.email || 'Conta Google') : '';
   if (login) { login.classList.toggle('hidden', Boolean(user)); login.disabled = busy; }
   if (logout) { logout.classList.toggle('hidden', !user); logout.disabled = busy; }
+  if (firestoreTestButton) {
+    firestoreTestButton.classList.toggle('hidden', !user);
+    firestoreTestButton.disabled = busy;
+  }
 }
 function errorMessage(error) {
   switch (error?.code) {
@@ -73,5 +82,42 @@ if (logout) logout.addEventListener('click', async () => {
   } finally {
     busy = false;
     render(auth.currentUser, status?.textContent);
+  }
+});
+
+/* Teste manual e isolado: somente dados fictícios em users/{uid}/syncTests/connection-check. */
+if (firestoreTestButton) firestoreTestButton.addEventListener('click', async () => {
+  const user = auth.currentUser;
+  if (!user || busy) return;
+  busy = true;
+  firestoreTestButton.disabled = true;
+  if (firestoreTestStatus) firestoreTestStatus.textContent = 'Gravando e lendo registro de teste no Firestore…';
+  try {
+    const reference = doc(firestore, 'users', user.uid, 'syncTests', 'connection-check');
+    const marker = 'raytech-cg-homologacao-test-v1';
+    const nonce = crypto.randomUUID();
+    await setDoc(reference, {
+      marker,
+      nonce,
+      testedAt: serverTimestamp()
+    });
+    const snapshot = await getDocFromServer(reference);
+    const data = snapshot.data();
+    if (!snapshot.exists() || data?.marker !== marker || data?.nonce !== nonce) {
+      throw new Error('test/verification-failed');
+    }
+    if (firestoreTestStatus) firestoreTestStatus.textContent = 'Teste aprovado: gravação e leitura confirmadas na nuvem.';
+  } catch (error) {
+    console.warn('Teste Firestore:', error?.code || 'falha de verificação');
+    if (firestoreTestStatus) {
+      firestoreTestStatus.textContent = error?.code === 'permission-denied'
+        ? 'Permissão negada. Verifique as regras do Firestore.'
+        : error?.code === 'unavailable'
+          ? 'Firestore indisponível ou sem conexão. Tente novamente online.'
+          : 'Teste não concluído. Confira a conexão e as configurações do Firestore.';
+    }
+  } finally {
+    busy = false;
+    firestoreTestButton.disabled = !auth.currentUser;
   }
 });
