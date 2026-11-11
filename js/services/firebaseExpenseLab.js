@@ -10,6 +10,7 @@ export function initializeExpenseLab(auth, db, onAuthStateChanged) {
   const amount = document.getElementById('firebaseExpenseLabAmount');
   const save = document.getElementById('firebaseExpenseLabSave');
   const cancel = document.getElementById('firebaseExpenseLabCancel');
+  const queueEdit = document.getElementById('firebaseExpenseQueueEdit');
   const draftButton = document.getElementById('firebaseExpenseLabDraft');
   const draftStatus = document.getElementById('firebaseExpenseLabDraftStatus');
   const list = document.getElementById('firebaseExpenseLabList');
@@ -32,12 +33,14 @@ export function initializeExpenseLab(auth, db, onAuthStateChanged) {
     amount.value = '';
     save.textContent = 'Cadastrar despesa fictícia';
     cancel.classList.add('hidden');
+    if (queueEdit) queueEdit.classList.add('hidden');
   };
   const controls = () => {
     save.disabled = busy || !auth.currentUser || !serverReady;
     title.disabled = busy;
     amount.disabled = busy;
     if (draftButton) draftButton.disabled = busy || !auth.currentUser;
+    if (queueEdit) queueEdit.disabled = busy || !auth.currentUser;
   };
   const money = cents => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   function render() {
@@ -62,13 +65,14 @@ export function initializeExpenseLab(auth, db, onAuthStateChanged) {
       edit.type = 'button';
       edit.className = 'text-xs text-cyan-300 underline';
       edit.textContent = 'Editar';
-      edit.disabled = busy || !serverReady;
+      edit.disabled = busy;
       edit.addEventListener('click', () => {
         editing = { id, version: data.version };
         title.value = data.title;
         amount.value = (data.amountCents / 100).toFixed(2).replace('.', ',');
         save.textContent = 'Salvar edição';
         cancel.classList.remove('hidden');
+        if (queueEdit) queueEdit.classList.remove('hidden');
         message('Editando versão ' + data.version + '. Alterações simultâneas serão verificadas.');
       });
       const remove = document.createElement('button');
@@ -77,7 +81,19 @@ export function initializeExpenseLab(auth, db, onAuthStateChanged) {
       remove.textContent = 'Excluir';
       remove.disabled = busy || !serverReady;
       remove.addEventListener('click', () => mutate('delete', { id, version: data.version }));
-      buttons.append(edit, remove);
+      const offlineDelete = document.createElement('button');
+      offlineDelete.type = 'button';
+      offlineDelete.className = 'text-xs text-amber-300 underline';
+      offlineDelete.textContent = 'Excluir offline';
+      offlineDelete.disabled = busy;
+      offlineDelete.addEventListener('click', () => {
+        if (!window.confirm('Enfileirar exclusão fictícia? Ela será aplicada somente se a versão não mudar no servidor.')) return;
+        window.dispatchEvent(new CustomEvent('raytech-lab-queue-mutation', {
+          detail: { kind: 'delete', targetId: id, baseVersion: data.version }
+        }));
+        message('Solicitação de exclusão enviada à fila local. Confira o indicador da fila.');
+      });
+      buttons.append(edit, remove, offlineDelete);
       line.append(name, buttons);
       list.append(line);
     }
@@ -136,6 +152,22 @@ export function initializeExpenseLab(auth, db, onAuthStateChanged) {
       if (session === generation) { busy = false; controls(); render(); }
     }
   }
+  if (queueEdit) queueEdit.addEventListener('click', () => {
+    const user = auth.currentUser;
+    if (!user || !editing || busy) return;
+    const name = title.value.trim(), raw = amount.value.trim();
+    const valid = /^\d{1,7}(?:[,.]\d{1,2})?$/.test(raw);
+    const cents = valid ? Math.round(Number(raw.replace(',', '.')) * 100) : NaN;
+    if (!name || name.length > 60 || !Number.isSafeInteger(cents) || cents <= 0) {
+      message('Informe descrição e valor válidos para a edição offline.');
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('raytech-lab-queue-mutation', {
+      detail: { kind: 'update', targetId: editing.id, baseVersion: editing.version, title: name, amountCents: cents }
+    }));
+    reset();
+    message('Solicitação de edição enviada à fila local. Confira o indicador da fila.');
+  });
   if (draftButton) draftButton.addEventListener('click', () => {
     const user = auth.currentUser;
     if (!user || busy) return;

@@ -591,6 +591,7 @@
               <div class="flex flex-wrap gap-2">
                 <button id="firebaseExpenseLabSave" type="button" class="px-3 py-2 rounded-lg bg-cyan-800 hover:bg-cyan-700 text-white text-xs font-bold">Cadastrar despesa fictícia</button>
                 <button id="firebaseExpenseLabCancel" type="button" class="hidden px-3 py-2 rounded-lg bg-slate-800 text-white text-xs">Cancelar edição</button>
+                <button id="firebaseExpenseQueueEdit" type="button" class="hidden px-3 py-2 rounded-lg bg-amber-800 text-white text-xs">Enfileirar edição offline</button>
               </div>
               <div class="border border-amber-500/30 rounded-lg p-2 space-y-2">
                 <p class="text-[11px] font-bold text-amber-200">Teste offline seguro (somente rascunho)</p>
@@ -607,7 +608,8 @@
                 <p class="text-[11px] text-slate-400">Preencha a descrição e o valor fictícios acima e clique abaixo. A operação será guardada no IndexedDB, mesmo sem internet, e reenviada quando houver conexão. Não use também o botão “Cadastrar despesa fictícia” para o mesmo teste.</p>
                 <button id="firebaseExpenseQueueAdd" type="button" class="px-3 py-2 rounded-lg bg-cyan-800 text-white text-xs font-bold">Adicionar à fila offline</button>
                 <p id="firebaseExpenseQueueStatus" role="status" aria-live="polite" class="text-[11px] text-cyan-200">Aguardando conta.</p>
-                <p class="text-[10px] text-amber-200">Nesta etapa, somente novas despesas fictícias entram na fila. Edições e exclusões continuam exigindo conexão. Não limpe os dados do site enquanto houver operações pendentes.</p>
+                <div id="firebaseExpenseQueueConflicts" class="space-y-2"></div>
+                <p class="text-[10px] text-amber-200">Criações, edições e exclusões fictícias podem entrar na fila. Em conflito, a operação permanece pendente para análise, sem sobrescrever o servidor. Não limpe os dados do site enquanto houver operações pendentes.</p>
               </div>
               <div id="firebaseExpenseLabList" class="space-y-2"></div>
               <p id="firebaseExpenseLabStatus" role="status" aria-live="polite" class="text-[11px] text-emerald-300">Aguardando login.</p>
