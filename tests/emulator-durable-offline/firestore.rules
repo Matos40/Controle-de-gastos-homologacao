@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function owner(uid){return request.auth != null && request.auth.uid == uid;}
+  function headFields(){return request.resource.data.keys().hasOnly(['version','number','checksum','parent'])
+    && request.resource.data.keys().hasAll(['version','number','checksum','parent'])
+    && request.resource.data.version == 2
+    && request.resource.data.number is int
+    && request.resource.data.checksum is string
+    && request.resource.data.parent is string;}
+  match /users/{uid}/financeRevisionLab/control/state/head {
+   allow get: if owner(uid);
+   allow list,delete: if false;
+   allow create: if owner(uid) && headFields()
+    && request.resource.data.number == 1 && request.resource.data.parent == '';
+   allow update: if owner(uid) && headFields()
+    && request.resource.data.number == resource.data.number + 1
+    && request.resource.data.parent == resource.data.checksum
+    && request.resource.data.checksum != resource.data.checksum;
+  }
+  match /users/{uid}/financeRevisionLab/control/revisions/{revisionId} {
+   allow get,list: if owner(uid);
+   allow create: if owner(uid)
+    && request.resource.data.keys().hasOnly(['version','number','parent','checksum','shared'])
+    && request.resource.data.keys().hasAll(['version','number','parent','checksum','shared'])
+    && request.resource.data.version == 2
+    && request.resource.data.number is int
+    && revisionId == string(request.resource.data.number)
+    && request.resource.data.parent is string
+    && request.resource.data.checksum is string
+    && request.resource.data.shared is map
+    && request.resource.data.shared.keys().hasOnly(['schema','months'])
+    && request.resource.data.shared.keys().hasAll(['schema','months'])
+    && request.resource.data.shared.schema == 1
+    && request.resource.data.shared.months is map;
+   allow update,delete: if false;
+  }
+  match /{document=**}{allow read,write: if false;}
+ }
+}

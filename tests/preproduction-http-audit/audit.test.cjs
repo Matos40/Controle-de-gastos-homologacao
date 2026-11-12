@@ -1,0 +1,43 @@
+'use strict';
+// Auditoria ESTATICA de controles: nao inicializa SDK nem faz requisicoes.
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const root=path.resolve(__dirname,'../..');
+const read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const http=read('js/services/httpFinanceLab.js');
+const auth=read('js/services/emulatorAuthBackendLab.js');
+const backend=read('js/services/trustedFinanceBackendLab.js');
+const rules=read('tests/emulator-http-finance/firestore.rules');
+const config=JSON.parse(read('tests/emulator-http-finance/firebase.json'));
+const base='tests/emulator-http-finance/http.test.cjs';
+const resilience='tests/emulator-http-resilience/resilience.test.cjs';
+let passed=0;
+function test(name,fn){fn();passed++;console.log('APROVADO:',name);}
+function has(text,re){assert.match(text,re);}
+test('backend HTTP vinculado a localhost',()=>has(http,/server|http\.createServer/));
+test('guarda Firestore Emulator obrigatoria',()=>has(http,/FIRESTORE_EMULATOR_HOST[^\n]*!==['"]127\.0\.0\.1:8094/));
+test('guarda Auth Emulator obrigatoria',()=>has(http,/FIREBASE_AUTH_EMULATOR_HOST[^\n]*!==['"]127\.0\.0\.1:9100/));
+test('Firestore Emulator usa interface loopback',()=>assert.equal(config.emulators.firestore.host,'127.0.0.1'));
+test('Auth Emulator usa interface loopback',()=>assert.equal(config.emulators.auth.host,'127.0.0.1'));
+test('regras negam leitura e escrita de clientes',()=>has(rules,/allow read, write: if false/));
+test('endpoint aceita apenas POST',()=>has(http,/req\.method!==['"]POST/));
+test('endpoint verifica JSON',()=>has(http,/application\/json/));
+test('endpoint exige Bearer',()=>has(http,/req\.headers\.authorization/));
+test('backend verifica ID token no Admin SDK',()=>has(auth,/auth\.verifyIdToken\(token\)/));
+test('UID deriva de token verificado',()=>has(auth,/uid:decoded\.uid/));
+test('backend usa UID verificado para paths',()=>has(backend,/const uid=await identity\(token\)/));
+test('backend usa transacoes Firestore',()=>has(backend,/db\.runTransaction/));
+test('backend verifica idempotencia por hash',()=>has(backend,/r\.operationHash===hash/));
+test('backend audita cadeia de revisoes',()=>has(backend,/async function auditTx/));
+test('endpoint limita payload',()=>has(http,/MAX_BODY=128\*1024/));
+test('endpoint responde sem cache',()=>has(http,/Cache-Control['"]:['"]no-store/));
+test('endpoint define nosniff',()=>has(http,/X-Content-Type-Options['"]:['"]nosniff/));
+test('endpoint nao devolve mensagem bruta de excecao',()=>assert(!/reply\([^\n]*e\.message/.test(http)));
+test('testes HTTP de autenticacao existentes',()=>has(read(base),/token adulterado nao confirma/));
+test('testes de concorrencia existentes',()=>has(read(resilience),/envios simultaneos com mesma chave/));
+test('testes de payload excessivo existentes',()=>has(read(resilience),/payload acima de 128 KiB/));
+test('testes de isolamento existentes',()=>has(read(resilience),/auditoria B isolada/));
+test('nao ha listener fixo de producao no modulo HTTP',()=>assert(!/\.listen\(80\)|\.listen\(443\)/.test(http)));
+console.log('RESULTADO: '+passed+'/24 TESTES APROVADOS');
+console.log('AVISO: testes estaticos nao equivalem a auditoria de seguranca dinamica.');

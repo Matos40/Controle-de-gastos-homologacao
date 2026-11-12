@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function owner(uid) { return request.auth != null && request.auth.uid == uid; }
+  function base() { return request.resource.data.version == 2 && request.resource.data.planId is string; }
+  match /users/{uid}/financeV2Plans/{planId}/documents/{docId} {
+   allow get,list: if owner(uid);
+   allow create: if owner(uid) && base() && request.resource.data.planId == planId
+    && ((docId == 'manifest'
+      && request.resource.data.keys().hasOnly(['version','kind','planId','checksum','monthCount'])
+      && request.resource.data.keys().hasAll(['version','kind','planId','checksum','monthCount'])
+      && request.resource.data.kind == 'manifest'
+      && request.resource.data.checksum is string && request.resource.data.monthCount is int)
+     || (docId.matches('m_[0-9]{4}-(0[1-9]|1[0-2])')
+      && request.resource.data.keys().hasOnly(['version','kind','planId','ym','data'])
+      && request.resource.data.keys().hasAll(['version','kind','planId','ym','data'])
+      && request.resource.data.kind == 'month'
+      && docId == 'm_' + request.resource.data.ym
+      && request.resource.data.data is map
+      && !request.resource.data.data.keys().hasAny(['selectedMonth','gemini_user_api_key','controle_gastos_pin_lock','pin','pinHash','apiKey','geminiApiKey','viewPreferences'])));
+   allow update,delete: if false;
+  }
+  match /users/{uid}/financeV2Plans/{planId}/completion/{markerId} {
+   allow get,list: if owner(uid);
+   allow create: if owner(uid) && markerId == 'audited'
+    && request.resource.data.keys().hasOnly(['version','planId','checksum','status'])
+    && request.resource.data.keys().hasAll(['version','planId','checksum','status'])
+    && request.resource.data.version == 2 && request.resource.data.planId == planId
+    && request.resource.data.checksum is string
+    && request.resource.data.status == 'audited'
+    && exists(/databases/$(database)/documents/users/$(uid)/financeV2Plans/$(planId)/documents/manifest);
+   allow update,delete: if false;
+  }
+  match /{document=**} { allow read,write: if false; }
+ }
+}
