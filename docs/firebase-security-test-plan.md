@@ -25,3 +25,18 @@
 ## Antes da migração
 
 Auditar concorrência multiaba, filas com mesmo alvo, reenvio após confirmação perdida, recuperação de erros permanentes e contas trocadas no mesmo dispositivo. Fazer backup JSON completo e comparação de contagens e valores, sem enviar PIN ou chave Gemini.
+
+## Execução do teste negativo no Firebase Console
+
+1. Abra Firebase Console > projeto `raytech-cg-homologacao` > Firestore Database > Rules.
+2. Antes de alterar regras, use o simulador de regras (quando disponível) ou o Firebase Emulator Suite.
+3. Selecione operação `get` e caminho de documento **existente** `/users/UID_A/syncTests/expense-lab/items/ID_A`. O caminho deve ter IDs reais de teste, não os textos `UID_A`/`ID_A`.
+4. Execute como usuário autenticado com `auth.uid = UID_A`: resultado esperado **ALLOW**.
+5. Repita com `auth.uid = UID_B` (UID diferente): resultado esperado **DENY**.
+6. Repita sem autenticação: resultado esperado **DENY**.
+7. Execute um `create` como UID B em `/users/UID_A/syncTests/expense-lab/items/ID_NOVO`: resultado esperado **DENY**.
+8. Teste um `create` do proprietário com campo extra `gemini_user_api_key` usando as **regras propostas no emulador**: resultado esperado **DENY**.
+
+**Cuidado:** o resultado ALLOW de uma leitura não prova que o documento existe. Para o teste positivo, use um registro fictício existente. O simulador pode ter interface diferente conforme a versão do Console. Não cole tokens de autenticação nem dados financeiros no chat.
+
+**Pendência de segurança:** as regras propostas limitam formato e propriedade dos documentos, mas ainda precisam de testes de transações de recibos e concorrência. Não devem ser publicadas como definitivas sem essa validação.

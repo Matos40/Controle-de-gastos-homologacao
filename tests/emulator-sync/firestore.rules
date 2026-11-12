@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) { return request.auth != null && request.auth.uid == uid; }
+    function itemPath(uid, itemId) {
+      return /databases/$(database)/documents/users/$(uid)/labItems/$(itemId);
+    }
+    function receiptPath(uid, opId) {
+      return /databases/$(database)/documents/users/$(uid)/labReceipts/$(opId);
+    }
+    match /users/{uid}/labItems/{itemId} {
+      allow read: if owner(uid);
+      allow create, update: if owner(uid)
+        && request.resource.data.keys().hasOnly(['month','type','id','version','deleted','data','operationId'])
+        && request.resource.data.id == itemId
+        && request.resource.data.version is int
+        && request.resource.data.version >= 1
+        && request.resource.data.operationId is string
+        && request.resource.data.deleted is bool
+        && (request.resource.data.deleted == (request.resource.data.data == null))
+        && (resource == null || request.resource.data.version == resource.data.version + 1)
+        && (resource == null || resource.data.deleted == false)
+        && getAfter(receiptPath(uid, request.resource.data.operationId)).data.targetId == itemId
+        && getAfter(receiptPath(uid, request.resource.data.operationId)).data.version == request.resource.data.version;
+      allow delete: if false;
+    }
+    match /users/{uid}/labReceipts/{opId} {
+      allow read: if owner(uid);
+      allow create: if owner(uid)
+        && request.resource.data.keys().hasOnly(['targetId','version','kind','operationId'])
+        && request.resource.data.operationId == opId
+        && request.resource.data.targetId is string
+        && request.resource.data.version is int
+        && request.resource.data.kind in ['create','update','delete']
+        && getAfter(itemPath(uid, request.resource.data.targetId)).data.operationId == opId
+        && getAfter(itemPath(uid, request.resource.data.targetId)).data.version == request.resource.data.version;
+      allow update, delete: if false;
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

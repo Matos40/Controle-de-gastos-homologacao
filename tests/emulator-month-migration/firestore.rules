@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) { return request.auth != null && request.auth.uid == uid; }
+    function validVersion() {
+      return request.resource.data.version is int && request.resource.data.version == 1;
+    }
+    match /users/{uid}/monthMigrationManifest/{planId} {
+      allow get, list: if owner(uid);
+      allow create: if owner(uid) && validVersion()
+        && request.resource.data.keys().hasOnly([
+          'version','planId','schema','selectedMonth','topLevel','checksum','monthCount','recordCount'
+        ])
+        && request.resource.data.keys().hasAll([
+          'version','planId','schema','selectedMonth','topLevel','checksum','monthCount','recordCount'
+        ])
+        && request.resource.data.planId == planId
+        && request.resource.data.schema == 1
+        && request.resource.data.selectedMonth is string
+        && request.resource.data.topLevel is map
+        && request.resource.data.checksum is string
+        && request.resource.data.monthCount is int
+        && request.resource.data.recordCount is int;
+      allow update, delete: if false;
+    }
+    match /users/{uid}/monthMigrationMonths/{ym} {
+      allow get, list: if owner(uid);
+      allow create: if owner(uid) && validVersion()
+        && request.resource.data.keys().hasOnly(['version','ym','fields','presence','counts'])
+        && request.resource.data.keys().hasAll(['version','ym','fields','presence','counts'])
+        && request.resource.data.ym == ym
+        && request.resource.data.fields is map
+        && request.resource.data.presence is map
+        && request.resource.data.counts is map;
+      allow update, delete: if false;
+    }
+    match /users/{uid}/monthMigrationRecords/{recordId} {
+      allow get, list: if owner(uid);
+      allow create: if owner(uid) && validVersion()
+        && request.resource.data.keys().hasOnly([
+          'version','recordId','ym','type','sourceId','index','value'
+        ])
+        && request.resource.data.keys().hasAll([
+          'version','recordId','ym','type','sourceId','index','value'
+        ])
+        && request.resource.data.recordId == recordId
+        && request.resource.data.ym is string
+        && request.resource.data.type in ['expenses','cardExpenses','extraIncomes']
+        && request.resource.data.sourceId is string
+        && request.resource.data.index is int
+        && request.resource.data.index >= 0
+        && request.resource.data.value is map;
+      allow update, delete: if false;
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
