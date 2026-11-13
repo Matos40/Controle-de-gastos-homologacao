@@ -21,6 +21,7 @@ jobs:
         with:
           path: homologacao
           persist-credentials: true
+          fetch-depth: 0
       - name: Obter develop do aplicativo original
         uses: actions/checkout@v4
         with:
@@ -53,6 +54,87 @@ jobs:
           if "homolog-controle-gastos-shell-" not in sw or "key.startsWith('homolog-controle-gastos-shell-')" not in sw:
               raise SystemExit('ERRO: cache PWA sem isolamento esperado')
           PY
+      - name: Restaurar personalizacoes aprovadas e validar integridade
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYOVERLAY'
+          from pathlib import Path
+          import subprocess
+
+          root = Path('homologacao')
+          source_commit = '37d253e17ba95974ed05bb2cd39d2ce90050d1e6'
+          modules = {
+              'js/services/firebaseAuthLite.js': '6d626ed74a068c8ab82d54c8a14844345d5a612d',
+              'js/services/firebaseAuthAvailability.js': '00c1dfa5d3c49bb5cee8e1e819071699e18e1f5c',
+          }
+          # O checkout da homologacao usa fetch-depth: 0 para disponibilizar o commit aprovado.
+          for path, expected_sha in modules.items():
+              blob = subprocess.check_output(['git', '-C', str(root), 'show', f'{source_commit}:{path}'])
+              actual_sha = subprocess.check_output(['git', 'hash-object', '--stdin'], input=blob).decode().strip()
+              if actual_sha != expected_sha:
+                  raise SystemExit(f'ERRO: integridade da personalizacao comprometida: {path}')
+              target = root / path
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(blob)
+
+          html_file = root / 'index.html'
+          html = html_file.read_text(encoding='utf-8')
+          replacements = {
+              '<!-- Firebase Authentication de homologação: independente do banco financeiro local -->':
+                  '<!-- Conta Google opcional: sem sincronização financeira -->',
+              '<i class="fa-solid fa-cloud"></i> Conta na nuvem (teste)':
+                  '<i class="fa-solid fa-cloud"></i> Conta Google',
+              'Laboratórios isolados: nenhum lançamento financeiro real é enviado ou sincronizado.':
+                  'O login Google identifica sua conta, mas não sincroniza nem separa seus dados financeiros. Trocar ou sair da conta Google neste navegador não altera os lançamentos armazenados neste dispositivo.',
+              '<script type="module" src="./js/services/firebaseAuth.js"></script>':
+                  '<script type="module" src="./js/services/firebaseAuthLite.js"></script>\n  <script src="./js/services/firebaseAuthAvailability.js"></script>',
+          }
+          for before, after in replacements.items():
+              if html.count(before) != 1:
+                  raise SystemExit(f'ERRO: index.html mudou; personalizacao exige revisao: {before[:65]}')
+              html = html.replace(before, after, 1)
+          html_file.write_text(html, encoding='utf-8')
+
+          sw = (root / 'sw.js').read_text(encoding='utf-8')
+          required = [
+              "key.startsWith('homolog-controle-gastos-shell-')",
+              "!url.pathname.startsWith(new URL(self.registration.scope).pathname)",
+              "'./js/services/firebaseAuthLite.js'",
+              "'./js/services/firebaseAuthAvailability.js'",
+          ]
+          if any(sw.count(marker) != 1 for marker in required):
+              raise SystemExit('ERRO: service worker incompatível ou cache sem isolamento')
+          for rel in modules:
+              if html.count('./' + rel) != 1:
+                  raise SystemExit(f'ERRO: referência ausente ou duplicada no HTML: {rel}')
+          if '<script type="module" src="./js/services/firebaseAuth.js"></script>' in html:
+              raise SystemExit('ERRO: autenticacao antiga continua ativa')
+          PYOVERLAY
+      - name: Validar referencias e integridade do resultado final
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYVALIDATE'
+          from pathlib import Path
+          import re
+          root = Path('homologacao')
+          html = (root / 'index.html').read_text()
+          sw = (root / 'sw.js').read_text()
+          # Apenas referencias relativas locais, sem confundir URLs de CDN com arquivos do repositorio.
+          for src in re.findall(r'<script[^>]+src=["\'](\./js/[^"\']+)["\']', html):
+              if not (root / src).is_file():
+                  raise SystemExit(f'ERRO: modulo inexistente referenciado no HTML: {src}')
+          shell = sw.split('const APP_SHELL = [', 1)
+          if len(shell) != 2:
+              raise SystemExit('ERRO: APP_SHELL nao encontrado')
+          shell = shell[1].split('];', 1)[0]
+          for src in re.findall(r'["\'](\./[^"\']+)["\']', shell):
+              if src == './':
+                  continue
+              if not (root / src).is_file():
+                  raise SystemExit(f'ERRO: recurso inexistente no cache: {src}')
+          PYVALIDATE
       - name: Validar JavaScript e manifesto
         shell: bash
         run: |
