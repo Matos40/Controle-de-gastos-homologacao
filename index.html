@@ -556,10 +556,10 @@
             </div>
           </div>
 
-          <!-- Firebase Authentication de homologação: independente do banco financeiro local -->
+          <!-- Conta Google opcional: sem sincronização financeira -->
           <section class="bg-slate-950/80 border border-cyan-500/30 rounded-xl p-2.5 space-y-2" aria-label="Conta na nuvem">
             <div class="text-[10px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5 px-1">
-              <i class="fa-solid fa-cloud"></i> Conta na nuvem (teste)
+              <i class="fa-solid fa-cloud"></i> Conta Google
             </div>
             <p id="firebaseAuthStatus" role="status" aria-live="polite" class="text-[11px] text-slate-400 px-1">Carregando autenticação…</p>
             <p id="firebaseAccount" class="text-[11px] text-slate-200 px-1 break-words"></p>
@@ -614,7 +614,7 @@
               <div id="firebaseExpenseLabList" class="space-y-2"></div>
               <p id="firebaseExpenseLabStatus" role="status" aria-live="polite" class="text-[11px] text-emerald-300">Aguardando login.</p>
             </div>
-            <p class="text-[10px] text-amber-200/80 px-1">Laboratórios isolados: nenhum lançamento financeiro real é enviado ou sincronizado.</p>
+            <p class="text-[10px] text-amber-200/80 px-1">Conectar sua conta Google não envia nem sincroniza lançamentos financeiros.</p>
           </section>
 
           <!-- Ajuda acessível pelo menu Opções, sem botão flutuante -->
@@ -1657,7 +1657,7 @@
   <script src="./js/ui/renderHistory.js"></script>
   <script src="./js/app.js"></script>
   <script src="./js/onboarding.js"></script>
-  <script type="module" src="./js/services/firebaseAuth.js"></script>
+  <script type="module" src="./js/services/firebaseAuthLite.js"></script>
 
 </body>
 </html>
