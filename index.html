@@ -82,14 +82,14 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen antialiased flex flex-col selection:bg-emerald-500 selection:text-slate-950 pb-20 sm:pb-0">
 <section id="cloudControl" aria-label="Sincronização de teste">
   <div class="max-w-6xl mx-auto px-3 sm:px-6 py-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
-    <span class="font-bold text-cyan-200"><i class="fa-solid fa-cloud"></i> Nuvem de teste <span class="text-slate-400">RC1</span></span>
+    <span class="font-bold text-cyan-200"><i class="fa-solid fa-cloud"></i> Nuvem de teste <span class="text-slate-400">RC2</span></span>
     <span id="cloudIndicator" data-tone="busy" role="status" aria-live="polite">Conectando…</span>
     <span class="text-slate-400">Dados fictícios</span>
   </div>
   <details id="cloudDetails" class="max-w-6xl mx-auto px-3 sm:px-6 pb-2 text-xs">
     <summary class="text-slate-400">Detalhes e recuperação <span aria-hidden="true">▾</span></summary>
     <div class="pt-2 space-y-2">
-      <p class="text-amber-200">Somente dados fictícios. Use a palavra Teste nas descrições. Até 16 alterações pendentes, sujeito à capacidade do dispositivo. Reconexão envia automaticamente quando não houver conflito. Importe somente backups fictícios identificados. IA e PIN local indisponíveis na nuvem.</p>
+      <p class="text-amber-200">Somente dados fictícios. Use a palavra Teste nas descrições. Até 16 alterações pendentes, sujeito à capacidade do dispositivo. Reconexão envia automaticamente e concilia alterações independentes quando a revisão-base é comprovada. Importe somente backups fictícios identificados. IA e PIN local indisponíveis na nuvem.</p>
       <p id="cloudStatus" role="status" aria-live="polite">Aguardando autenticação e servidor…</p>
       <div class="flex flex-wrap gap-2">
         <a id="cloudLeave" href="./index.html?mode=local" class="cloud-action">Modo local</a>
@@ -1723,10 +1723,10 @@
   const common=['./js/ui/renderSummary.js','./js/ui/renderExpenses.js','./js/ui/renderCards.js','./js/ui/renderAnalytics.js','./js/ui/renderHistory.js'];
   const classic=cloud?['./js/cloudTest/state.js','./js/cloudTest/storage.js','./js/cloudTest/export.js',...common,'./js/cloudTest/app.js']:['./js/state.js','./js/services/storageService.js','./js/services/geminiService.js','./js/services/excelService.js',...common,'./js/app.js','./js/onboarding.js'];
   // Parser-inserted same-origin scripts preserve execution order. All URLs are constants.
-  for(const path of classic)document.write('<scr'+'ipt src="'+path+'?v=rc1"><'+'/script>');
+  for(const path of classic)document.write('<scr'+'ipt src="'+path+'?v=rc2"><'+'/script>');
   const module=cloud?'./js/cloudTest/sync.mjs':'./js/services/firebaseAuthLite.js';
-  document.write('<scr'+'ipt type="module" src="'+module+'?v=rc1"><'+'/script>');
-  if(!cloud)document.write('<scr'+'ipt src="./js/services/firebaseAuthAvailability.js?v=rc1"><'+'/script>');
+  document.write('<scr'+'ipt type="module" src="'+module+'?v=rc2"><'+'/script>');
+  if(!cloud)document.write('<scr'+'ipt src="./js/services/firebaseAuthAvailability.js?v=rc2"><'+'/script>');
 })();
 </script>
 </body>

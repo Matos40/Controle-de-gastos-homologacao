@@ -112,3 +112,37 @@ export function validateLegacyFixture(payload){const d=validatePayload(payload);
 export function legacyRows(d){const p=validateLegacyFixture(JSON.stringify(d)),chunks=p.match(/[\s\S]{1,30000}/g);return [["Formato","Versão","Parte","Total","JSON"],...chunks.map((x,i)=>["RAYTECH_BACKUP",1,i+1,chunks.length,x])];}
 export function readLegacyRows(rows){if(!Array.isArray(rows)||rows.length<2||rows.length>7||canonical(rows[0])!==canonical(["Formato","Versão","Parte","Total","JSON"]))throw Error("LEGACY_ROWS");let p="";for(let i=1;i<rows.length;i++){const x=rows[i];if(!Array.isArray(x)||x.length!==5||x[0]!=="RAYTECH_BACKUP"||x[1]!==1||x[2]!==i||x[3]!==rows.length-1||typeof x[4]!=="string"||!x[4]||x[4].length>30000)throw Error("LEGACY_ROWS");p+=x[4];}return validateLegacyFixture(p);}
 export function conflictBranches(rows){const ids=new Set(rows.map(q=>q.id)),parents=new Set(rows.map(q=>q.parentId).filter(id=>ids.has(id)));return rows.filter(q=>!parents.has(q.id)).sort((a,b)=>a.expectedRevision-b.expectedRevision||a.id.localeCompare(b.id));}
+
+export function mergeThreeWay(basePayload,localPayload,remotePayload){
+ const b=validatePayload(basePayload),l=validatePayload(localPayload),r=validatePayload(remotePayload),out=JSON.parse(remotePayload),conflicts=[];
+ const eq=(a,b)=>canonical(a??null)===canonical(b??null),keys=x=>Object.keys(x).sort(),fail=path=>conflicts.push(path);
+ const choose=(a,x,y,path)=>{if(eq(x,a))return y;if(eq(y,a)||eq(x,y))return x;fail(path);return y;};
+ if(!eq(keys(b.months),keys(l.months))||!eq(keys(b.months),keys(r.months)))return {payload:null,conflicts:["Estrutura de meses mudou"]};
+ const groups=db=>{const map=new Map();for(const [ym,m] of Object.entries(db.months)){for(const c of m.cardExpenses){if(!c.isInstallment)continue;const k=c.installmentOriginId,arr=map.get(k)??[];arr.push([ym,c]);map.set(k,arr);}for(const t of m.deletedInstallmentOrigins??[]){const k=t.split(":")[0],arr=map.get(k)??[];arr.push([ym,t]);map.set(k,arr);}}for(const arr of map.values())arr.sort((x,y)=>canonical(x).localeCompare(canonical(y)));return map;};
+ const [gb,gl,gr]=[b,l,r].map(groups);for(const k of new Set([...gb.keys(),...gl.keys(),...gr.keys()])){const a=gb.get(k)??[],x=gl.get(k)??[],y=gr.get(k)??[];if(!eq(a,x)&&!eq(a,y)&&!eq(x,y))fail("Série de parcelas "+k);}
+ for(const ym of keys(b.months)){
+  const a=b.months[ym],x=l.months[ym],y=r.months[ym],m=out.months[ym];
+  if(a.closed!==x.closed||a.closed!==y.closed||a.closedAt!==x.closedAt||a.closedAt!==y.closedAt){fail(ym+" · fechamento de mês");continue;}
+  if(a.closed&&(!eq(a,x)||!eq(a,y))){fail(ym+" · mês fechado");continue;}
+  for(const k of ["salary","budgetLimit"])m[k]=choose(a[k],x[k],y[k],ym+" · "+k);
+  const ta=new Set(a.deletedInstallmentOrigins??[]),tl=new Set(x.deletedInstallmentOrigins??[]),tr=new Set(y.deletedInstallmentOrigins??[]);
+  if([...ta].some(t=>!tl.has(t)||!tr.has(t)))fail(ym+" · remoção de marca de exclusão");
+  const tomb=new Set([...tr,...tl]);if(tomb.size||Object.hasOwn(m,"deletedInstallmentOrigins"))m.deletedInstallmentOrigins=[...tomb];
+  for(const k of ["expenses","cardExpenses","extraIncomes"]){
+   const [aa,xx,yy]=[a,x,y].map(m=>new Map(m[k].map(i=>[i.id,i])));m[k]=[];
+   for(const id of new Set([...yy.keys(),...xx.keys(),...aa.keys()])){
+    const av=aa.get(id),lv=xx.get(id),rv=yy.get(id);
+    if(!av&&/^(exp_sync_|exp_inherited_|card_sync_|card_inherited_)/.test(id))fail(ym+" · lançamento herdado "+id);
+    const v=choose(av,lv,rv,ym+" · "+k+" · "+id);if(v!==undefined)m[k].push(v);
+    if(k==="cardExpenses"&&av?.isInstallment&&!v&&!tomb.has(av.installmentOriginId+":"+av.currentInstallment))fail(ym+" · exclusão de parcela sem marca "+id);
+   }
+  }
+  const origins=new Set();for(const c of m.cardExpenses){if(!c.isInstallment)continue;const k=c.installmentOriginId+":"+c.currentInstallment;if(origins.has(k)||tomb.has(k))fail(ym+" · parcela duplicada ou excluída "+k);origins.add(k);}
+ }
+ if(conflicts.length)return {payload:null,conflicts:[...new Set(conflicts)]};
+ const payload=JSON.stringify(out);try{validatePayload(payload);}catch{return {payload:null,conflicts:["Limites ou integridade financeira incompatíveis"]};}
+ return {payload,conflicts:[]};
+}
+export function linearConflict(rows){if(!rows.length)return null;const sorted=[...rows].sort((a,b)=>a.expectedRevision-b.expectedRevision||a.id.localeCompare(b.id));for(let i=0;i<sorted.length;i++){const q=validateQueued(sorted[i]);if(!Object.hasOwn(q,"parentId")||!q.expectedRevision||i&&(q.parentId!==sorted[i-1].id||q.expectedRevision!==sorted[i-1].expectedRevision+1))return null;}return {first:sorted[0],tail:sorted[sorted.length-1],rows:sorted};}
+export function reconcileCandidate(remote,rows,proof,hash,id){if(!remote||!proof||!validId(id))return {payload:null,conflicts:["Revisão-base ausente"]};validateEnvelope(remote);const chain=linearConflict(rows);if(!chain)return {payload:null,conflicts:["Fila não linear ou base inicial ausente"]};const first=chain.first;if(remote.revision<=first.expectedRevision||remote.revision>=500||rows.some(q=>Object.hasOwn(remote.receipts,q.id)))return {payload:null,conflicts:["Revisão ou recibos incompatíveis"]};if(proof.operationId!==first.id||proof.parentId!==first.parentId||proof.revision!==first.expectedRevision||remote.receipts[first.parentId]!==first.expectedRevision+":"+hash)return {payload:null,conflicts:["Revisão-base não comprovada"]};const result=mergeThreeWay(proof.payload,chain.tail.payload,remote.payload);if(!result.payload)return result;return {...result,operation:{id,expectedRevision:remote.revision,parentId:remote.lastOperationId,payload:result.payload}};}
+export function proofMatches(q,proof){return !!proof&&proof.operationId===q.id&&proof.parentId===q.parentId&&proof.revision===q.expectedRevision&&typeof proof.payload==="string";}
