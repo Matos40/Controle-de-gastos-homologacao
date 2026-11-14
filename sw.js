@@ -1,14 +1,19 @@
-const CACHE_NAME = 'homolog-controle-gastos-shell-v10';
+const CACHE_NAME = 'homolog-controle-gastos-shell-v11';
 const APP_SHELL = [
   './', './index.html', './manifest.json', './css/styles.css',
   './js/state.js', './js/app.js',
   './js/services/firebaseAuth.js', './js/services/firebaseAuthLite.js', './js/services/firebaseAuthAvailability.js', './js/services/firebaseExpenseLab.js', './js/services/firebaseOfflineQueue.js',
   './js/services/firebaseFinancialPilot.mjs', './js/services/firebaseFinancialPilotModel.mjs',
   './js/services/storageService.js', './js/services/geminiService.js', './js/services/excelService.js',
+  './js/onboarding.js', './js/cloudTest/state.js', './js/cloudTest/storage.js', './js/cloudTest/export.js',
+  './js/cloudTest/app.js', './js/cloudTest/model.mjs', './js/cloudTest/sync.mjs', './cloud-test.html',
   './js/ui/renderSummary.js', './js/ui/renderExpenses.js', './js/ui/renderCards.js',
   './js/ui/renderAnalytics.js', './js/ui/renderHistory.js'
 ];
 const CDN_ASSETS = [
+  'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js',
+  'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js',
+  'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js',
   'https://cdn.tailwindcss.com',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
   'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
@@ -36,19 +41,21 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin && !CDN_ASSETS.some(asset => request.url.startsWith(asset.split('?')[0]))) return;
   if (url.origin === self.location.origin && !url.pathname.startsWith(new URL(self.registration.scope).pathname)) return;
-  // Cloud-test never falls back to the local application or cached financial page.
-  if (request.mode === 'navigate' && (url.pathname.endsWith('/cloud-test.html') || url.searchParams.get('mode') === 'cloud')) {
-    event.respondWith(fetch(request, {cache:'no-store'}).catch(() => new Response('Modo nuvem indisponível sem internet. Volte ao aplicativo local.', {status:503,headers:{'Content-Type':'text/plain; charset=utf-8'}})));
+  // Both modes use the identical shell. Legacy URL only redirects; never cache it as index.
+  if (request.mode === 'navigate' && url.pathname.endsWith('/cloud-test.html')) {
+    event.respondWith(Promise.resolve(Response.redirect(new URL('./index.html?mode=cloud', self.registration.scope).href,302)));
     return;
   }
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
-      try { const fresh = await fetch(request); const cache = await caches.open(CACHE_NAME); cache.put('./index.html', fresh.clone()); return fresh; }
+      try { const fresh = await fetch(request); const cache = await caches.open(CACHE_NAME); if(fresh.ok && (url.pathname.endsWith('/index.html')||url.pathname===new URL(self.registration.scope).pathname)) await cache.put('./index.html', fresh.clone()); return fresh; }
       catch { return (await caches.match('./index.html')) || Response.error(); }
     })());
     return;
   }
-  if (url.pathname.includes('/js/cloudTest/')) { event.respondWith(fetch(request,{cache:'no-store'})); return; }
+  if (url.pathname.includes('/js/cloudTest/') || (url.origin==='https://www.gstatic.com' && url.pathname.startsWith('/firebasejs/11.10.0/'))) {
+    event.respondWith((async()=>{const cache=await caches.open(CACHE_NAME);const cached=await cache.match(request);if(cached)return cached;const fresh=await fetch(request);if(fresh.ok)await cache.put(request,fresh.clone());return fresh;})());return;
+  }
   event.respondWith((async () => {
     const cached = await (await caches.open(CACHE_NAME)).match(request);
     const network = fetch(request).then(response => {

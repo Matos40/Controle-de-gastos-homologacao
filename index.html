@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Raytech CG | Controle de Gastos</title>
-  <script>document.documentElement.dataset.raytechMode=new URLSearchParams(location.search).get('mode')==='cloud'?'cloud':'local';</script>
+  <script>
+    (function(){const requested=new URLSearchParams(location.search).get('mode');let remembered=false;try{if(requested==='local')localStorage.removeItem('raytech_cloud_test_preference_v1');remembered=localStorage.getItem('raytech_cloud_test_preference_v1')==='enabled';}catch{}document.documentElement.dataset.raytechMode=requested==='cloud'||(requested!=='local'&&remembered)?'cloud':'local';})();
+  </script>
   <style>
     #cloudWorkspace{display:contents}
     #cloudControl{display:none}
@@ -82,18 +84,18 @@
   <div class="max-w-6xl mx-auto px-3 sm:px-6 py-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
     <span class="font-bold text-cyan-200"><i class="fa-solid fa-cloud"></i> Nuvem de teste</span>
     <span id="cloudIndicator" data-tone="busy" role="status" aria-live="polite">Conectando…</span>
-    <a id="cloudLeave" href="./index.html" class="cloud-action">Modo local</a>
+    <a id="cloudLeave" href="./index.html?mode=local" class="cloud-action">Modo local</a>
   </div>
   <details id="cloudDetails" class="max-w-6xl mx-auto px-3 sm:px-6 pb-2 text-xs">
     <summary class="text-slate-400">Detalhes e recuperação <span aria-hidden="true">▾</span></summary>
     <div class="pt-2 space-y-2">
-      <p class="text-amber-200">Somente dados fictícios. Use a palavra Teste nas descrições. Importação comum, IA e PIN local indisponíveis na nuvem.</p>
+      <p class="text-amber-200">Somente dados fictícios. Use a palavra Teste nas descrições. Até 8 alterações pendentes. Reconexão envia automaticamente quando não houver conflito. Importação comum, IA e PIN local indisponíveis na nuvem.</p>
       <p id="cloudStatus" role="status" aria-live="polite">Aguardando autenticação e servidor…</p>
       <div class="flex flex-wrap gap-2">
         <button id="cloudRefresh" type="button" class="cloud-action">Atualizar / conectar</button>
         <button id="cloudRetry" hidden type="button" class="cloud-action">Repetir operação pendente</button>
-        <button id="cloudDownload" hidden type="button" class="cloud-action">Salvar arquivo de recuperação</button>
-        <button id="cloudDiscard" hidden type="button" class="cloud-action">Descartar conflito</button>
+        <button id="cloudDownload" hidden type="button" class="cloud-action">Salvar fila de recuperação</button>
+        <button id="cloudDiscard" hidden type="button" class="cloud-action">Descartar fila em conflito</button>
         <button id="cloudRestore" hidden type="button" class="cloud-action">Recuperar operação fictícia</button>
         <input id="cloudRecoveryFile" type="file" accept=".json,application/json" hidden>
       </div>
@@ -1701,7 +1703,7 @@
   </nav>
 
   <footer class="hidden sm:block border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-600">
-    <p class="local-mode-only">Controle de Gastos Mensais • Aplicativo Web Progressivo (PWA) 100% Offline • Salvo no seu dispositivo</p><p class="cloud-mode-only">Nuvem de teste • Gravação online • Banco fictício separado</p>
+    <p class="local-mode-only">Controle de Gastos Mensais • Aplicativo Web Progressivo (PWA) 100% Offline • Salvo no seu dispositivo</p><p class="cloud-mode-only">Nuvem de teste • Gravação local e sincronização • Banco fictício separado</p>
   </footer>
 
 </div>

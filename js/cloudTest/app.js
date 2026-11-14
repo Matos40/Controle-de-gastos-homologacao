@@ -747,7 +747,7 @@ async function triggerNativePwaInstall() {
       };
     }
     function showToast(message, type = 'info') {
-      if (window.raytechCloudPending && type === 'success') { message = 'Alteração de teste enviada para confirmação. Confira o status da nuvem.'; type = 'info'; }
+      if (window.raytechCloudPending && type === 'success') { message = 'Alteração fictícia salva neste dispositivo. Confira o status da sincronização.'; type = 'info'; }
       const toast = document.getElementById('toast');
       const toastMsg = document.getElementById('toastMsg');
       const toastIcon = document.getElementById('toastIcon');

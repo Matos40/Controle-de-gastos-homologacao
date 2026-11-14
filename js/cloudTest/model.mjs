@@ -48,3 +48,22 @@ export function operationStatus(confirmed,q){if(confirmed&&Object.hasOwn(confirm
 export function checkSuccessor(previous,next){if(!previous)return;if(!next||next.revision<previous.revision)throw Error("REVISION_ROLLBACK");for(const [id,receipt] of Object.entries(previous.receipts)){if(next.receipts[id]!==receipt)throw Error("RECEIPT_DIVERGENCE");}if(next.revision===previous.revision&&(next.payload!==previous.payload||next.lastOperationId!==previous.lastOperationId))throw Error("REVISION_DIVERGENCE");}
 export function validateRecovery(pack,uid){if(!pack||Object.keys(pack).sort().join("|")!=="format|operation|sha256|uid"||pack.format!=="raytech-test-recovery-v1"||pack.uid!==uid||typeof pack.sha256!=="string"||!/^[0-9a-f]{64}$/.test(pack.sha256))throw Error("RECOVERY_FORMAT");const q=pack.operation;if(!q||Object.keys(q).sort().join("|")!=="expectedRevision|id|payload"||!validId(q.id)||!Number.isInteger(q.expectedRevision)||q.expectedRevision<0||q.expectedRevision>=500)throw Error("RECOVERY_OPERATION");validatePayload(q.payload);return q;}
 export function recoveryPackage(uid,q,sha256){const pack={format:"raytech-test-recovery-v1",uid,operation:q,sha256};validateRecovery(pack,uid);return pack;}
+
+export function validateQueued(q){if(!q||!validId(q.id)||!Number.isInteger(q.expectedRevision)||q.expectedRevision<0||q.expectedRevision>=500)throw Error("INVALID_QUEUE");validatePayload(q.payload);if(Object.hasOwn(q,"parentId")){if(Object.keys(q).sort().join("|")!=="expectedRevision|id|parentId|payload"||!(q.expectedRevision===0?q.parentId==="":validId(q.parentId))||q.parentId===q.id)throw Error("INVALID_PARENT");}else if(Object.keys(q).sort().join("|")!=="expectedRevision|id|payload")throw Error("INVALID_QUEUE");return q;}
+export function queueStatus(confirmed,rows){
+  const rev=confirmed?.revision??0, parent=confirmed?.lastOperationId??"";
+  if(!rows.length)return {kind:"empty",revision:rev,parent};
+  const ids=new Set();for(const q of rows){validateQueued(q);if(ids.has(q.id))throw Error("DUPLICATE_ID");ids.add(q.id);}
+  const sorted=[...rows].sort((a,b)=>a.expectedRevision-b.expectedRevision||a.id.localeCompare(b.id));
+  const first=sorted[0];
+  if(confirmed&&Object.hasOwn(confirmed.receipts,first.id))return {kind:"recorded",first};
+  if(first.expectedRevision!==rev||Object.hasOwn(first,"parentId")&&first.parentId!==parent)return {kind:"conflict",first};
+  if(!Object.hasOwn(first,"parentId")&&sorted.length>1)return {kind:"conflict",first};
+  let previous=first;
+  for(const q of sorted.slice(1)){if(q.expectedRevision!==previous.expectedRevision+1||q.parentId!==previous.id)return {kind:"conflict",first};previous=q;}
+  return {kind:"ready",first,tail:previous,revision:previous.expectedRevision+1,parent:previous.id};
+}
+export function assertParent(remote,q){validateQueued(q);if(remote&&Object.hasOwn(remote.receipts,q.id))return;if(Object.hasOwn(q,"parentId")&&(remote?.lastOperationId??"")!==q.parentId)throw Error("CONFLICT");}
+export function appendQueued(confirmed,rows,view,payload,id){const plan=queueStatus(confirmed,rows);if(!["empty","ready"].includes(plan.kind)||rows.length>=8||plan.revision>=500||view.revision!==plan.revision||view.parent!==plan.parent)throw Error("QUEUE_BLOCKED");if(rows.length&& !Object.hasOwn(plan.first,"parentId"))throw Error("LEGACY_PENDING");const q={id,expectedRevision:plan.revision,parentId:plan.parent,payload};validateQueued(q);return q;}
+export function makeQueueBackup(uid,rows){return {format:"raytech-test-queue-v1",uid,operations:rows.map(validateQueued)};}
+export function readQueueBackup(pack,uid){if(!pack||Object.keys(pack).sort().join("|")!=="format|operations|uid"||pack.format!=="raytech-test-queue-v1"||pack.uid!==uid||!Array.isArray(pack.operations)||pack.operations.length<1||pack.operations.length>8)throw Error("RECOVERY_FORMAT");const ids=new Set();return pack.operations.map(q=>{validateQueued(q);if(ids.has(q.id))throw Error("DUPLICATE_ID");ids.add(q.id);return q;});}
