@@ -64,6 +64,41 @@ export function queueStatus(confirmed,rows){
   return {kind:"ready",first,tail:previous,revision:previous.expectedRevision+1,parent:previous.id};
 }
 export function assertParent(remote,q){validateQueued(q);if(remote&&Object.hasOwn(remote.receipts,q.id))return;if(Object.hasOwn(q,"parentId")&&(remote?.lastOperationId??"")!==q.parentId)throw Error("CONFLICT");}
-export function appendQueued(confirmed,rows,view,payload,id){const plan=queueStatus(confirmed,rows);if(!["empty","ready"].includes(plan.kind)||rows.length>=8||plan.revision>=500||view.revision!==plan.revision||view.parent!==plan.parent)throw Error("QUEUE_BLOCKED");if(rows.length&& !Object.hasOwn(plan.first,"parentId"))throw Error("LEGACY_PENDING");const q={id,expectedRevision:plan.revision,parentId:plan.parent,payload};validateQueued(q);return q;}
+export function appendQueued(confirmed,rows,view,payload,id){const plan=queueStatus(confirmed,rows);if(!["empty","ready"].includes(plan.kind)||rows.length>=16||plan.revision>=500||view.revision!==plan.revision||view.parent!==plan.parent)throw Error("QUEUE_BLOCKED");if(rows.length&& !Object.hasOwn(plan.first,"parentId"))throw Error("LEGACY_PENDING");const q={id,expectedRevision:plan.revision,parentId:plan.parent,payload};validateQueued(q);if(!queueFits(rows,q))throw Error("QUEUE_CAPACITY");return q;}
 export function makeQueueBackup(uid,rows){return {format:"raytech-test-queue-v1",uid,operations:rows.map(validateQueued)};}
-export function readQueueBackup(pack,uid){if(!pack||Object.keys(pack).sort().join("|")!=="format|operations|uid"||pack.format!=="raytech-test-queue-v1"||pack.uid!==uid||!Array.isArray(pack.operations)||pack.operations.length<1||pack.operations.length>8)throw Error("RECOVERY_FORMAT");const ids=new Set();return pack.operations.map(q=>{validateQueued(q);if(ids.has(q.id))throw Error("DUPLICATE_ID");ids.add(q.id);return q;});}
+export function readQueueBackup(pack,uid){if(!pack||Object.keys(pack).sort().join("|")!=="format|operations|uid"||pack.format!=="raytech-test-queue-v1"||pack.uid!==uid||!Array.isArray(pack.operations)||pack.operations.length<1||pack.operations.length>16)throw Error("RECOVERY_FORMAT");const ids=new Set();return pack.operations.map(q=>{validateQueued(q);if(ids.has(q.id))throw Error("DUPLICATE_ID");ids.add(q.id);return q;});}
+
+export function canonical(x){if(x===null||typeof x!=="object")return JSON.stringify(x);if(Array.isArray(x))return "["+x.map(canonical).join(",")+"]";return "{"+Object.keys(x).sort().map(k=>JSON.stringify(k)+":"+canonical(x[k])).join(",")+"}";}
+export function backupPack(payload,sha256){validatePayload(payload);if(typeof sha256!=="string"||!/^[0-9a-f]{64}$/.test(sha256))throw Error("BACKUP_HASH");return {format:"raytech-synthetic-backup-v1",payload,sha256};}
+export function validateBackupPack(p){if(!p||Object.keys(p).sort().join("|")!=="format|payload|sha256"||p.format!=="raytech-synthetic-backup-v1")throw Error("Somente backups fictícios gerados nesta homologação.");return backupPack(p.payload,p.sha256);}
+export function packRows(p){validateBackupPack(p);const chunks=p.payload.match(/[\s\S]{1,24000}/g);return [["Formato","SHA-256","Parte","Total","JSON"],...chunks.map((chunk,i)=>[p.format,p.sha256,i+1,chunks.length,chunk])];}
+export function readPackRows(rows){if(!Array.isArray(rows)||rows.length<2||rows.length>9||canonical(rows[0])!==canonical(["Formato","SHA-256","Parte","Total","JSON"]))throw Error("Planilha fictícia inválida.");const parts=rows.slice(1),hash=parts[0]?.[1];let payload="";for(let i=0;i<parts.length;i++){const x=parts[i];if(!Array.isArray(x)||x.length!==5||x[0]!=="raytech-synthetic-backup-v1"||x[1]!==hash||x[2]!==i+1||x[3]!==parts.length||typeof x[4]!=="string"||x[4].length<1||x[4].length>24000)throw Error("Partes da planilha divergentes ou incompletas.");payload+=x[4];}return backupPack(payload,hash);}
+export function mergeImport(currentPayload,incomingPayload){
+ const current=validatePayload(currentPayload),incoming=validatePayload(incomingPayload),out=JSON.parse(currentPayload),stats={months:0,added:0,duplicates:0,skippedDeleted:0,filled:0,kept:0},conflicts=[];
+ const equal=(a,b)=>canonical(a)===canonical(b),parcel=x=>x.isInstallment?x.installmentOriginId+":"+x.currentInstallment:null;
+ const withoutId=x=>{const y={...x};delete y.id;return y;};
+ for(const [ym,im] of Object.entries(incoming.months)){
+  if(!Object.hasOwn(out.months,ym)){out.months[ym]=JSON.parse(JSON.stringify(im));stats.months++;stats.added+=im.expenses.length+im.extraIncomes.length+im.cardExpenses.length;const seen=new Set();for(const c of im.cardExpenses){const k=parcel(c);if(k&&(seen.has(k)||(im.deletedInstallmentOrigins??[]).includes(k)))conflicts.push(ym+" · parcela incoerente "+k);if(k)seen.add(k);}continue;}
+  const m=out.months[ym],oldTomb=new Set(m.deletedInstallmentOrigins??[]),incomingTomb=new Set(im.deletedInstallmentOrigins??[]);
+  for(const key of ["salary","budgetLimit"]){if(m[key]===im[key])continue;if(im[key]===0){stats.kept++;continue;}if(m[key]===0&&m.expenses.length+m.cardExpenses.length+m.extraIncomes.length===0&&!m.closed){m[key]=im[key];stats.filled++;}else conflicts.push(ym+" · "+(key==="salary"?"salário":"orçamento")+" divergente");}
+  if(m.closed!==im.closed||m.closedAt!==im.closedAt)stats.kept++;
+  for(const key of incomingTomb)if(m.cardExpenses.some(c=>parcel(c)===key))conflicts.push(ym+" · exclusão de parcela contradiz lançamento atual "+key);
+  const tomb=new Set([...oldTomb,...incomingTomb]);if(tomb.size||Object.hasOwn(m,"deletedInstallmentOrigins")||Object.hasOwn(im,"deletedInstallmentOrigins"))m.deletedInstallmentOrigins=[...tomb];
+  for(const k of ["expenses","cardExpenses","extraIncomes"]){
+    const byId=new Map(m[k].map(x=>[x.id,x])),byParcel=new Map();
+    if(k==="cardExpenses"){for(const x of m[k]){const p=parcel(x);if(p){if(byParcel.has(p)||tomb.has(p))conflicts.push(ym+" · parcela atual incoerente "+p);byParcel.set(p,x);}}}
+    for(const item of im[k]){
+      const old=byId.get(item.id),p=k==="cardExpenses"?parcel(item):null;
+      if(old){if(equal(old,item))stats.duplicates++;else conflicts.push(ym+" · ID divergente "+item.id);continue;}
+      if(p&&tomb.has(p)){stats.skippedDeleted++;continue;}
+      if(p&&byParcel.has(p)){if(equal(withoutId(byParcel.get(p)),withoutId(item)))stats.duplicates++;else conflicts.push(ym+" · parcela divergente "+p);continue;}
+      const copy=JSON.parse(JSON.stringify(item));m[k].push(copy);byId.set(copy.id,copy);if(p)byParcel.set(p,copy);stats.added++;
+    }
+  }
+ }
+ if(!conflicts.length)validatePayload(JSON.stringify(out));
+ return {payload:JSON.stringify(out),stats,conflicts,changed:canonical(current)!==canonical(out)};
+}
+export function validateUndo(j,uid,view,parent,revision){if(!j||j.format!=="raytech-import-undo-v1"||j.uid!==uid||j.operationId!==parent||j.revision!==revision||j.after!==view||!validId(parent)||typeof j.sha256!=="string"||!/^[0-9a-f]{64}$/.test(j.sha256))throw Error("Reversão indisponível: revisão mudou.");validatePayload(j.before);validatePayload(j.after);return j;}
+export function snapshotDiff(remotePayload,localPayload){const a=validatePayload(remotePayload),b=validatePayload(localPayload),out=[];for(const ym of [...new Set([...Object.keys(a.months),...Object.keys(b.months)])].sort()){const x=a.months[ym],y=b.months[ym];if(!x||!y){out.push(ym+" · mês apenas "+(x?"no servidor":"na fila"));continue;}for(const k of ["salary","budgetLimit","closed","closedAt","deletedInstallmentOrigins"])if(canonical(x[k]??null)!==canonical(y[k]??null))out.push(ym+" · "+k+" divergente");for(const k of ["expenses","cardExpenses","extraIncomes"]){const ax=new Map(x[k].map(v=>[v.id,v])),by=new Map(y[k].map(v=>[v.id,v]));for(const id of new Set([...ax.keys(),...by.keys()])){const u=ax.get(id),v=by.get(id);if(canonical(u??null)!==canonical(v??null))out.push(ym+" · "+(v?.title??v?.description??u?.title??u?.description??id)+" · "+(!u?"só na fila":!v?"só no servidor":"valores divergentes"));}}}return out;}
+export function queueFits(rows,next){return rows.length<16&&rows.reduce((n,q)=>n+JSON.stringify(q).length,0)+JSON.stringify(next).length<=1250000;}

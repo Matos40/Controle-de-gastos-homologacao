@@ -1,11 +1,13 @@
 /* Exportação e importação Excel otimizada para migração e versão mobile sem perdas. */
-function exportToExcel() {
+async function exportToExcel() {
   if (typeof XLSX === 'undefined') {
     showToast('Biblioteca do Excel ainda carregando. Aguarde um instante.', 'error');
     return;
   }
 
   try {
+    if(typeof window.raytechSyntheticExport !== "function") throw Error("Aguarde a autorização da conta de teste.");
+    const snapshot=JSON.stringify(appDb);
     const wb = XLSX.utils.book_new();
     const monthKeys = Object.keys(appDb.months || {}).sort();
     if (!monthKeys.length && appDb.selectedMonth) monthKeys.push(appDb.selectedMonth);
@@ -108,7 +110,10 @@ function exportToExcel() {
     ];
     addSheet('Backup restauracao', restoreRows, [30, 10, 10, 10, 100]);
 
-    const filename = `Controle_Financeiro_Completo_${appDb.selectedMonth || 'backup'}.xlsx`;
+    const pack=await window.raytechSyntheticExport(snapshot);
+    if(!pack)throw Error("Conta de teste mudou.");
+    addSheet("Raytech Teste",pack.rows,[34,70,10,10,100]);
+    const filename = `Raytech_Teste_${JSON.parse(snapshot).selectedMonth}.xlsx`;
     XLSX.writeFile(wb, filename, { compression: true });
     showToast('Planilha de backup completo exportada com sucesso!', 'success');
   } catch (err) {
@@ -117,12 +122,6 @@ function exportToExcel() {
   }
 }
 
-function exportData() {
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appDb, null, 2));
-  const a = document.createElement('a');
-  a.href = dataStr;
-  a.download = `controle_financeiro_backup_${appDb.selectedMonth}.json`;
-  a.click();
-  a.remove();
-  showToast('Backup JSON baixado com sucesso!', 'success');
+async function exportData() {
+  try{if(typeof window.raytechSyntheticExport!=="function")throw Error("Conta de teste indisponível.");const pack=await window.raytechSyntheticExport(JSON.stringify(appDb));if(!pack)throw Error("Conta de teste mudou.");const url=URL.createObjectURL(new Blob([JSON.stringify(pack.backup,null,2)],{type:"application/json"})),a=document.createElement("a");a.href=url;a.download="Raytech_Teste_"+JSON.parse(pack.backup.payload).selectedMonth+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);showToast("Backup fictício JSON exportado!","success");}catch(e){showToast("Exportação não concluída: "+e.message,"error");}
 }
