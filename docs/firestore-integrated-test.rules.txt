@@ -1,0 +1,31 @@
+// Adicionar dentro de match /databases/{database}/documents. Não substituir as regras existentes.
+match /raytechFinancialTestV1/{uid} {
+  function approved() {
+    return request.auth != null && request.auth.uid == uid
+      && exists(/databases/$(database)/documents/raytechSyncPilotAccessV1/$(uid))
+      && get(/databases/$(database)/documents/raytechSyncPilotAccessV1/$(uid)).data.enabled == true;
+  }
+  function valid(d) {
+    return d.keys().hasAll(['marker','revision','payload','receipts','lastOperationId'])
+      && d.keys().hasOnly(['marker','revision','payload','receipts','lastOperationId'])
+      && d.marker == 'raytech-financial-test-v1'
+      && d.revision is int && d.revision >= 1 && d.revision <= 500
+      && d.payload is string && d.payload.size() <= 180000
+      && d.receipts is map && d.receipts.keys().size() == d.revision
+      && d.lastOperationId is string
+      && d.lastOperationId.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+      && d.receipts.keys().hasAny([d.lastOperationId])
+      && d.receipts[d.lastOperationId] is string
+      && d.receipts[d.lastOperationId].matches('^[1-9][0-9]{0,2}:[0-9a-f]{64}$');
+  }
+  allow get: if approved();
+  allow list, delete: if false;
+  allow create: if approved() && valid(request.resource.data)
+    && request.resource.data.revision == 1
+    && request.resource.data.receipts.keys().hasOnly([request.resource.data.lastOperationId]);
+  allow update: if approved() && valid(request.resource.data)
+    && request.resource.data.revision == resource.data.revision + 1
+    && !resource.data.receipts.keys().hasAny([request.resource.data.lastOperationId])
+    && request.resource.data.receipts.diff(resource.data.receipts).addedKeys().hasOnly([request.resource.data.lastOperationId])
+    && request.resource.data.receipts.diff(resource.data.receipts).affectedKeys().hasOnly([request.resource.data.lastOperationId]);
+}

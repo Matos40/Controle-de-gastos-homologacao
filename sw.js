@@ -1,4 +1,4 @@
-const CACHE_NAME = 'homolog-controle-gastos-shell-v8';
+const CACHE_NAME = 'homolog-controle-gastos-shell-v9';
 const APP_SHELL = [
   './', './index.html', './manifest.json', './css/styles.css',
   './js/state.js', './js/app.js',
@@ -36,6 +36,11 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin && !CDN_ASSETS.some(asset => request.url.startsWith(asset.split('?')[0]))) return;
   if (url.origin === self.location.origin && !url.pathname.startsWith(new URL(self.registration.scope).pathname)) return;
+  // Cloud-test never falls back to the local application or cached financial page.
+  if (request.mode === 'navigate' && url.pathname.endsWith('/cloud-test.html')) {
+    event.respondWith(fetch(request, {cache:'no-store'}).catch(() => new Response('Modo nuvem indisponível sem internet. Volte ao aplicativo local.', {status:503,headers:{'Content-Type':'text/plain; charset=utf-8'}})));
+    return;
+  }
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
       try { const fresh = await fetch(request); const cache = await caches.open(CACHE_NAME); cache.put('./index.html', fresh.clone()); return fresh; }
@@ -43,6 +48,7 @@ self.addEventListener('fetch', event => {
     })());
     return;
   }
+  if (url.pathname.includes('/js/cloudTest/')) { event.respondWith(fetch(request,{cache:'no-store'})); return; }
   event.respondWith((async () => {
     const cached = await (await caches.open(CACHE_NAME)).match(request);
     const network = fetch(request).then(response => {
