@@ -4,6 +4,36 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Raytech CG | Controle de Gastos</title>
+  <script>document.documentElement.dataset.raytechMode=new URLSearchParams(location.search).get('mode')==='cloud'?'cloud':'local';</script>
+  <style>
+    #cloudWorkspace{display:contents}
+    #cloudControl{display:none}
+    html[data-raytech-mode="cloud"] #cloudControl{display:block;background:#0b1829;border-bottom:1px solid #164e63;color:#e2e8f0}
+    html[data-raytech-mode="cloud"] #cloudWorkspace{display:none}
+    html[data-raytech-mode="cloud"] #cloudWorkspace[aria-busy="true"]{pointer-events:none}
+    html[data-raytech-mode="cloud"] #cloudWorkspace button[onclick*="Ocr"],
+    html[data-raytech-mode="cloud"] #cloudWorkspace button[onclick*="ApiKey"],
+    html[data-raytech-mode="cloud"] #cloudWorkspace button[onclick*="Pin"],
+    html[data-raytech-mode="cloud"] #cloudWorkspace button[onclick*="Pwa"],
+    html[data-raytech-mode="cloud"] #cloudWorkspace button[onclick*="ExcelInput"],
+    html[data-raytech-mode="cloud"] #cloudWorkspace button[onclick*="ExcelImport"],
+    html[data-raytech-mode="cloud"] #cloudWorkspace button[onclick*="jsonImportInput"],
+    html[data-raytech-mode="cloud"] #cloudWorkspace button[onclick*="Onboarding"],
+    html[data-raytech-mode="cloud"] #cloudWorkspace input[type=file],
+    html[data-raytech-mode="cloud"] #localGoogleSection,
+    html[data-raytech-mode="cloud"] .local-mode-only{display:none!important}
+    .cloud-mode-only{display:none!important}
+    html[data-raytech-mode="cloud"] .cloud-mode-only{display:inline!important}
+    #cloudControl [hidden]{display:none!important}
+    #cloudControl [data-tone="ok"]{color:#4ade80}
+    #cloudControl [data-tone="warn"]{color:#fbbf24}
+    #cloudControl [data-tone="busy"]{color:#67e8f9}
+    #cloudControl details>summary{cursor:pointer;list-style:none}
+    #cloudControl details>summary::-webkit-details-marker{display:none}
+    #cloudControl .cloud-action{font-size:12px;padding:7px 10px;background:#1e293b;border:1px solid #334155;border-radius:8px}
+    #cloudControl .cloud-action:disabled{opacity:.45}
+    #cloudControl .cloud-action:focus-visible,#cloudControl summary:focus-visible{outline:2px solid #67e8f9}
+  </style>
   
   <!-- Metadata PWA / Mobile Nativo -->
   <meta name="theme-color" content="#020617">
@@ -48,6 +78,31 @@
   <link rel="stylesheet" href="./css/styles.css">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen antialiased flex flex-col selection:bg-emerald-500 selection:text-slate-950 pb-20 sm:pb-0">
+<section id="cloudControl" aria-label="Sincronização de teste">
+  <div class="max-w-6xl mx-auto px-3 sm:px-6 py-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+    <span class="font-bold text-cyan-200"><i class="fa-solid fa-cloud"></i> Nuvem de teste</span>
+    <span id="cloudIndicator" data-tone="busy" role="status" aria-live="polite">Conectando…</span>
+    <a id="cloudLeave" href="./index.html" class="cloud-action">Modo local</a>
+  </div>
+  <details id="cloudDetails" class="max-w-6xl mx-auto px-3 sm:px-6 pb-2 text-xs">
+    <summary class="text-slate-400">Detalhes e recuperação <span aria-hidden="true">▾</span></summary>
+    <div class="pt-2 space-y-2">
+      <p class="text-amber-200">Somente dados fictícios. Use a palavra Teste nas descrições. Importação comum, IA e PIN local indisponíveis na nuvem.</p>
+      <p id="cloudStatus" role="status" aria-live="polite">Aguardando autenticação e servidor…</p>
+      <div class="flex flex-wrap gap-2">
+        <button id="cloudRefresh" type="button" class="cloud-action">Atualizar / conectar</button>
+        <button id="cloudRetry" hidden type="button" class="cloud-action">Repetir operação pendente</button>
+        <button id="cloudDownload" hidden type="button" class="cloud-action">Salvar arquivo de recuperação</button>
+        <button id="cloudDiscard" hidden type="button" class="cloud-action">Descartar conflito</button>
+        <button id="cloudRestore" hidden type="button" class="cloud-action">Recuperar operação fictícia</button>
+        <input id="cloudRecoveryFile" type="file" accept=".json,application/json" hidden>
+      </div>
+    </div>
+  </details>
+</section>
+<div id="cloudWorkspace">
+<script>if(document.documentElement.dataset.raytechMode==='cloud'){const w=document.getElementById('cloudWorkspace');w.inert=true;w.setAttribute('aria-busy','true');}</script>
+
 
   <!-- Barra de Status Offline (Exibida automaticamente quando sem internet) -->
   <div id="offlineBanner" class="hidden bg-amber-500/15 border-b border-amber-500/30 text-amber-300 text-xs font-semibold py-2 px-4 text-center items-center justify-center gap-2 z-50">
@@ -468,11 +523,12 @@
               <h1 class="text-sm sm:text-lg font-bold tracking-tight text-white truncate">
                 Raytech CG
               </h1>
+              <span class="cloud-mode-only text-[9px] font-bold text-cyan-300">TESTE</span>
               <span id="pwaInstalledBadge" class="hidden text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
                 App
               </span>
             </div>
-            <p class="text-[11px] text-slate-400 hidden sm:block">Salário, contas fixas, cartão e modo offline</p>
+            <p class="text-[11px] text-slate-400 hidden sm:block"><span class="local-mode-only">Salário, contas fixas, cartão e modo offline</span><span class="cloud-mode-only">Salário, contas e cartão sincronizados</span></p>
           </div>
         </div>
 
@@ -557,7 +613,7 @@
           </div>
 
           <!-- Conta Google opcional: sem sincronização financeira -->
-          <section class="bg-slate-950/80 border border-cyan-500/30 rounded-xl p-2.5 space-y-2" aria-label="Conta na nuvem">
+          <section id="localGoogleSection" class="bg-slate-950/80 border border-cyan-500/30 rounded-xl p-2.5 space-y-2" aria-label="Conta na nuvem">
             <div class="text-[10px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5 px-1">
               <i class="fa-solid fa-cloud"></i> Conta Google
             </div>
@@ -569,7 +625,7 @@
             <button id="firebaseLogoutButton" type="button" class="hidden w-full px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition">Sair da conta Google</button>
             <button id="firebaseFirestoreTestButton" type="button" class="hidden w-full px-3 py-2 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold transition"><i class="fa-solid fa-database mr-1"></i> Testar banco de dados</button>
             <p id="firebaseFirestoreTestStatus" role="status" aria-live="polite" class="text-[11px] text-slate-300 px-1"></p>
-            <a href="./cloud-test.html" class="block w-full text-center px-3 py-2 rounded-lg bg-emerald-800 text-white text-xs font-bold">Usar aplicativo na nuvem (teste)</a>
+            <a href="./index.html?mode=cloud" class="block w-full text-center px-3 py-2 rounded-lg bg-emerald-800 text-white text-xs font-bold">Mudar para nuvem de teste</a>
             <button id="financialPilotOpen" type="button" class="w-full px-3 py-2 rounded-lg bg-cyan-800 text-white text-xs font-bold">Abrir finanças na nuvem (teste)</button>
             <section id="financialPilotPanel" class="hidden border-t border-cyan-500/40 pt-3 space-y-2 text-xs text-slate-200" aria-label="Finanças fictícias sincronizadas"></section>
             <div id="firebaseSyncDemo" class="hidden border-t border-slate-700/60 pt-3 space-y-2">
@@ -1525,7 +1581,7 @@
                 type="text" 
                 inputmode="decimal" 
                 id="budgetLimitInput" 
-                oninput="handleBudgetLimitInput(event)"
+                oninput="if(document.documentElement.dataset.raytechMode==='local')handleBudgetLimitInput(event)" onchange="if(document.documentElement.dataset.raytechMode==='cloud')handleBudgetLimitInput(event)"
                 placeholder="Ex: 3.000,00" 
                 class="w-full h-11 bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 text-sm font-bold text-amber-300 focus:outline-none focus:border-amber-500 transition"
               >
@@ -1645,23 +1701,21 @@
   </nav>
 
   <footer class="hidden sm:block border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-600">
-    <p>Controle de Gastos Mensais • Aplicativo Web Progressivo (PWA) 100% Offline • Salvo no seu dispositivo</p>
+    <p class="local-mode-only">Controle de Gastos Mensais • Aplicativo Web Progressivo (PWA) 100% Offline • Salvo no seu dispositivo</p><p class="cloud-mode-only">Nuvem de teste • Gravação online • Banco fictício separado</p>
   </footer>
 
-  <!-- Lógica da Aplicação e Engine PWA -->
-  <script src="./js/state.js"></script>
-  <script src="./js/services/storageService.js"></script>
-  <script src="./js/services/geminiService.js"></script>
-  <script src="./js/services/excelService.js"></script>
-  <script src="./js/ui/renderSummary.js"></script>
-  <script src="./js/ui/renderExpenses.js"></script>
-  <script src="./js/ui/renderCards.js"></script>
-  <script src="./js/ui/renderAnalytics.js"></script>
-  <script src="./js/ui/renderHistory.js"></script>
-  <script src="./js/app.js"></script>
-  <script src="./js/onboarding.js"></script>
-  <script type="module" src="./js/services/firebaseAuthLite.js"></script>
-  <script src="./js/services/firebaseAuthAvailability.js"></script>
-
+</div>
+<script>
+(function(){
+  const cloud=document.documentElement.dataset.raytechMode==='cloud';
+  const common=['./js/ui/renderSummary.js','./js/ui/renderExpenses.js','./js/ui/renderCards.js','./js/ui/renderAnalytics.js','./js/ui/renderHistory.js'];
+  const classic=cloud?['./js/cloudTest/state.js','./js/cloudTest/storage.js','./js/cloudTest/export.js',...common,'./js/cloudTest/app.js']:['./js/state.js','./js/services/storageService.js','./js/services/geminiService.js','./js/services/excelService.js',...common,'./js/app.js','./js/onboarding.js'];
+  // Parser-inserted same-origin scripts preserve execution order. All URLs are constants.
+  for(const path of classic)document.write('<scr'+'ipt src="'+path+'"><'+'/script>');
+  const module=cloud?'./js/cloudTest/sync.mjs':'./js/services/firebaseAuthLite.js';
+  document.write('<scr'+'ipt type="module" src="'+module+'"><'+'/script>');
+  if(!cloud)document.write('<scr'+'ipt src="./js/services/firebaseAuthAvailability.js"><'+'/script>');
+})();
+</script>
 </body>
 </html>

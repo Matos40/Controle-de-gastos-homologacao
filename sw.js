@@ -1,4 +1,4 @@
-const CACHE_NAME = 'homolog-controle-gastos-shell-v9';
+const CACHE_NAME = 'homolog-controle-gastos-shell-v10';
 const APP_SHELL = [
   './', './index.html', './manifest.json', './css/styles.css',
   './js/state.js', './js/app.js',
@@ -37,7 +37,7 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin && !CDN_ASSETS.some(asset => request.url.startsWith(asset.split('?')[0]))) return;
   if (url.origin === self.location.origin && !url.pathname.startsWith(new URL(self.registration.scope).pathname)) return;
   // Cloud-test never falls back to the local application or cached financial page.
-  if (request.mode === 'navigate' && url.pathname.endsWith('/cloud-test.html')) {
+  if (request.mode === 'navigate' && (url.pathname.endsWith('/cloud-test.html') || url.searchParams.get('mode') === 'cloud')) {
     event.respondWith(fetch(request, {cache:'no-store'}).catch(() => new Response('Modo nuvem indisponível sem internet. Volte ao aplicativo local.', {status:503,headers:{'Content-Type':'text/plain; charset=utf-8'}})));
     return;
   }

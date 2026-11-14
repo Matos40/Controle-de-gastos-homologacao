@@ -1,8 +1,8 @@
-/* Integrated synthetic app; separate page and data store, no production/local financial reads. */
+/* Unified shell; mutually exclusive runtime and synthetic data store. */
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getFirestore,doc,onSnapshot,getDocFromServer,runTransaction} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
-import {blank,validatePayload,validId,validateEnvelope,apply} from './model.mjs';
+import {blank,validatePayload,validId,validateEnvelope,apply,recoveryPackage,validateRecovery,operationStatus,checkSuccessor} from './model.mjs';
 const firebaseConfig = Object.freeze({
   apiKey: 'AIzaSyAlOok-2bV9QigR6PyjRgHMLjFLIoPDWpw',
   authDomain: 'raytech-cg-homologacao.firebaseapp.com',
@@ -12,16 +12,17 @@ const firebaseConfig = Object.freeze({
   appId: '1:195471491370:web:b7e5a0a5a218d16f7a9e53'
 });
 const host=location.hostname,path=location.pathname;
-if(!((host==='matos40.github.io'&&path==='/Controle-de-gastos-homologacao/cloud-test.html')||(host==='raytech-cg-homologacao.firebaseapp.com'&&path==='/cloud-test.html')))throw Error('Homologation only');
+if(document.documentElement.dataset.raytechMode!=='cloud'||new URLSearchParams(location.search).get('mode')!=='cloud'||!((host==='matos40.github.io'&&['/Controle-de-gastos-homologacao/','/Controle-de-gastos-homologacao/index.html'].includes(path))||(host==='raytech-cg-homologacao.firebaseapp.com'&&['/','/index.html'].includes(path))))throw Error('Homologation only');
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 function startCloud(){
 const workspace=document.getElementById('cloudWorkspace'),status=document.getElementById('cloudStatus'),btnRefresh=document.getElementById('cloudRefresh'),btnRetry=document.getElementById('cloudRetry'),btnDownload=document.getElementById('cloudDownload'),btnDiscard=document.getElementById('cloudDiscard');
+const indicator=document.getElementById('cloudIndicator'),details=document.getElementById('cloudDetails'),btnRestore=document.getElementById('cloudRestore'),recoveryFile=document.getElementById('cloudRecoveryFile'),leave=document.getElementById('cloudLeave');
 const ref=id=>doc(db,'raytechFinancialTestV1',id);
 const access=id=>doc(db,'raytechSyncPilotAccessV1',id);
 const prefix=id=>'raytech_financial_test_pending_v1:'+id+':';
 const same=(id,g)=>uid===id&&generation===g&&auth.currentUser?.uid===id;
 const sha=async p=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(p))),b=>b.toString(16).padStart(2,'0')).join('');
-let uid=null,generation=0,unsub=null,confirmed=null,viewRevision=0,ready=false,busy=false,dirty=false,loaded=false,storageFault=false,deferred=null,hasDeferred=false,notice='Aguardando conta Google…',snapshotSerial=0;
+let uid=null,generation=0,unsub=null,confirmed=null,viewRevision=0,ready=false,busy=false,dirty=false,loaded=false,storageFault=false,deferred=null,hasDeferred=false,notice='Aguardando conta Google…',snapshotSerial=0,connectionEpoch=0,recoverBusy=false,lastAttention='';
 let viewPayload=JSON.stringify(blank(getTodayYM()));
 function listPending(){
   if(!uid)return [];
@@ -29,11 +30,21 @@ function listPending(){
 }
 function modalOpen(){return ['confirmModal','editExpenseModal','editCardModal','incomeModal'].some(id=>!document.getElementById(id)?.classList.contains('hidden'));}
 function paint(){
-  const rows=listPending(),q=rows[0],blocked=!loaded||!ready||busy||!!q||storageFault||(confirmed?.revision??0)>=500;
-  workspace.style.display=loaded?'':'none';workspace.inert=blocked;workspace.setAttribute('aria-busy',String(blocked));window.raytechCloudPending=busy||!!q;
+  const rows=listPending(),q=rows[0],op=q?operationStatus(confirmed,q):null,blocked=!loaded||!ready||busy||recoverBusy||!!q||storageFault||(confirmed?.revision??0)>=500;
+  workspace.style.display=loaded?'block':'none';workspace.inert=blocked;workspace.setAttribute('aria-busy',String(blocked));window.raytechCloudPending=busy||!!q;
   status.textContent=notice+(loaded?' · revisão '+viewRevision+' / 500':'')+(q?' · intenção local pendente':'')+(storageFault?' · armazenamento local inválido, gravações bloqueadas':'');
-  btnRetry.hidden=!q;btnRetry.disabled=busy||!ready||storageFault;
-  btnDownload.hidden=!q;btnDiscard.hidden=!(q&&ready&&!busy&&(confirmed?.revision??0)>q.expectedRevision&&!Object.hasOwn(confirmed?.receipts??{},q.id));btnRefresh.disabled=busy;
+  btnRetry.hidden=!q;btnRetry.disabled=busy||recoverBusy||!ready||storageFault||op==='conflict'||op==='future';
+  btnDownload.hidden=!q;btnDownload.disabled=busy||recoverBusy||storageFault;
+  btnDiscard.hidden=!(q&&ready&&!busy&&!recoverBusy&&op==='conflict');
+  btnRefresh.disabled=busy||recoverBusy;
+  btnRestore.hidden=!uid||!loaded||!ready||!!q||storageFault||busy;
+  btnRestore.disabled=recoverBusy;
+  const attention=storageFault?'storage':op==='conflict'?'conflict':q?'pending':hasDeferred?'draft':loaded&&!ready?'offline':!loaded?'connecting':'';
+  indicator.textContent=storageFault?'Bloqueado':busy||recoverBusy?'Confirmando…':op==='conflict'?'Conflito':q?'Pendente':hasDeferred?'Revisão nova':ready?'Sincronizado':loaded?'Sem confirmação':'Conectando…';
+  indicator.dataset.tone=ready&&!attention&&!busy&&!recoverBusy?'ok':busy||recoverBusy||!loaded?'busy':'warn';
+  if(attention&&attention!==lastAttention)details.open=true;
+  if(!attention&&lastAttention==='connecting')details.open=false;
+  lastAttention=attention;
 }
 function show(s){
   viewPayload=s?s.payload:JSON.stringify(blank(getTodayYM()));viewRevision=s?.revision??0;appDb=validatePayload(viewPayload);
@@ -52,8 +63,7 @@ async function settle(s,id,g){
 }
 async function accept(s,id,g,serial){
   await verify(s);if(!same(id,g)||serial!==snapshotSerial)return;
-  if(confirmed&&(s?.revision??0)<confirmed.revision)throw Error('REVISION_ROLLBACK');
-  if(confirmed&&s&&s.revision===confirmed.revision&&s.receipts[s.lastOperationId]!==confirmed.receipts[confirmed.lastOperationId])throw Error('REVISION_DIVERGENCE');
+  checkSuccessor(confirmed,s);
   confirmed=s;await settle(s,id,g);if(!same(id,g)||serial!==snapshotSerial)return;
   ready=true;const rows=listPending();
   if(!loaded){show(s);}
@@ -66,17 +76,18 @@ async function accept(s,id,g,serial){
 }
 function failed(err,id,g){if(!same(id,g))return;ready=false;notice=err?.code==='permission-denied'?'Acesso negado. Confira as regras do Firestore de homologação.':'Servidor indisponível ou dados inválidos. Gravações bloqueadas.';paint();}
 async function connect(id,g){
-  ++snapshotSerial;if(unsub)unsub();unsub=null;ready=false;notice='Verificando autorização e servidor…';paint();
-  try{const a=await getDocFromServer(access(id));if(!same(id,g))return;if(!a.exists()||a.data().enabled!==true){notice='Conta ainda não autorizada para o teste.';paint();return;}
+  const epoch=++connectionEpoch;++snapshotSerial;if(unsub)unsub();unsub=null;ready=false;notice='Verificando autorização e servidor…';paint();
+  try{const a=await getDocFromServer(access(id));if(!same(id,g)||epoch!==connectionEpoch)return;if(!a.exists()||a.data().enabled!==true){notice='Conta ainda não autorizada para o teste.';paint();return;}
     unsub=onSnapshot(ref(id),{includeMetadataChanges:true},snap=>{
-      if(!same(id,g))return;const serial=++snapshotSerial;
+      if(!same(id,g)||epoch!==connectionEpoch)return;const serial=++snapshotSerial;
       if(snap.metadata.fromCache||snap.metadata.hasPendingWrites){ready=false;notice='Aguardando confirmação atual do servidor.';paint();return;}
       accept(snap.exists()?snap.data():null,id,g,serial).catch(e=>{if(serial===snapshotSerial)failed(e,id,g);});
-    },e=>failed(e,id,g));
-  }catch(e){failed(e,id,g);}
+    },e=>{if(epoch===connectionEpoch)failed(e,id,g);});
+  }catch(e){if(epoch===connectionEpoch)failed(e,id,g);}
 }
 async function execute(q){
-  const id=uid,g=generation;if(!id||!same(id,g)||busy||!ready||storageFault)return;
+  const id=uid,g=generation;if(!id||!same(id,g)||busy||recoverBusy||!ready||storageFault)return;
+  const op=operationStatus(confirmed,q);if(op==='conflict'||op==='future'){notice='Revisão incompatível. Intenção preservada.';paint();return;}
   busy=true;notice='Enviando alteração fictícia; aguardando confirmação…';paint();
   try{
     const hash=await sha(q.payload);if(!same(id,g))return;
@@ -87,7 +98,7 @@ async function execute(q){
     });
     const snap=await getDocFromServer(ref(id));if(!same(id,g))return;const s=await verify(snap.exists()?snap.data():null);if(!same(id,g))return;
     if(!s||s.receipts[q.id]!==q.expectedRevision+1+':'+hash)throw Error('UNCONFIRMED');
-    if(!confirmed||s.revision>=confirmed.revision)confirmed=s;
+    if(!confirmed||s.revision>=confirmed.revision){checkSuccessor(confirmed,s);confirmed=s;}
     await settle(confirmed,id,g);if(!same(id,g))return;
     show(confirmed);ready=true;notice='Sincronizado com o servidor. Operação confirmada.';
   }catch(e){
@@ -103,7 +114,9 @@ window.raytechCloudSave=function(candidate){
   if(payload===viewPayload)return;
   const q={id:crypto.randomUUID(),expectedRevision:viewRevision,payload};
   try{localStorage.setItem(prefix(uid)+q.id,JSON.stringify(q));}catch(e){appDb=validatePayload(viewPayload);storageFault=true;notice='Não foi possível guardar a operação. Nada enviado.';paint();renderAll();throw e;}
-  dirty=false;execute(q);
+  dirty=false;
+  if(operationStatus(confirmed,q)==='conflict'){notice='Conflito de revisão. Intenção preservada, sem sobrescrever a nuvem.';paint();return;}
+  execute(q);
 };
 workspace.addEventListener('input',e=>{if(e.target.closest('form')||['salaryInput','budgetLimitInput'].includes(e.target.id))dirty=true;},true);
 for(const ev of ['click','submit','keydown','input','change'])workspace.addEventListener(ev,e=>{if(workspace.inert){e.preventDefault();e.stopImmediatePropagation();}},true);
@@ -119,16 +132,43 @@ btnRefresh.addEventListener('click',()=>{
   connect(uid,generation);
 });
 btnRetry.addEventListener('click',()=>{const q=listPending()[0];if(q)execute(q);});
-btnDownload.addEventListener('click',()=>{const q=listPending()[0];if(!q)return;const a=document.createElement('a'),url=URL.createObjectURL(new Blob([q.payload],{type:'application/json'}));a.href=url;a.download='raytech-intencao-ficticia.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);});
+btnDownload.addEventListener('click',async()=>{
+  const id=uid,g=generation,q=listPending()[0];if(!id||!q||!same(id,g)||busy||recoverBusy||storageFault)return;
+  try{const pack=recoveryPackage(id,q,await sha(q.payload));if(!same(id,g))return;
+    const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(pack,null,2)],{type:'application/json'}));a.href=url;a.download='raytech-recuperacao-teste-'+q.id+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);
+  }catch{notice='Não foi possível exportar a intenção. Ela permanece guardada.';paint();}
+});
+btnRestore.addEventListener('click',()=>{if(!uid||!loaded||!ready||busy||recoverBusy||storageFault||listPending().length)return;recoveryFile.value='';recoveryFile.click();});
+recoveryFile.addEventListener('change',async()=>{
+  const file=recoveryFile.files?.[0],id=uid,g=generation;if(!file||!id||!same(id,g)||!loaded||!ready||busy||recoverBusy||storageFault||listPending().length)return;
+  if(file.size>1200000){notice='Arquivo de recuperação acima do limite.';paint();return;}
+  recoverBusy=true;paint();
+  try{
+    const pack=JSON.parse(await file.text());const q=validateRecovery(pack,id);
+    const h=await sha(q.payload);if(!same(id,g))return;if(pack.sha256!==h)throw Error('HASH');
+    if(!ready||storageFault||listPending().length)throw Error('PENDING');
+    const op=operationStatus(confirmed,q);
+    if(op==='recorded'){if(confirmed.receipts[q.id]!==q.expectedRevision+1+':'+h)throw Error('ID_REUSE');notice='Operação já confirmada; nada foi duplicado.';return;}
+    if(op==='future')throw Error('FUTURE');
+    if(!confirm('Recuperar uma intenção fictícia desta conta? Ela será guardada, sem envio automático.'))return;
+    if(!same(id,g)||!ready||storageFault||listPending().length)throw Error('PENDING');
+    localStorage.setItem(prefix(id)+q.id,JSON.stringify(q));
+    notice=op==='conflict'?'Intenção recuperada, mas a revisão mudou. Revise antes de descartar.':'Intenção recuperada. Use Repetir operação pendente para enviar.';
+  }catch(e){if(same(id,g))notice='Arquivo recusado: conta, integridade, formato ou revisão incompatível. Nenhum dado foi enviado.';}
+  finally{if(same(id,g)){recoverBusy=false;recoveryFile.value='';paint();}}
+});
+leave.addEventListener('click',e=>{if(busy||recoverBusy){e.preventDefault();notice='Aguarde a confirmação da operação ou recuperação.';paint();return;}if((dirty||modalOpen())&&!confirm('Há um rascunho ainda não enviado. Sair do modo nuvem sem salvar?')){e.preventDefault();return;}dirty=false;});
+window.addEventListener('beforeunload',e=>{if(dirty||busy||recoverBusy||modalOpen()){e.preventDefault();e.returnValue='';}});
+window.addEventListener('pageshow',e=>{if(e.persisted)location.reload();});
 btnDiscard.addEventListener('click',()=>{const q=listPending()[0];if(!q||!ready||busy||!uid||auth.currentUser?.uid!==uid||(confirmed?.revision??0)<=q.expectedRevision||Object.hasOwn(confirmed?.receipts??{},q.id))return;if(!confirm('Descartar apenas esta intenção fictícia desatualizada? Os dados no servidor serão preservados.'))return;try{localStorage.removeItem(prefix(uid)+q.id);show(confirmed);notice='Conflito descartado. Revise e refaça o lançamento se necessário.';}catch{storageFault=true;}paint();});
 onAuthStateChanged(auth,user=>{
-  const g=++generation;++snapshotSerial;if(unsub)unsub();unsub=null;uid=null;confirmed=null;busy=false;dirty=false;hasDeferred=false;storageFault=false;scrub();
+  const g=++generation;++connectionEpoch;++snapshotSerial;recoverBusy=false;if(unsub)unsub();unsub=null;uid=null;confirmed=null;busy=false;dirty=false;hasDeferred=false;storageFault=false;scrub();
   if(!user||!/^[a-zA-Z0-9_-]{1,128}$/.test(user.uid)){notice='Entre com Google no aplicativo local e volte a este modo.';paint();return;}
   uid=user.uid;connect(uid,g);
 });
-window.addEventListener('offline',()=>{ready=false;notice='Sem internet. Gravações bloqueadas; operações pendentes preservadas.';paint();});
+window.addEventListener('offline',()=>{++snapshotSerial;ready=false;notice='Sem internet. Gravações bloqueadas; operações pendentes preservadas.';paint();});
 window.addEventListener('online',()=>{if(uid&&!busy)connect(uid,generation);});
-window.addEventListener('storage',e=>{if(uid&&e.key?.startsWith(prefix(uid)))paint();});
+window.addEventListener('storage',e=>{if(uid&&(e.key===null||e.key.startsWith(prefix(uid))))paint();});
 paint();
 
 }

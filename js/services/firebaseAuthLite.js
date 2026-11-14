@@ -30,7 +30,7 @@ let lastMessage = '';
 function render(user, message = '') {
   if (message) lastMessage = message;
   else lastMessage = user
-    ? 'Conta Google conectada. Abra Finanças na nuvem (teste) para experimentar a sincronização fictícia.'
+    ? 'Conta Google conectada. Selecione Mudar para nuvem de teste para usar os lançamentos sincronizados fictícios.'
     : 'Não conectado. Seus dados permanecem neste dispositivo.';
   if (status) status.textContent = lastMessage;
   if (account) account.textContent = user ? (user.displayName || user.email || 'Conta Google') : '';

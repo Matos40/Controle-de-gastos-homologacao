@@ -43,3 +43,8 @@ export function apply(old,q,hash){
   if((old?.revision??0)!==q.expectedRevision)throw Error("CONFLICT");
   const s={marker,revision:q.expectedRevision+1,lastOperationId:q.id,payload:q.payload,receipts:{...(old?.receipts??{}),[q.id]:receipt}};validateEnvelope(s);return {state:s,replay:false};
 }
+
+export function operationStatus(confirmed,q){if(confirmed&&Object.hasOwn(confirmed.receipts,q.id))return "recorded";const rev=confirmed?.revision??0;return rev===q.expectedRevision?"ready":rev>q.expectedRevision?"conflict":"future";}
+export function checkSuccessor(previous,next){if(!previous)return;if(!next||next.revision<previous.revision)throw Error("REVISION_ROLLBACK");for(const [id,receipt] of Object.entries(previous.receipts)){if(next.receipts[id]!==receipt)throw Error("RECEIPT_DIVERGENCE");}if(next.revision===previous.revision&&(next.payload!==previous.payload||next.lastOperationId!==previous.lastOperationId))throw Error("REVISION_DIVERGENCE");}
+export function validateRecovery(pack,uid){if(!pack||Object.keys(pack).sort().join("|")!=="format|operation|sha256|uid"||pack.format!=="raytech-test-recovery-v1"||pack.uid!==uid||typeof pack.sha256!=="string"||!/^[0-9a-f]{64}$/.test(pack.sha256))throw Error("RECOVERY_FORMAT");const q=pack.operation;if(!q||Object.keys(q).sort().join("|")!=="expectedRevision|id|payload"||!validId(q.id)||!Number.isInteger(q.expectedRevision)||q.expectedRevision<0||q.expectedRevision>=500)throw Error("RECOVERY_OPERATION");validatePayload(q.payload);return q;}
+export function recoveryPackage(uid,q,sha256){const pack={format:"raytech-test-recovery-v1",uid,operation:q,sha256};validateRecovery(pack,uid);return pack;}
