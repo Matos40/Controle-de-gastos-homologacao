@@ -2,7 +2,7 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getFirestore,doc,onSnapshot,getDocFromServer,runTransaction} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
-import {blank,validatePayload,validateEnvelope,apply,checkSuccessor,validateRecovery,validateQueued,queueStatus,assertParent,appendQueued,makeQueueBackup,readQueueBackup,backupPack,validateBackupPack,packRows,readPackRows,mergeImport,validateUndo,snapshotDiff,queueFits} from './model.mjs';
+import {blank,validatePayload,validateEnvelope,apply,checkSuccessor,validateRecovery,validateQueued,queueStatus,assertParent,appendQueued,makeQueueBackup,readQueueBackup,backupPack,validateBackupPack,packRows,readPackRows,mergeImport,validateUndo,snapshotDiff,queueFits,encodeQueue,decodeQueue,sameQueued,legacyFixture,validateLegacyFixture,legacyRows,readLegacyRows,conflictBranches} from './model.mjs?v=rc1';
 const firebaseConfig = Object.freeze({
   apiKey: 'AIzaSyAlOok-2bV9QigR6PyjRgHMLjFLIoPDWpw',
   authDomain: 'raytech-cg-homologacao.firebaseapp.com',
@@ -16,6 +16,7 @@ if(document.documentElement.dataset.raytechMode!=='cloud'||!((host==='matos40.gi
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 function startCloud(){
 const el=id=>document.getElementById(id),workspace=el('cloudWorkspace'),status=el('cloudStatus'),indicator=el('cloudIndicator'),details=el('cloudDetails'),refresh=el('cloudRefresh'),retry=el('cloudRetry'),download=el('cloudDownload'),discard=el('cloudDiscard'),restore=el('cloudRestore'),fileInput=el('cloudRecoveryFile'),leave=el('cloudLeave');
+const legacyJson=el('cloudLegacyJson'),legacyExcel=el('cloudLegacyExcel');
 const importBtn=el('cloudImport'),importFile=el('cloudImportFile'),fixtureJson=el('cloudFixtureJson'),fixtureExcel=el('cloudFixtureExcel'),undoBtn=el('cloudUndo'),compareBtn=el('cloudCompare'),conflictReport=el('cloudConflictReport');
 const ref=id=>doc(db,'raytechFinancialTestV1',id),access=id=>doc(db,'raytechSyncPilotAccessV1',id);
 const prefix=id=>'raytech_financial_test_pending_v1:'+id+':',checkpoint=id=>'raytech_financial_test_checkpoint_v1:'+id,preference='raytech_cloud_test_preference_v1';
@@ -24,9 +25,10 @@ let uid=null,generation=0,epoch=0,serial=0,unsub=null,base=null,authorized=false
 const same=(id,g)=>uid===id&&generation===g&&auth.currentUser?.uid===id;
 function modalOpen(){return ['confirmModal','editExpenseModal','editCardModal','incomeModal'].some(id=>!el(id)?.classList.contains('hidden'));}
 function dismiss(){pendingModalAction=null;for(const id of ['confirmModal','editExpenseModal','editCardModal','incomeModal'])el(id)?.classList.add('hidden');}
-function readRows(){if(!uid)return [];try{const rows=[],pre=prefix(uid);for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k?.startsWith(pre))continue;const q=validateQueued(JSON.parse(localStorage.getItem(k)));if(k!==pre+q.id)throw Error('QUEUE_KEY');rows.push(q);}return rows.sort((a,b)=>a.expectedRevision-b.expectedRevision||a.id.localeCompare(b.id));}catch{storageFault=true;return [];}}
+function readRows(){if(!uid)return [];try{const rows=[],pre=prefix(uid);for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k?.startsWith(pre))continue;const q=decodeQueue(localStorage.getItem(k));if(k!==pre+q.id)throw Error('QUEUE_KEY');rows.push(q);}return rows.sort((a,b)=>a.expectedRevision-b.expectedRevision||a.id.localeCompare(b.id));}catch{storageFault=true;return [];}}
+function canonicalQueue(rows){return JSON.stringify(rows.map(q=>encodeQueue(q)));}
 function plan(){try{return queueStatus(base,readRows());}catch{storageFault=true;return {kind:'conflict'};}}
-function put(q){validateQueued(q);const k=prefix(uid)+q.id,prior=localStorage.getItem(k);if(prior!==null&&prior!==JSON.stringify(q))throw Error('ID_REUSE');localStorage.setItem(k,JSON.stringify(q));}
+function put(q){validateQueued(q);const k=prefix(uid)+q.id,prior=localStorage.getItem(k);if(prior!==null){if(!sameQueued(prior,q))throw Error('ID_REUSE');return;}localStorage.setItem(k,encodeQueue(q));}
 async function verify(s){if(!s)return null;validateEnvelope(s);if(s.receipts[s.lastOperationId]!==s.revision+':'+await sha(s.payload))throw Error('PAYLOAD_HASH_MISMATCH');return s;}
 function persist(s,id){
   const key=checkpoint(id),raw=localStorage.getItem(key);
@@ -60,7 +62,7 @@ function paint(){
   download.hidden=!rows.length;download.disabled=busy||recoverBusy||storageFault;
   discard.hidden=!(rows.length&&conflict&&ready&&!busy&&!recoverBusy&&!denied);
   refresh.disabled=busy||recoverBusy;restore.hidden=!loaded||!authorized||denied||rows.length>0||storageFault;restore.disabled=busy||recoverBusy;
-  importBtn.hidden=!canMigrate();fixtureJson.hidden=!loaded||!authorized||denied;fixtureExcel.hidden=fixtureJson.hidden;
+  importBtn.hidden=!canMigrate();fixtureJson.hidden=!loaded||!authorized||denied;fixtureExcel.hidden=fixtureJson.hidden;legacyJson.hidden=fixtureJson.hidden;legacyExcel.hidden=fixtureJson.hidden;
   undoBtn.hidden=!canMigrate()||!currentUndo();compareBtn.hidden=!(rows.length&&conflict&&ready&&!busy&&!recoverBusy&&!denied);
   if(compareBtn.hidden){conflictReport.hidden=true;conflictReport.textContent='';}
   const next=denied?'denied':storageFault?'fault':conflict?'conflict':rows.length>=16?'full':!loaded?'connecting':'';
@@ -70,7 +72,7 @@ function fault(e){storageFault=true;notice='Armazenamento ou integridade não co
 async function settle(s,id,g){
   for(const q of readRows()){if(!s||!Object.hasOwn(s.receipts,q.id))continue;const h=await sha(q.payload);if(!same(id,g))return;if(s.receipts[q.id]!==q.expectedRevision+1+':'+h)throw Error('ID_REUSE');
     // Checkpoint has already been persisted. An acknowledged operation can now be removed.
-    const k=prefix(id)+q.id;if(localStorage.getItem(k)===JSON.stringify(q))localStorage.removeItem(k);}
+    const k=prefix(id)+q.id;if(sameQueued(localStorage.getItem(k),q))localStorage.removeItem(k);}
 }
 function schedule(delay=0){if(timer!==null)clearTimeout(timer);timer=setTimeout(()=>{timer=null;drain();},delay);}
 async function accept(s,id,g,n){
@@ -135,7 +137,7 @@ fileInput.addEventListener('change',async()=>{const f=fileInput.files?.[0],id=ui
     if(!unconfirmed.length){notice='Todas as operações já confirmadas; nenhuma duplicação.';return;}
     if(!confirm('Recuperar '+unconfirmed.length+' operação(ões) fictícia(s) desta conta?'))return;
     // Immutable keys: if storage is exhausted, already saved entries remain available and original file unchanged.
-    if(unconfirmed.length>16||unconfirmed.reduce((n,q)=>n+JSON.stringify(q).length,0)>1250000)throw Error('QUEUE_CAPACITY');
+    if(unconfirmed.length>16||unconfirmed.reduce((n,q)=>n+encodeQueue(q).length,0)>1250000)throw Error('QUEUE_CAPACITY');
     for(const q of unconfirmed)put(q);showPlan();notice='Fila recuperada. Conflitos não serão enviados.';schedule();
   }catch(e){if(same(id,g))notice='Recuperação interrompida: '+e.message+'. Confira as operações guardadas; mantenha o arquivo original.';}
   finally{if(same(id,g)){recoverBusy=false;fileInput.value='';paint();schedule();}}});
@@ -153,6 +155,8 @@ async function fixture(asExcel){
  }catch(e){if(same(id,g)){notice='Falha ao gerar arquivo: '+e.message;paint();}}
 }
 fixtureJson.addEventListener('click',()=>fixture(false));fixtureExcel.addEventListener('click',()=>fixture(true));
+function makeLegacy(asExcel){if(!uid||auth.currentUser?.uid!==uid||!authorized||!loaded||denied)return;try{const d=legacyFixture(asExcel?'excel':'json');if(asExcel){if(typeof XLSX==='undefined')throw Error('Excel indisponível.');const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(legacyRows(d)),'Backup restauracao');XLSX.writeFile(wb,'Raytech_Legado_Teste.xlsx');}else downloadJson(d,'Raytech_Legado_Teste.json');notice='Fixture legada gerada: dezembro/2026, dois lançamentos de R$ 27,25.';paint();}catch(e){notice='Falha ao gerar fixture: '+e.message;paint();}}
+legacyJson.addEventListener('click',()=>makeLegacy(false));legacyExcel.addEventListener('click',()=>makeLegacy(true));
 importBtn.addEventListener('click',()=>{if(!canMigrate())return;importFile.value='';importFile.click();});
 function migrationStillValid(id,g,v,payload){return same(id,g)&&authorized&&ready&&!denied&&!storageFault&&!busy&&!dirty&&!modalOpen()&&!readRows().length&&view?.revision===v.revision&&view?.parent===v.parent&&viewPayload===payload&&v.revision===(base?.revision??0)&&v.parent===(base?.lastOperationId??'');}
 function enqueueMigration(payload,q){put(q);showPayload(payload,q.expectedRevision+1,q.id);notice='Operação salva. Aguardando confirmação do servidor.';paint();schedule();}
@@ -160,14 +164,15 @@ importFile.addEventListener('change',async()=>{
  const file=importFile.files?.[0],id=uid,g=generation;if(!file||!canMigrate())return;if(file.size>2000000){notice='Arquivo excede o limite de 2 MB.';paint();return;}
  const v={...view},before=viewPayload;recoverBusy=true;paint();
  try{
- let pack;if(file.name.toLowerCase().endsWith('.xlsx')){if(typeof XLSX==='undefined')throw Error('Biblioteca Excel indisponível.');const wb=XLSX.read(await file.arrayBuffer(),{type:'array',sheetRows:10});const ws=wb.Sheets['Raytech Teste'];if(!ws||!ws['!ref'])throw Error('Aba Raytech Teste ausente.');const range=XLSX.utils.decode_range(ws['!ref']);if(range.s.r!==0||range.s.c!==0||range.e.r>8||range.e.c!==4||Object.keys(ws).some(k=>!k.startsWith('!')&&ws[k]?.f))throw Error('Estrutura Excel inválida.');pack=readPackRows(XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null,blankrows:true}));}else if(file.name.toLowerCase().endsWith('.json'))pack=validateBackupPack(JSON.parse(await file.text()));else throw Error('Formato não permitido.');
+ let pack,legacy=false;if(file.name.toLowerCase().endsWith('.xlsx')){if(typeof XLSX==='undefined')throw Error('Biblioteca Excel indisponível.');const wb=XLSX.read(await file.arrayBuffer(),{type:'array',sheetRows:10});let ws=wb.Sheets['Raytech Teste'];if(!ws){ws=wb.Sheets['Backup restauracao'];legacy=true;}if(!ws||!ws['!ref'])throw Error('Aba de backup ausente.');const range=XLSX.utils.decode_range(ws['!ref']);if(range.s.r!==0||range.s.c!==0||range.e.r>8||range.e.c!==4||Object.keys(ws).some(k=>!k.startsWith('!')&&ws[k]?.f))throw Error('Estrutura Excel inválida.');const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null,blankrows:true});if(legacy){const payload=readLegacyRows(rows);pack=backupPack(payload,await sha(payload));}else pack=readPackRows(rows);}
+ else if(file.name.toLowerCase().endsWith('.json')){const raw=JSON.parse(await file.text());if(raw?.format==='raytech-synthetic-backup-v1')pack=validateBackupPack(raw);else{const payload=validateLegacyFixture(JSON.stringify(raw));pack=backupPack(payload,await sha(payload));legacy=true;}}else throw Error('Formato não permitido.');
  if(await sha(pack.payload)!==pack.sha256)throw Error('Checksum SHA-256 divergente.');
  if(!migrationStillValid(id,g,v,before))throw Error('Revisão mudou. Reabra a importação.');
  const result=mergeImport(before,pack.payload);
  if(result.conflicts.length){notice='Importação bloqueada: '+result.conflicts.slice(0,8).join('; ');details.open=true;return;}
  if(!result.changed){notice='Nenhuma alteração: '+result.stats.duplicates+' duplicata(s), '+result.stats.skippedDeleted+' parcela(s) excluída(s) preservada(s).';return;}
  const st=result.stats;
- if(!confirm('Backup FICTÍCIO validado.\n'+st.added+' lançamento(s) novo(s), '+st.months+' mês(es) novo(s), '+st.duplicates+' duplicata(s), '+st.skippedDeleted+' parcela(s) excluída(s) ignorada(s), '+st.filled+' saldo(s)/limite(s) preenchido(s), '+st.kept+' campo(s) atual(is) preservado(s).\nConfirma a importação sem substituir os lançamentos atuais?')){notice='Importação cancelada. Banco intacto.';return;}
+ if(!confirm((legacy?'Fixture legada conhecida (sem checksum original).':'Backup FICTÍCIO validado.')+'\n'+st.added+' lançamento(s) novo(s), '+st.months+' mês(es) novo(s), '+st.duplicates+' duplicata(s), '+st.skippedDeleted+' parcela(s) excluída(s) ignorada(s), '+st.filled+' saldo(s)/limite(s) preenchido(s), '+st.kept+' campo(s) atual(is) preservado(s).\nConfirma a importação sem substituir os lançamentos atuais?')){notice='Importação cancelada. Banco intacto.';return;}
  const q=appendQueued(base,[],v,result.payload,crypto.randomUUID());const journal={format:'raytech-import-undo-v1',uid:id,operationId:q.id,revision:q.expectedRevision+1,before,after:result.payload,sha256:await sha(before)};
  if(!migrationStillValid(id,g,v,before))throw Error('Revisão mudou antes da gravação.');
  localStorage.setItem(undoKey(id,q.id),JSON.stringify(journal));enqueueMigration(result.payload,q);
@@ -181,9 +186,10 @@ undoBtn.addEventListener('click',async()=>{
  catch(e){if(same(id,g))notice='Reversão bloqueada: '+e.message;}
  finally{if(same(id,g)){recoverBusy=false;paint();schedule();}}
 });
-compareBtn.addEventListener('click',()=>{if(!ready||busy||recoverBusy||plan().kind!=='conflict')return;try{const rows=readRows(),tail=rows[rows.length-1],remote=base?.payload??JSON.stringify(blank(getTodayYM()));const lines=snapshotDiff(remote,tail.payload);conflictReport.textContent='Servidor x última intenção da fila (não é mesclagem automática):\n'+(lines.slice(0,80).join('\n')||'Sem diferenças de conteúdo; revisão incompatível.')+(lines.length>80?'\nMais diferenças no arquivo da fila.':'')+'\nExporte a fila antes de descartar. Revise e reaplique manualmente apenas os lançamentos desejados.';conflictReport.hidden=false;}catch(e){notice='Comparação indisponível: '+e.message;paint();}});
+compareBtn.addEventListener('click',()=>{if(!ready||busy||recoverBusy||plan().kind!=='conflict')return;try{const rows=readRows(),remote=base?.payload??JSON.stringify(blank(getTodayYM())),branches=conflictBranches(rows);const lines=branches.flatMap((q,i)=>['Ramo '+(i+1)+' · revisão-base '+q.expectedRevision+' · '+q.id,...snapshotDiff(remote,q.payload)]);conflictReport.textContent='Servidor x '+branches.length+' ramo(s) da fila (sem mesclagem automática):\n'+(lines.slice(0,120).join('\n')||'Revisão incompatível.')+(lines.length>120?'\nOutras diferenças no arquivo da fila.':'')+'\nExporte a fila antes de descartar. Revise e reaplique manualmente os lançamentos desejados.';conflictReport.hidden=false;}catch(e){notice='Comparação indisponível: '+e.message;paint();}});
 discard.addEventListener('click',()=>{const id=uid,g=generation,rows=readRows();if(!id||!same(id,g)||!ready||busy||recoverBusy||plan().kind!=='conflict')return;if(!confirm('Descartar TODA a fila fictícia em conflito? Exporte-a antes. O servidor não será alterado.'))return;
-  try{for(const q of rows){const k=prefix(id)+q.id;if(localStorage.getItem(k)===JSON.stringify(q))localStorage.removeItem(k);}showPlan();notice='Fila descartada por confirmação do usuário.';paint();}catch(e){fault(e);}});
+  if(plan().kind!=='conflict'||canonicalQueue(readRows())!==canonicalQueue(rows)){notice='Fila mudou em outro separador. Revise novamente.';paint();return;}
+  try{for(const q of rows){const k=prefix(id)+q.id;if(sameQueued(localStorage.getItem(k),q))localStorage.removeItem(k);}showPlan();notice='Fila descartada por confirmação do usuário.';paint();}catch(e){fault(e);}});
 leave.addEventListener('click',e=>{if((dirty||modalOpen())&&!confirm('Sair sem salvar o rascunho? A fila já gravada será preservada.')){e.preventDefault();return;}dirty=false;dismiss();try{localStorage.removeItem(preference);}catch{}});
 window.addEventListener('beforeunload',e=>{if(dirty||modalOpen()){e.preventDefault();e.returnValue='';}});
 window.addEventListener('pageshow',e=>{if(e.persisted)location.reload();});
@@ -199,7 +205,7 @@ window.addEventListener('offline',()=>{++serial;ready=false;notice='Sem internet
 window.addEventListener('online',()=>{if(uid&&!busy)connect();});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&uid&&!busy&&navigator.onLine){if(!ready)connect();else schedule();}});
 window.addEventListener('storage',e=>{if(!uid||!(e.key===null||e.key.startsWith(prefix(uid))||e.key===checkpoint(uid)))return;if(dirty||modalOpen()||busy){notice='Outro separador alterou o armazenamento. Seu rascunho não será sobrescrito.';paint();return;}const p=plan();if(loaded&&p.kind==='ready')showPlan(p);if(navigator.onLine&&!busy)connect();else paint();});
-if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{notice='Cache offline indisponível neste navegador.';paint();});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{notice='Cache offline indisponível neste navegador.';paint();});
 paint();
 }
 if(window.raytechCloudUiReady)startCloud();else window.addEventListener('DOMContentLoaded',startCloud,{once:true});
