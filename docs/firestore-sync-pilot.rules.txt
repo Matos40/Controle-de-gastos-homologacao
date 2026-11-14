@@ -1,0 +1,45 @@
+// INSERIR DENTRO de match /databases/{database}/documents, preservando as demais regras.
+// Antes de publicar, verificar que nenhuma regra recursiva/permissiva concede acesso a estas duas coleções.
+// Somente para o projeto raytech-cg-homologacao; NÃO usar na produção.
+match /raytechSyncPilotAccessV1/{uid} {
+  allow get: if request.auth != null && request.auth.uid == uid;
+  allow list, create, update, delete: if false;
+}
+match /raytechSyncPilotV1/{uid} {
+  function approved() {
+    return request.auth != null && request.auth.uid == uid
+      && exists(/databases/$(database)/documents/raytechSyncPilotAccessV1/$(uid))
+      && get(/databases/$(database)/documents/raytechSyncPilotAccessV1/$(uid)).data.enabled == true;
+  }
+  function valid(d) {
+    return d.keys().hasAll(['marker', 'revision', 'receipts', 'lastOperationId', 'salary', 'energy', 'food', 'card', 'extra', 'energyPaid', 'foodPaid', 'cardPaid'])
+      && d.keys().hasOnly(['marker', 'revision', 'receipts', 'lastOperationId', 'salary', 'energy', 'food', 'card', 'extra', 'energyPaid', 'foodPaid', 'cardPaid'])
+      && d.marker == 'raytech-synthetic-financial-pilot-v1'
+      && d.revision is int && d.revision >= 1 && d.revision <= 100
+      && d.receipts is map && d.receipts.keys().size() == d.revision
+      && d.lastOperationId is string
+      && d.lastOperationId.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+      && d.receipts.keys().hasAny([d.lastOperationId])
+      && d.receipts[d.lastOperationId] is string
+      && d.receipts[d.lastOperationId].size() <= 80
+      && d.receipts[d.lastOperationId].matches('^(salary|energy|food|card|extra|energyPaid|foodPaid|cardPaid):(true|false|[0-9]+):[0-9]+$')
+      && d.salary is int && d.salary in [0, 400000, 500000, 550000]
+      && d.energy is int && d.energy in [0, 15000, 18000, 21000]
+      && d.energyPaid is bool && (d.energy != 0 || d.energyPaid == false)
+      && d.food is int && d.food in [0, 25000, 30000, 35000]
+      && d.foodPaid is bool && (d.food != 0 || d.foodPaid == false)
+      && d.card is int && d.card in [0, 10000, 20000, 30000]
+      && d.cardPaid is bool && (d.card != 0 || d.cardPaid == false)
+      && d.extra is int && d.extra in [0, 10000, 25000, 50000];
+  }
+  allow get: if approved();
+  allow list, delete: if false;
+  allow create: if approved() && valid(request.resource.data)
+    && request.resource.data.revision == 1
+    && request.resource.data.receipts.keys().hasOnly([request.resource.data.lastOperationId]);
+  allow update: if approved() && valid(request.resource.data)
+    && request.resource.data.revision == resource.data.revision + 1
+    && !resource.data.receipts.keys().hasAny([request.resource.data.lastOperationId])
+    && request.resource.data.receipts.diff(resource.data.receipts).addedKeys().hasOnly([request.resource.data.lastOperationId])
+    && request.resource.data.receipts.diff(resource.data.receipts).affectedKeys().hasOnly([request.resource.data.lastOperationId]);
+}

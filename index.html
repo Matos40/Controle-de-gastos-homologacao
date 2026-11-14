@@ -569,6 +569,8 @@
             <button id="firebaseLogoutButton" type="button" class="hidden w-full px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition">Sair da conta Google</button>
             <button id="firebaseFirestoreTestButton" type="button" class="hidden w-full px-3 py-2 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold transition"><i class="fa-solid fa-database mr-1"></i> Testar banco de dados</button>
             <p id="firebaseFirestoreTestStatus" role="status" aria-live="polite" class="text-[11px] text-slate-300 px-1"></p>
+            <button id="financialPilotOpen" type="button" class="w-full px-3 py-2 rounded-lg bg-cyan-800 text-white text-xs font-bold">Abrir finanças na nuvem (teste)</button>
+            <section id="financialPilotPanel" class="hidden border-t border-cyan-500/40 pt-3 space-y-2 text-xs text-slate-200" aria-label="Finanças fictícias sincronizadas"></section>
             <div id="firebaseSyncDemo" class="hidden border-t border-slate-700/60 pt-3 space-y-2">
               <p class="text-xs font-bold text-cyan-300">Sincronização entre dispositivos (teste)</p>
               <p class="text-[11px] text-slate-400">Digite apenas um texto fictício. Ele aparecerá nos outros dispositivos conectados à mesma conta.</p>
@@ -614,7 +616,7 @@
               <div id="firebaseExpenseLabList" class="space-y-2"></div>
               <p id="firebaseExpenseLabStatus" role="status" aria-live="polite" class="text-[11px] text-emerald-300">Aguardando login.</p>
             </div>
-            <p class="text-[10px] text-amber-200/80 px-1">O login Google identifica sua conta, mas não sincroniza nem separa seus dados financeiros. Trocar ou sair da conta Google neste navegador não altera os lançamentos armazenados neste dispositivo.</p>
+            <p class="text-[10px] text-amber-200/80 px-1">O piloto na nuvem tem valores exclusivamente fictícios e separados por conta. Os lançamentos locais do aplicativo continuam independentes e não serão enviados.</p>
           </section>
 
           <!-- Ajuda acessível pelo menu Opções, sem botão flutuante -->

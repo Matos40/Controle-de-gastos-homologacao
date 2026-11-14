@@ -30,7 +30,7 @@ let lastMessage = '';
 function render(user, message = '') {
   if (message) lastMessage = message;
   else lastMessage = user
-    ? 'Conta Google conectada. Sincronização financeira indisponível nesta etapa.'
+    ? 'Conta Google conectada. Abra Finanças na nuvem (teste) para experimentar a sincronização fictícia.'
     : 'Não conectado. Seus dados permanecem neste dispositivo.';
   if (status) status.textContent = lastMessage;
   if (account) account.textContent = user ? (user.displayName || user.email || 'Conta Google') : '';
@@ -81,4 +81,17 @@ if (logout) logout.addEventListener('click', async () => {
     if (login) login.disabled = false;
     if (logout) logout.disabled = false;
   }
+});
+
+// Lazy loading keeps local finances and authentication independent of pilot failures.
+const pilotOpen=document.getElementById('financialPilotOpen');
+const pilotPanel=document.getElementById('financialPilotPanel');
+let pilotMounted=false, pilotLoading=false;
+if(pilotOpen&&pilotPanel)pilotOpen.addEventListener('click',async()=>{
+  pilotPanel.classList.remove('hidden');
+  if(pilotMounted||pilotLoading)return;
+  pilotLoading=true;pilotOpen.disabled=true;pilotPanel.textContent='Carregando piloto…';
+  try{const {mountPilot}=await import('./firebaseFinancialPilot.mjs');mountPilot(app,auth,onAuthStateChanged);pilotMounted=true;}
+  catch{pilotPanel.textContent='Não foi possível carregar o piloto. Os dados locais continuam independentes.';}
+  finally{pilotLoading=false;pilotOpen.disabled=false;}
 });

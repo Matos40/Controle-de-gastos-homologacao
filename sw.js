@@ -1,8 +1,9 @@
-const CACHE_NAME = 'homolog-controle-gastos-shell-v7';
+const CACHE_NAME = 'homolog-controle-gastos-shell-v8';
 const APP_SHELL = [
   './', './index.html', './manifest.json', './css/styles.css',
   './js/state.js', './js/app.js',
   './js/services/firebaseAuth.js', './js/services/firebaseAuthLite.js', './js/services/firebaseAuthAvailability.js', './js/services/firebaseExpenseLab.js', './js/services/firebaseOfflineQueue.js',
+  './js/services/firebaseFinancialPilot.mjs', './js/services/firebaseFinancialPilotModel.mjs',
   './js/services/storageService.js', './js/services/geminiService.js', './js/services/excelService.js',
   './js/ui/renderSummary.js', './js/ui/renderExpenses.js', './js/ui/renderCards.js',
   './js/ui/renderAnalytics.js', './js/ui/renderHistory.js'
