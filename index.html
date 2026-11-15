@@ -82,14 +82,14 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen antialiased flex flex-col selection:bg-emerald-500 selection:text-slate-950 pb-20 sm:pb-0">
 <section id="cloudControl" aria-label="Sincronização de teste">
   <div class="max-w-6xl mx-auto px-3 sm:px-6 py-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
-    <span class="font-bold text-cyan-200"><i class="fa-solid fa-cloud"></i> Nuvem de teste <span class="text-slate-400">RC2</span></span>
+    <span class="font-bold text-cyan-200"><i class="fa-solid fa-cloud"></i> Nuvem de teste <span class="text-slate-400">RC Final</span></span>
     <span id="cloudIndicator" data-tone="busy" role="status" aria-live="polite">Conectando…</span>
     <span class="text-slate-400">Dados fictícios</span>
   </div>
   <details id="cloudDetails" class="max-w-6xl mx-auto px-3 sm:px-6 pb-2 text-xs">
     <summary class="text-slate-400">Detalhes e recuperação <span aria-hidden="true">▾</span></summary>
     <div class="pt-2 space-y-2">
-      <p class="text-amber-200">Somente dados fictícios. Use a palavra Teste nas descrições. Até 16 alterações pendentes, sujeito à capacidade do dispositivo. Reconexão envia automaticamente e concilia alterações independentes quando a revisão-base é comprovada. Importe somente backups fictícios identificados. IA e PIN local indisponíveis na nuvem.</p>
+      <p class="text-amber-200">Somente dados fictícios. Use a palavra Teste nas descrições. Fila offline adaptativa, sujeita à capacidade do dispositivo. Reconexão envia automaticamente e concilia alterações independentes quando a revisão-base é comprovada. Importe somente backups fictícios identificados. Fatura fictícia com IA opcional; PIN local indisponível na nuvem.</p>
       <p id="cloudStatus" role="status" aria-live="polite">Aguardando autenticação e servidor…</p>
       <div class="flex flex-wrap gap-2">
         <a id="cloudLeave" href="./index.html?mode=local" class="cloud-action">Modo local</a>
@@ -107,6 +107,16 @@
         <button id="cloudLegacyExcel" hidden type="button" class="cloud-action">Gerar Excel legado fictício</button>
         <button id="cloudUndo" hidden type="button" class="cloud-action">Desfazer última importação</button>
         <button id="cloudCompare" hidden type="button" class="cloud-action">Revisar conflito</button>
+        <button id="cloudInvoice" hidden type="button" class="cloud-action">Fatura de teste / IA</button>
+        <button id="cloudV2" hidden type="button" class="cloud-action">Testar armazenamento V2 isolado</button>
+        <details id="cloudInvoicePanel" hidden class="w-full border border-slate-700 rounded-lg p-3 space-y-2">
+          <summary class="font-medium">Fatura fictícia</summary>
+          <p>A imagem é criada aqui, sem arquivos bancários. A chave Gemini é opcional e não será salva. A chamada real pode consumir a cota da sua conta Google.</p>
+          <canvas id="cloudInvoiceCanvas" width="600" height="250" class="block max-w-full rounded-md"></canvas>
+          <label for="cloudInvoiceKey">Chave Gemini (apenas nesta análise)</label>
+          <input id="cloudInvoiceKey" type="password" autocomplete="off" class="w-full rounded-md bg-slate-950 border border-slate-700 p-2" placeholder="Opcional, somente para teste real">
+          <div class="flex flex-wrap gap-2"><button id="cloudInvoiceMock" type="button" class="cloud-action">Simular leitura e revisar</button><button id="cloudInvoiceAnalyze" type="button" class="cloud-action">Analisar com Gemini e revisar</button><button id="cloudInvoiceClose" type="button" class="cloud-action">Fechar</button></div>
+        </details>
         <pre id="cloudConflictReport" hidden style="white-space:pre-wrap;max-height:240px;overflow:auto" class="text-xs text-amber-200"></pre>
       </div>
     </div>
@@ -1723,10 +1733,10 @@
   const common=['./js/ui/renderSummary.js','./js/ui/renderExpenses.js','./js/ui/renderCards.js','./js/ui/renderAnalytics.js','./js/ui/renderHistory.js'];
   const classic=cloud?['./js/cloudTest/state.js','./js/cloudTest/storage.js','./js/cloudTest/export.js',...common,'./js/cloudTest/app.js']:['./js/state.js','./js/services/storageService.js','./js/services/geminiService.js','./js/services/excelService.js',...common,'./js/app.js','./js/onboarding.js'];
   // Parser-inserted same-origin scripts preserve execution order. All URLs are constants.
-  for(const path of classic)document.write('<scr'+'ipt src="'+path+'?v=rc2"><'+'/script>');
+  for(const path of classic)document.write('<scr'+'ipt src="'+path+'?v=rcfinal"><'+'/script>');
   const module=cloud?'./js/cloudTest/sync.mjs':'./js/services/firebaseAuthLite.js';
-  document.write('<scr'+'ipt type="module" src="'+module+'?v=rc2"><'+'/script>');
-  if(!cloud)document.write('<scr'+'ipt src="./js/services/firebaseAuthAvailability.js?v=rc2"><'+'/script>');
+  document.write('<scr'+'ipt type="module" src="'+module+'?v=rcfinal"><'+'/script>');
+  if(!cloud)document.write('<scr'+'ipt src="./js/services/firebaseAuthAvailability.js?v=rcfinal"><'+'/script>');
 })();
 </script>
 </body>

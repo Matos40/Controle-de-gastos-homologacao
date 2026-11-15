@@ -1,4 +1,4 @@
-const CACHE_NAME = 'homolog-controle-gastos-shell-v14';
+const CACHE_NAME = 'homolog-controle-gastos-shell-v15';
 const APP_SHELL = [
   './', './index.html', './manifest.json', './css/styles.css',
   './js/state.js', './js/app.js',
@@ -6,7 +6,7 @@ const APP_SHELL = [
   './js/services/firebaseFinancialPilot.mjs', './js/services/firebaseFinancialPilotModel.mjs',
   './js/services/storageService.js', './js/services/geminiService.js', './js/services/excelService.js',
   './js/onboarding.js', './js/cloudTest/state.js', './js/cloudTest/storage.js', './js/cloudTest/export.js',
-  './js/cloudTest/app.js', './js/cloudTest/model.mjs', './js/cloudTest/sync.mjs', './cloud-test.html',
+  './js/cloudTest/app.js', './js/cloudTest/model.mjs', './js/cloudTest/capacityV2.mjs', './js/cloudTest/sync.mjs', './cloud-test.html',
   './js/ui/renderSummary.js', './js/ui/renderExpenses.js', './js/ui/renderCards.js',
   './js/ui/renderAnalytics.js', './js/ui/renderHistory.js'
 ];
@@ -23,9 +23,9 @@ const CDN_ASSETS = [
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    // Do not activate an incomplete release. Versioned JS URLs defeat a stale v13 worker.
+    // Do not activate an incomplete release. Versioned JS URLs defeat a stale v14 worker.
     await Promise.all(APP_SHELL.map(url => cache.add(new Request(url,{cache:'reload'}))));
-    await Promise.all(APP_SHELL.filter(url=>url.startsWith('./js/')).map(url=>cache.add(new Request(url+'?v=rc2',{cache:'reload'}))));
+    await Promise.all(APP_SHELL.filter(url=>url.startsWith('./js/')).map(url=>cache.add(new Request(url+'?v=rcfinal',{cache:'reload'}))));
     await Promise.allSettled(CDN_ASSETS.map(url => cache.add(url)));
     await self.skipWaiting();
   })());
@@ -33,7 +33,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter(key => key.startsWith('homolog-controle-gastos-shell-') && key !== CACHE_NAME && key !== 'homolog-controle-gastos-shell-v13').map(key => caches.delete(key)));
+    await Promise.all(keys.filter(key => key.startsWith('homolog-controle-gastos-shell-') && key !== CACHE_NAME && key !== 'homolog-controle-gastos-shell-v14').map(key => caches.delete(key)));
     await self.clients.claim();
   })());
 });
@@ -55,7 +55,7 @@ self.addEventListener('fetch', event => {
     })());
     return;
   }
-  if ((url.origin===self.location.origin && url.pathname.includes('/js/') && url.searchParams.get('v')==='rc2') || url.pathname.includes('/js/cloudTest/') || (url.origin==='https://www.gstatic.com' && url.pathname.startsWith('/firebasejs/11.10.0/'))) {
+  if ((url.origin===self.location.origin && url.pathname.includes('/js/') && url.searchParams.get('v')==='rcfinal') || url.pathname.includes('/js/cloudTest/') || (url.origin==='https://www.gstatic.com' && url.pathname.startsWith('/firebasejs/11.10.0/'))) {
     event.respondWith((async()=>{const cache=await caches.open(CACHE_NAME);const cached=await cache.match(request);if(cached)return cached;const fresh=await fetch(request,{cache:'reload'});if(fresh.ok)await cache.put(request,fresh.clone());return fresh;})());return;
   }
   event.respondWith((async () => {
