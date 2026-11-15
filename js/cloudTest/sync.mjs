@@ -2,7 +2,7 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getFirestore,doc,onSnapshot,getDocFromServer,runTransaction} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
-import {blank,validatePayload,validateEnvelope,apply,checkSuccessor,validateRecovery,validateQueued,queueStatus,assertParent,appendQueued,makeQueueBackup,readQueueBackup,backupPack,validateBackupPack,packRows,readPackRows,mergeImport,validateUndo,snapshotDiff,queueFits,encodeQueue,decodeQueue,sameQueued,legacyFixture,validateLegacyFixture,legacyRows,readLegacyRows,conflictBranches,mergeThreeWay,linearConflict,reconcileCandidate,proofMatches,canonical,adaptiveFits,adaptiveAppend,adaptiveBackup,readAdaptiveBackup,invoiceFixture,invoiceImport} from './model.mjs?v=rcfinal';
+import {blank,validatePayload,validateEnvelope,apply,checkSuccessor,validateRecovery,validateQueued,queueStatus,assertParent,appendQueued,makeQueueBackup,readQueueBackup,backupPack,validateBackupPack,packRows,readPackRows,mergeImport,validateUndo,snapshotDiff,queueFits,encodeQueue,decodeQueue,sameQueued,legacyFixture,validateLegacyFixture,legacyRows,readLegacyRows,conflictBranches,mergeThreeWay,linearConflict,reconcileCandidate,proofMatches,canonical,adaptiveFits,adaptiveAppend,adaptiveBackup,readAdaptiveBackup,invoiceFixture,invoiceImport,richLegacyFixture} from './model.mjs?v=rcfinal';
 import {commitV2,validateV2Head} from './capacityV2.mjs?v=rcfinal';
 const firebaseConfig = Object.freeze({
   apiKey: 'AIzaSyAlOok-2bV9QigR6PyjRgHMLjFLIoPDWpw',
@@ -19,6 +19,7 @@ function startCloud(){
 const el=id=>document.getElementById(id),workspace=el('cloudWorkspace'),status=el('cloudStatus'),indicator=el('cloudIndicator'),details=el('cloudDetails'),refresh=el('cloudRefresh'),retry=el('cloudRetry'),download=el('cloudDownload'),discard=el('cloudDiscard'),restore=el('cloudRestore'),fileInput=el('cloudRecoveryFile'),leave=el('cloudLeave');
 const legacyJson=el('cloudLegacyJson'),legacyExcel=el('cloudLegacyExcel');
 const importBtn=el('cloudImport'),importFile=el('cloudImportFile'),fixtureJson=el('cloudFixtureJson'),fixtureExcel=el('cloudFixtureExcel'),undoBtn=el('cloudUndo'),compareBtn=el('cloudCompare'),conflictReport=el('cloudConflictReport');
+const richJson=el('cloudRichLegacy'),richExcel=el('cloudRichExcel');
 const invoiceBtn=el('cloudInvoice'),invoicePanel=el('cloudInvoicePanel'),invoiceCanvas=el('cloudInvoiceCanvas'),invoiceKey=el('cloudInvoiceKey'),invoiceMock=el('cloudInvoiceMock'),invoiceAnalyze=el('cloudInvoiceAnalyze'),invoiceClose=el('cloudInvoiceClose'),v2Btn=el('cloudV2');
 const ref=id=>doc(db,'raytechFinancialTestV1',id),access=id=>doc(db,'raytechSyncPilotAccessV1',id);
 const prefix=id=>'raytech_financial_test_pending_v1:'+id+':',checkpoint=id=>'raytech_financial_test_checkpoint_v1:'+id,preference='raytech_cloud_test_preference_v1';
@@ -58,6 +59,7 @@ function scrub(){invoiceKey.value='';invoicePanel.hidden=true;invoicePanel.open=
   document.activeElement?.blur?.();updateMonthHeader();renderAll();
 }
 const undoKey=(id,op)=>'raytech_test_import_undo_v1:'+id+':'+op;
+function canProbeV2(){return !!uid&&auth.currentUser?.uid===uid&&loaded&&authorized&&ready&&!denied&&!storageFault&&!busy&&!recoverBusy&&!readRows().length&&!hasJournal();}
 function canMigrate(){return !!uid&&auth.currentUser?.uid===uid&&loaded&&authorized&&ready&&!denied&&!storageFault&&!busy&&!recoverBusy&&!dirty&&!modalOpen()&&!readRows().length&&!hasJournal()&&!!view&&view.revision===(base?.revision??0)&&view.parent===(base?.lastOperationId??'')&&view.revision<500;}
 function currentUndo(){try{if(!uid||!view||!view.parent)return null;const raw=localStorage.getItem(undoKey(uid,view.parent));if(raw===null)return null;return validateUndo(JSON.parse(raw),uid,viewPayload,view.parent,view.revision);}catch{return null;}}
 function paint(){
@@ -70,8 +72,8 @@ function paint(){
   download.hidden=!rows.length;download.disabled=busy||recoverBusy||storageFault;
   discard.hidden=!(rows.length&&conflict&&ready&&!busy&&!recoverBusy&&!denied&&!hasJournal());
   refresh.disabled=busy||recoverBusy;restore.hidden=!loaded||!authorized||denied||rows.length>0||storageFault||hasJournal();restore.disabled=busy||recoverBusy;
-  invoiceBtn.hidden=!canMigrate();v2Btn.hidden=!canMigrate();invoiceMock.disabled=busy||recoverBusy;invoiceAnalyze.disabled=busy||recoverBusy;invoiceClose.disabled=busy||recoverBusy;
-  importBtn.hidden=!canMigrate();fixtureJson.hidden=!loaded||!authorized||denied;fixtureExcel.hidden=fixtureJson.hidden;legacyJson.hidden=fixtureJson.hidden;legacyExcel.hidden=fixtureJson.hidden;
+  invoiceBtn.hidden=!canMigrate();v2Btn.hidden=!canProbeV2();invoiceMock.disabled=busy||recoverBusy;invoiceAnalyze.disabled=busy||recoverBusy;invoiceClose.disabled=busy||recoverBusy;
+  importBtn.hidden=!canMigrate();fixtureJson.hidden=!loaded||!authorized||denied;fixtureExcel.hidden=fixtureJson.hidden;legacyJson.hidden=fixtureJson.hidden;legacyExcel.hidden=fixtureJson.hidden;richJson.hidden=fixtureJson.hidden;richExcel.hidden=fixtureJson.hidden;
   undoBtn.hidden=!canMigrate()||!currentUndo();compareBtn.hidden=!(rows.length&&conflict&&ready&&!busy&&!recoverBusy&&!denied);
   if(compareBtn.hidden){conflictReport.hidden=true;conflictReport.textContent='';}
   const next=denied?'denied':storageFault?'fault':conflict?'conflict':rows.length>=64?'full':!loaded?'connecting':'';
@@ -212,6 +214,8 @@ async function fixture(asExcel){
 fixtureJson.addEventListener('click',()=>fixture(false));fixtureExcel.addEventListener('click',()=>fixture(true));
 function makeLegacy(asExcel){if(!uid||auth.currentUser?.uid!==uid||!authorized||!loaded||denied)return;try{const d=legacyFixture(asExcel?'excel':'json');if(asExcel){if(typeof XLSX==='undefined')throw Error('Excel indisponível.');const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(legacyRows(d)),'Backup restauracao');XLSX.writeFile(wb,'Raytech_Legado_Teste.xlsx');}else downloadJson(d,'Raytech_Legado_Teste.json');notice='Fixture legada gerada: dezembro/2026, dois lançamentos de R$ 27,25.';paint();}catch(e){notice='Falha ao gerar fixture: '+e.message;paint();}}
 legacyJson.addEventListener('click',()=>makeLegacy(false));legacyExcel.addEventListener('click',()=>makeLegacy(true));
+function generateRichLegacy(excel){if(!uid||auth.currentUser?.uid!==uid||!authorized||!loaded||denied)return;try{const d=richLegacyFixture();if(excel){if(typeof XLSX==='undefined')throw Error('Excel indisponível.');const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(legacyRows(d)),'Backup restauracao');XLSX.writeFile(wb,'Raytech_Legado_Completo_Teste.xlsx');}else downloadJson(d,'Raytech_Legado_Completo_Teste.json');notice='Fixture completa gerada: fevereiro e março/2027, com parcelas e histórico.';paint();}catch(e){notice='Falha ao gerar fixture: '+e.message;paint();}}
+richJson.addEventListener('click',()=>generateRichLegacy(false));richExcel.addEventListener('click',()=>generateRichLegacy(true));
 importBtn.addEventListener('click',()=>{if(!canMigrate())return;importFile.value='';importFile.click();});
 function migrationStillValid(id,g,v,payload){return same(id,g)&&authorized&&ready&&!denied&&!storageFault&&!busy&&!dirty&&!modalOpen()&&!readRows().length&&view?.revision===v.revision&&view?.parent===v.parent&&viewPayload===payload&&v.revision===(base?.revision??0)&&v.parent===(base?.lastOperationId??'');}
 let invoiceMonth=null;
@@ -252,7 +256,7 @@ async function analyzeInvoice(real){
 invoiceMock.addEventListener('click',()=>analyzeInvoice(false));invoiceAnalyze.addEventListener('click',()=>analyzeInvoice(true));
 // V2 uses an independent UID path and never reads or migrates V1 or real account finances.
 v2Btn.addEventListener('click',async()=>{
- if(!canMigrate()||!confirm('Executar uma gravação FICTÍCIA isolada na coleção V2? Nenhum lançamento atual será copiado. Requer regras V2 publicadas.'))return;
+ if(!canProbeV2()||!confirm('Executar uma gravação FICTÍCIA isolada na coleção V2? Nenhum lançamento atual será copiado. Requer regras V2 publicadas.'))return;
  const id=uid,g=generation;recoverBusy=true;paint();
  try{
  const headRef=doc(db,'raytechFinancialTestV2',id),receiptRef=op=>doc(db,'raytechFinancialTestV2',id,'receipts',op);
