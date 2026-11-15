@@ -1738,10 +1738,10 @@
   const common=['./js/ui/renderSummary.js','./js/ui/renderExpenses.js','./js/ui/renderCards.js','./js/ui/renderAnalytics.js','./js/ui/renderHistory.js'];
   const classic=cloud?['./js/cloudTest/state.js','./js/cloudTest/storage.js','./js/cloudTest/export.js',...common,'./js/cloudTest/app.js']:['./js/state.js','./js/services/storageService.js','./js/services/geminiService.js','./js/services/excelService.js',...common,'./js/app.js','./js/onboarding.js'];
   // Parser-inserted same-origin scripts preserve execution order. All URLs are constants.
-  for(const path of classic)document.write('<scr'+'ipt src="'+path+'?v=v2integration"><'+'/script>');
+  for(const path of classic)document.write('<scr'+'ipt src="'+path+'?v=v2hotfix1"><'+'/script>');
   const module=cloud?'./js/cloudTest/sync.mjs':'./js/services/firebaseAuthLite.js';
-  document.write('<scr'+'ipt type="module" src="'+module+'?v=v2integration"><'+'/script>');
-  if(!cloud)document.write('<scr'+'ipt src="./js/services/firebaseAuthAvailability.js?v=v2integration"><'+'/script>');
+  document.write('<scr'+'ipt type="module" src="'+module+'?v=v2hotfix1"><'+'/script>');
+  if(!cloud)document.write('<scr'+'ipt src="./js/services/firebaseAuthAvailability.js?v=v2hotfix1"><'+'/script>');
 })();
 </script>
 </body>

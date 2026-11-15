@@ -1,4 +1,4 @@
-const CACHE_NAME = 'homolog-controle-gastos-shell-v16';
+const CACHE_NAME = 'homolog-controle-gastos-shell-v17';
 const APP_SHELL = [
   './', './index.html', './manifest.json', './css/styles.css',
   './js/state.js', './js/app.js',
@@ -23,9 +23,9 @@ const CDN_ASSETS = [
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    // Do not activate an incomplete release. Versioned JS URLs defeat a stale v15 worker.
+    // Do not activate an incomplete release. Versioned JS URLs defeat a stale worker.
     await Promise.all(APP_SHELL.map(url => cache.add(new Request(url,{cache:'reload'}))));
-    await Promise.all(APP_SHELL.filter(url=>url.startsWith('./js/')).map(url=>cache.add(new Request(url+'?v=v2integration',{cache:'reload'}))));
+    await Promise.all(APP_SHELL.filter(url=>url.startsWith('./js/')).map(url=>cache.add(new Request(url+'?v=v2hotfix1',{cache:'reload'}))));
     await Promise.allSettled(CDN_ASSETS.map(url => cache.add(url)));
     await self.skipWaiting();
   })());
@@ -33,7 +33,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter(key => key.startsWith('homolog-controle-gastos-shell-') && key !== CACHE_NAME && key !== 'homolog-controle-gastos-shell-v15').map(key => caches.delete(key)));
+    await Promise.all(keys.filter(key => key.startsWith('homolog-controle-gastos-shell-') && key !== CACHE_NAME && key !== 'homolog-controle-gastos-shell-v15' && key !== 'homolog-controle-gastos-shell-v16').map(key => caches.delete(key)));
     await self.clients.claim();
   })());
 });
@@ -55,15 +55,14 @@ self.addEventListener('fetch', event => {
     })());
     return;
   }
-  if ((url.origin===self.location.origin && url.pathname.includes('/js/') && url.searchParams.get('v')==='v2integration') || url.pathname.includes('/js/cloudTest/') || (url.origin==='https://www.gstatic.com' && url.pathname.startsWith('/firebasejs/11.10.0/'))) {
+  if ((url.origin===self.location.origin && url.pathname.includes('/js/') && url.searchParams.get('v')==='v2hotfix1') || url.pathname.includes('/js/cloudTest/') || (url.origin==='https://www.gstatic.com' && url.pathname.startsWith('/firebasejs/11.10.0/'))) {
     event.respondWith((async()=>{const cache=await caches.open(CACHE_NAME);const cached=await cache.match(request);if(cached)return cached;const fresh=await fetch(request,{cache:'reload'});if(fresh.ok)await cache.put(request,fresh.clone());return fresh;})());return;
   }
-  event.respondWith((async () => {
-    const cached = await (await caches.open(CACHE_NAME)).match(request);
-    const network = fetch(request).then(response => {
-      if (response && response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
-      return response;
-    }).catch(() => cached);
-    return cached || network;
-  })());
+  // Clone synchronously before the browser can consume the original body.
+  // Keep cache refresh alive on hits and isolate cache write failures from the response.
+  const cache = caches.open(CACHE_NAME);
+  const cached = cache.then(c => c.match(request)).catch(() => undefined);
+  const network = fetch(request).then(response => ({response, copy: response.ok ? response.clone() : null}));
+  event.waitUntil(network.then(({copy}) => copy ? cache.then(c => c.put(request, copy)) : undefined).catch(() => {}));
+  event.respondWith(cached.then(hit => hit || network.then(({response}) => response).catch(() => Response.error())));
 });

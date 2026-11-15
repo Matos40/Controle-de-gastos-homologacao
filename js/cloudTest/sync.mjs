@@ -2,8 +2,8 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getFirestore,doc,onSnapshot,getDocFromServer,runTransaction} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
-import {blank,validatePayload,validateEnvelope,apply,checkSuccessor,validateRecovery,validateQueued,queueStatus,assertParent,appendQueued,makeQueueBackup,readQueueBackup,backupPack,validateBackupPack,packRows,readPackRows,mergeImport,validateUndo,snapshotDiff,queueFits,encodeQueue,decodeQueue,sameQueued,legacyFixture,validateLegacyFixture,legacyRows,readLegacyRows,conflictBranches,mergeThreeWay,linearConflict,reconcileCandidate,proofMatches,canonical,adaptiveFits,adaptiveAppend,adaptiveBackup,readAdaptiveBackup,invoiceFixture,invoiceImport,richLegacyFixture,candidateV2,validateRoute,seedMigration,canRollbackV2} from './model.mjs?v=v2integration';
-import {commitV2,validateV2Head,validateV2Receipt} from './capacityV2.mjs?v=v2integration';
+import {blank,validatePayload,validateEnvelope,apply,checkSuccessor,validateRecovery,validateQueued,queueStatus,assertParent,appendQueued,makeQueueBackup,readQueueBackup,backupPack,validateBackupPack,packRows,readPackRows,mergeImport,validateUndo,snapshotDiff,queueFits,encodeQueue,decodeQueue,sameQueued,legacyFixture,validateLegacyFixture,legacyRows,readLegacyRows,conflictBranches,mergeThreeWay,linearConflict,reconcileCandidate,proofMatches,canonical,adaptiveFits,adaptiveAppend,adaptiveBackup,readAdaptiveBackup,invoiceFixture,invoiceImport,richLegacyFixture,candidateV2,validateRoute,seedMigration,canRollbackV2} from './model.mjs?v=v2hotfix1';
+import {commitV2,validateV2Head,validateV2Receipt,confirmMigrationV2} from './capacityV2.mjs?v=v2hotfix1';
 const firebaseConfig = Object.freeze({
   apiKey: 'AIzaSyAlOok-2bV9QigR6PyjRgHMLjFLIoPDWpw',
   authDomain: 'raytech-cg-homologacao.firebaseapp.com',
@@ -289,7 +289,7 @@ invoiceMock.addEventListener('click',()=>analyzeInvoice(false));invoiceAnalyze.a
 v2Btn.addEventListener('click',async()=>{
  if(version!==1||!routeAvailable||!base||!canProbeV2()||!confirm('Migrar somente os dados FICTÍCIOS sincronizados? O V1 ficará intacto e bloqueado para novas gravações enquanto V2 estiver ativo. Termine a sincronização nos outros aparelhos antes de continuar.'))return;
  const id=uid,g=generation,source=base,hash=await sha(base.payload);if(!same(id,g)||!canProbeV2()||base!==source)return;
- recoverBusy=true;paint();
+ let switching=false;recoverBusy=true;paint();
  try{
  budget(id,true);const op=crypto.randomUUID();
  const result=await runTransaction(db,async tx=>{
@@ -304,12 +304,21 @@ v2Btn.addEventListener('click',async()=>{
   else {const receipt=await tx.get(receiptRef(id,candidate.route.seed));if(!receipt.exists()||canonical(validateV2Receipt(receipt.data()))!==canonical({operationId:candidate.route.seed,revision:1,parentId:'',hash}))throw Error('SEED_RECEIPT');}
   tx.set(routeRef(id),candidate.route);return candidate;
  },{maxAttempts:3});
- const route=await getDocFromServer(routeRef(id)),head=await getDocFromServer(v2Ref(id));
- if(!same(id,g))return;if(!route.exists()||!head.exists())throw Error('MIGRATION_UNCONFIRMED');
- validateRoute(route.data(),source,validateV2Head(head.data()));if(canonical(route.data())!==canonical(result.route))throw Error('ROUTE_DIVERGENCE');
- notice='Migração confirmada. V1 preservado.';selectVersion(2,id);
+ // Verify the committed route, head and seed receipt in one consistent read-only transaction.
+ // Never repeat the migration write just because a confirmation read was incomplete.
+ await confirmMigrationV2({expected:result,source,sha,isCurrent:()=>same(id,g),
+  read:()=>runTransaction(db,async tx=>{
+   if(!same(id,g))throw Error('SESSION_CHANGED');
+   const route=await tx.get(routeRef(id)),head=await tx.get(v2Ref(id)),receipt=await tx.get(receiptRef(id,result.route.seed));
+   return {route:route.exists()?route.data():null,head:head.exists()?head.data():null,receipt:receipt.exists()?receipt.data():null};
+  },{maxAttempts:3}),
+  delay:ms=>new Promise(resolve=>setTimeout(resolve,ms))
+ });
+ if(!same(id,g))return;
+ if(readRows().length||hasJournal()||storageFault||dirty||modalOpen()||busy)throw Error('SESSION_OR_QUEUE_CHANGED');
+ notice='Migração confirmada. V1 preservado.';selectVersion(2,id);switching=true;
  }catch(e){if(same(id,g))notice='Migração não confirmada: '+e.message+'. V1 preservado; atualize para conferir o banco ativo.';}
- finally{if(same(id,g)){recoverBusy=false;paint();if(!routeMismatch)connect();}}
+ finally{if(same(id,g)){recoverBusy=false;if(!switching){paint();if(!routeMismatch)connect();}}}
 });
 rollbackBtn.addEventListener('click',async()=>{
  if(version!==2||base?.revision!==1||!canProbeV2()||!confirm('Voltar ao V1? Permitido somente se V2 ainda contiver exatamente a cópia inicial confirmada. Nenhum documento financeiro será excluído.'))return;
