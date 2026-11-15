@@ -82,7 +82,7 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen antialiased flex flex-col selection:bg-emerald-500 selection:text-slate-950 pb-20 sm:pb-0">
 <section id="cloudControl" aria-label="Sincronização de teste">
   <div class="max-w-6xl mx-auto px-3 sm:px-6 py-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
-    <span class="font-bold text-cyan-200"><i class="fa-solid fa-cloud"></i> Nuvem de teste <span class="text-slate-400">RC Final</span></span>
+    <span class="font-bold text-cyan-200"><i class="fa-solid fa-cloud"></i> Nuvem de teste <span class="text-slate-400" id="cloudVersion">RC V2</span></span>
     <span id="cloudIndicator" data-tone="busy" role="status" aria-live="polite">Conectando…</span>
     <span class="text-slate-400">Dados fictícios</span>
   </div>
@@ -110,7 +110,10 @@
         <button id="cloudUndo" hidden type="button" class="cloud-action">Desfazer última importação</button>
         <button id="cloudCompare" hidden type="button" class="cloud-action">Revisar conflito</button>
         <button id="cloudInvoice" hidden type="button" class="cloud-action">Fatura de teste / IA</button>
-        <button id="cloudV2" hidden type="button" class="cloud-action">Testar armazenamento V2 isolado</button>
+        <button id="cloudV2" hidden type="button" class="cloud-action">Migrar banco fictício para V2</button>
+<button id="cloudRollback" hidden type="button" class="cloud-action">Voltar ao V1 (sem alterações no V2)</button>
+<button id="cloudRouteSwitch" hidden type="button" class="cloud-action">Arquivar fila anterior e abrir banco ativo</button>
+<p id="cloudQuota" class="text-slate-400"></p>
         <details id="cloudInvoicePanel" hidden class="w-full border border-slate-700 rounded-lg p-3 space-y-2">
           <summary class="font-medium">Fatura fictícia</summary>
           <p>A imagem é criada aqui, sem arquivos bancários. A chave Gemini é opcional e não será salva. A chamada real pode consumir a cota da sua conta Google.</p>
@@ -1735,10 +1738,10 @@
   const common=['./js/ui/renderSummary.js','./js/ui/renderExpenses.js','./js/ui/renderCards.js','./js/ui/renderAnalytics.js','./js/ui/renderHistory.js'];
   const classic=cloud?['./js/cloudTest/state.js','./js/cloudTest/storage.js','./js/cloudTest/export.js',...common,'./js/cloudTest/app.js']:['./js/state.js','./js/services/storageService.js','./js/services/geminiService.js','./js/services/excelService.js',...common,'./js/app.js','./js/onboarding.js'];
   // Parser-inserted same-origin scripts preserve execution order. All URLs are constants.
-  for(const path of classic)document.write('<scr'+'ipt src="'+path+'?v=rcfinal"><'+'/script>');
+  for(const path of classic)document.write('<scr'+'ipt src="'+path+'?v=v2integration"><'+'/script>');
   const module=cloud?'./js/cloudTest/sync.mjs':'./js/services/firebaseAuthLite.js';
-  document.write('<scr'+'ipt type="module" src="'+module+'?v=rcfinal"><'+'/script>');
-  if(!cloud)document.write('<scr'+'ipt src="./js/services/firebaseAuthAvailability.js?v=rcfinal"><'+'/script>');
+  document.write('<scr'+'ipt type="module" src="'+module+'?v=v2integration"><'+'/script>');
+  if(!cloud)document.write('<scr'+'ipt src="./js/services/firebaseAuthAvailability.js?v=v2integration"><'+'/script>');
 })();
 </script>
 </body>
