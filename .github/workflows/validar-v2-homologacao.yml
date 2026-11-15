@@ -1,0 +1,32 @@
+name: Validar V2 somente homologacao
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  testes:
+    if: github.repository == 'Matos40/Controle-de-gastos-homologacao'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Sintaxe e testes sinteticos V1 e V2
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in js/cloudTest/*.mjs sw.js; do node --check "$f"; done
+          node --test tests/cloud-test*.test.mjs
+      - name: Confirmar isolamento e arquivos da migracao
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s docs/firestore-homologacao-completo-v2.rules
+          test -s tests/cloud-test-v2-integration.test.mjs
+          grep -q 'raytech-cg-homologacao' js/cloudTest/sync.mjs
+          grep -q 'raytechFinancialActiveV2' js/cloudTest/sync.mjs
+          printf 'Commit validado: %s\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Testes sinteticos apenas; nenhuma regra ou base Firestore publicada.' >> "$GITHUB_STEP_SUMMARY"
