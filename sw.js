@@ -1,4 +1,4 @@
-const CACHE_NAME = 'homolog-controle-gastos-shell-v17';
+const CACHE_NAME = 'homolog-controle-gastos-shell-v18';
 const APP_SHELL = [
   './', './index.html', './manifest.json', './css/styles.css',
   './js/state.js', './js/app.js',
@@ -33,10 +33,30 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter(key => key.startsWith('homolog-controle-gastos-shell-') && key !== CACHE_NAME && key !== 'homolog-controle-gastos-shell-v15' && key !== 'homolog-controle-gastos-shell-v16').map(key => caches.delete(key)));
+    await Promise.all(keys.filter(key => key.startsWith('homolog-controle-gastos-shell-') && key !== CACHE_NAME && key !== 'homolog-controle-gastos-shell-v15' && key !== 'homolog-controle-gastos-shell-v16' && key !== 'homolog-controle-gastos-shell-v17').map(key => caches.delete(key)));
     await self.clients.claim();
   })());
 });
+// Keep the installed HTML paired with the modules of the same release.
+async function navigateShell(request) {
+  const cache = await caches.open(CACHE_NAME).catch(() => null);
+  const shell = () => cache ? cache.match('./index.html').catch(() => undefined) : Promise.resolve(undefined);
+  if (self.navigator?.onLine === false) return (await shell()) || Response.error();
+  const controller = new AbortController();
+  let timer;
+  try {
+    const fresh = await Promise.race([
+      fetch(request,{cache:'no-store',signal:controller.signal}),
+      new Promise((_,reject) => { timer=setTimeout(() => { reject(Error('NAVIGATION_TIMEOUT'));controller.abort(); },3500); })
+    ]);
+    if(fresh.ok)return fresh;
+    return (await shell()) || fresh;
+  } catch {
+    return (await shell()) || Response.error();
+  } finally {
+    if(timer!==undefined)clearTimeout(timer);
+  }
+}
 self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET') return;
@@ -49,10 +69,7 @@ self.addEventListener('fetch', event => {
     return;
   }
   if (request.mode === 'navigate') {
-    event.respondWith((async () => {
-      try { const fresh = await fetch(request,{cache:'no-store'}); const cache = await caches.open(CACHE_NAME); if(fresh.ok && (url.pathname.endsWith('/index.html')||url.pathname===new URL(self.registration.scope).pathname)) await cache.put('./index.html', fresh.clone()); return fresh; }
-      catch { return (await caches.match('./index.html')) || Response.error(); }
-    })());
+    event.respondWith(navigateShell(request));
     return;
   }
   if ((url.origin===self.location.origin && url.pathname.includes('/js/') && url.searchParams.get('v')==='v2hotfix1') || url.pathname.includes('/js/cloudTest/') || (url.origin==='https://www.gstatic.com' && url.pathname.startsWith('/firebasejs/11.10.0/'))) {
