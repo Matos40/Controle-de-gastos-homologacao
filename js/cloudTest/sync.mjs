@@ -23,7 +23,7 @@ const richJson=el('cloudRichLegacy'),richExcel=el('cloudRichExcel');
 const invoiceBtn=el('cloudInvoice'),invoicePanel=el('cloudInvoicePanel'),invoiceCanvas=el('cloudInvoiceCanvas'),invoiceKey=el('cloudInvoiceKey'),invoiceMock=el('cloudInvoiceMock'),invoiceAnalyze=el('cloudInvoiceAnalyze'),invoiceClose=el('cloudInvoiceClose'),v2Btn=el('cloudV2');
 const routeRef=id=>doc(db,'raytechFinancialRouteV2',id),v1Ref=id=>doc(db,'raytechFinancialTestV1',id),v2Ref=id=>doc(db,'raytechFinancialActiveV2',id),receiptRef=(id,op)=>doc(db,'raytechFinancialActiveV2',id,'receipts',op);
 const rollbackBtn=el('cloudRollback'),switchBtn=el('cloudRouteSwitch'),quota=el('cloudQuota'),versionLabel=el('cloudVersion');
-let version=1,routeMismatch=false,routeAvailable=false,routeUnsub=null,routeObserved=null,refreshRouteBusy=false;
+let version=1,routeMismatch=false,routeAvailable=false,routeUnsub=null,routeObserved=null,quotaPauseUntil=0;
 const routeKey=id=>'raytech_test_active_bank_v2:'+id,limit=()=>version===2?Number.MAX_SAFE_INTEGER:500;
 const ref=id=>version===2?v2Ref(id):v1Ref(id),access=id=>doc(db,'raytechSyncPilotAccessV1',id);
 const prefix=id=>'raytech_financial_test_pending_v'+version+':'+id+':',checkpoint=id=>'raytech_financial_test_checkpoint_v'+version+':'+id,preference='raytech_cloud_test_preference_v1';
@@ -52,7 +52,7 @@ async function project(raw,id,g,extra=[]){
  const receipts={};await Promise.all([...ids].map(async op=>{if(!same(id,g))return;const value=await readReceipt(id,op);if(value)receipts[op]=value;}));if(!same(id,g))throw Error('SESSION_CHANGED');
  return verify({...head,receipts});
 }
-function budget(id,consume=false){const day=new Date().toISOString().slice(0,10),k='raytech_test_send_budget:'+id;let state;try{state=JSON.parse(localStorage.getItem(k)??'null');}catch{throw Error('BUDGET_STORAGE');}const used=state?.day===day?state.used:0;if(!Number.isInteger(used)||used<0)throw Error('BUDGET_STORAGE');if(consume){if(used>=300)throw Error('DAILY_BUDGET');localStorage.setItem(k,JSON.stringify({day,used:used+1}));}return used+(consume?1:0);}
+function budget(id,consume=false){const day=new Date().toISOString().slice(0,10),k='raytech_test_send_budget:'+id;let state;try{state=JSON.parse(localStorage.getItem(k)??'null');}catch{throw Error('BUDGET_STORAGE');}const used=state?.day===day?state.used:0;if(!Number.isInteger(used)||used<0)throw Error('BUDGET_STORAGE');if(consume){if(Date.now()<quotaPauseUntil)throw Error('QUOTA_PAUSE');if(used>=300)throw Error('DAILY_BUDGET');localStorage.setItem(k,JSON.stringify({day,used:used+1}));}return used+(consume?1:0);}
 async function send(q,id,g,hash){
  budget(id,true);
  if(version===1){await runTransaction(db,async tx=>{if(!same(id,g))throw Error('SESSION_CHANGED');const snap=await tx.get(v1Ref(id)),old=snap.exists()?await verify(snap.data()):null;if(!same(id,g))throw Error('SESSION_CHANGED');assertParent(old,q);const result=apply(old,q,hash);if(!result.replay)tx.set(v1Ref(id),result.state);},{maxAttempts:3});return;}
@@ -61,7 +61,7 @@ async function send(q,id,g,hash){
 }
 async function confirmedState(id,g,extra=[]){const snap=await getDocFromServer(ref(id));return project(snap.exists()?snap.data():null,id,g,extra);}
 function selectVersion(target,id){localStorage.setItem(routeKey(id),String(target));location.reload();}
-function routeChanged(target,id,g){if(!same(id,g)||target===version)return false;ready=false;routeMismatch=true;routeObserved=target;notice='Banco ativo mudou em outro aparelho. Fila anterior preservada. Exporte antes de arquivar ou trocar.';if(!readRows().length&&!hasJournal()&&!dirty&&!modalOpen()&&!busy&&!recoverBusy){selectVersion(target,id);return true;}paint();return true;}
+function routeChanged(target,id,g){if(!same(id,g)||target===version)return false;ready=false;routeMismatch=true;routeObserved=target;notice='Banco ativo mudou em outro aparelho. Fila anterior preservada. Exporte antes de arquivar ou trocar.';if(!readRows().length&&!hasJournal()&&!storageFault&&!dirty&&!modalOpen()&&!busy&&!recoverBusy){selectVersion(target,id);return true;}paint();return true;}
 async function checkRoute(id,g){try{const snap=await getDocFromServer(routeRef(id));if(!same(id,g))return false;routeAvailable=true;const target=snap.exists()?2:1;if(snap.exists())validateRoute(snap.data());routeObserved=target;if(routeChanged(target,id,g))return false;routeMismatch=false;return true;}catch(e){if(e?.code==='permission-denied'&&version===1&&!routeAvailable){routeAvailable=false;return true;}throw e;}}
 
 function persist(s,id){
@@ -110,9 +110,10 @@ async function settle(s,id,g){
     // Checkpoint has already been persisted. An acknowledged operation can now be removed.
     const k=prefix(id)+q.id;if(sameQueued(localStorage.getItem(k),q)){localStorage.removeItem(k);localStorage.removeItem(proofKey(id,q.id));}}
 }
-function schedule(delay=0){if(timer!==null)clearTimeout(timer);timer=setTimeout(()=>{timer=null;drain();},delay);}
+function schedule(delay=0){if(timer!==null)clearTimeout(timer);delay=Math.max(delay,quotaPauseUntil-Date.now());timer=setTimeout(()=>{timer=null;drain();},delay);}
 async function accept(s,id,g,n){
-  s=await project(s,id,g);if(!same(id,g)||n!==serial)return;
+  if(routeMismatch)return;
+  s=await project(s,id,g);if(!same(id,g)||n!==serial||routeMismatch)return;
   if(base&&s&&s.revision<base.revision)return;
   continuity(base,s);persist(s,id);base=s;authorized=true;denied=false;
   await settle(s,id,g);if(!same(id,g)||n!==serial)return;
@@ -122,8 +123,10 @@ async function accept(s,id,g,n){
   notice=p.kind==='conflict'?'Outro dispositivo alterou a revisão. Sua fila permanece guardada; exporte antes de descartar.':p.kind==='ready'?'Alterações locais aguardando envio automático.':dirty||modalOpen()?'Revisão recebida. Rascunho preservado; alterações sobre revisão antiga serão bloqueadas.':'Sincronizado com o servidor.';
   paint();schedule();
 }
-function fail(e,id,g){if(!same(id,g))return;ready=false;if(e?.code==='permission-denied'){if(routeMismatch){notice='Banco anterior bloqueado. Fila preservada.';paint();return;}denied=true;authorized=false;loaded=false;notice='Acesso revogado ou não autorizado. Fila preservada.';}else notice='Servidor indisponível. Alterações locais preservadas.';paint();}
+function pauseQuota(){quotaPauseUntil=Date.now()+300000;notice='Cota temporariamente indisponível. Fila preservada; nova tentativa em pelo menos 5 minutos.';}
+function fail(e,id,g){if(!same(id,g))return;ready=false;if(e?.code==='resource-exhausted'){pauseQuota();paint();schedule();return;}if(e?.code==='permission-denied'){if(routeMismatch){notice='Banco anterior bloqueado. Fila preservada.';paint();return;}denied=true;authorized=false;loaded=false;notice='Acesso revogado ou não autorizado. Fila preservada.';}else notice='Servidor indisponível. Alterações locais preservadas.';paint();}
 async function connect(){
+  if(Date.now()<quotaPauseUntil){schedule();return;}
   const id=uid,g=generation,t=++epoch;++serial;if(unsub)unsub();unsub=null;ready=false;paint();
   if(!id||!navigator.onLine)return;
   try{const a=await getDocFromServer(access(id));if(!same(id,g)||t!==epoch)return;if(!a.exists()||a.data().enabled!==true){fail({code:'permission-denied'},id,g);return;}
@@ -178,11 +181,13 @@ async function reconcile(){
   for(const original of j.sources){const k=mergedKey(id,original.id),record=JSON.stringify({operationId:q.id,receipt:confirmed.receipts[q.id]});const prior=localStorage.getItem(k);if(prior!==null&&prior!==record)throw Error('MERGE_ID_REUSE');localStorage.setItem(k,record);}
   for(const original of j.sources){const k=prefix(id)+original.id;if(sameQueued(localStorage.getItem(k),original)){localStorage.removeItem(k);localStorage.removeItem(proofKey(id,original.id));}}
   localStorage.removeItem(journalKey(id));completed=true;ready=true;showPlan();notice='Conciliação automática confirmada. Alterações independentes preservadas.';
- });}catch(e){if(same(id,g)){notice='Conciliação não confirmada: '+e.message+'. Fila e journal preservados.';if(e?.code==='permission-denied')fail(e,id,g);else if(e?.message==='CONFLICT'){ready=false;setTimeout(()=>{if(same(id,g)&&!busy)connect();},3000);}}}
+ });}catch(e){if(same(id,g)){notice='Conciliação não confirmada: '+e.message+'. Fila e journal preservados.';if(e?.code==='resource-exhausted'){pauseQuota();schedule();}else if(e?.code==='permission-denied')fail(e,id,g);else if(e?.message==='CONFLICT'){ready=false;setTimeout(()=>{if(same(id,g)&&!busy)connect();},3000);}}}
  finally{if(same(id,g)){busy=false;paint();if(completed)schedule();}}
 }
 async function drain(){
-  const id=uid,g=generation;if(!id||!same(id,g)||!ready||!navigator.onLine||busy||recoverBusy||storageFault||denied||routeMismatch)return;
+  const id=uid,g=generation;if(!id||!same(id,g)||!navigator.onLine||busy||recoverBusy||storageFault||denied||routeMismatch)return;
+  if(!ready){if(Date.now()<quotaPauseUntil)schedule();else if(readRows().length||hasJournal())connect();return;}
+  if(Date.now()<quotaPauseUntil){schedule();return;}
   try{if(budget(id)>=300){notice='Limite preventivo diário deste aparelho. Fila preservada até o próximo dia UTC.';paint();return;}}catch(e){fault(e);return;}
   const p=plan();if(p.kind==='conflict'){if(!dirty&&!modalOpen())await reconcile();return;}if(p.kind!=='ready')return;
   if(dirty||modalOpen()){schedule(1000);return;}
@@ -194,8 +199,8 @@ async function drain(){
     if(!s||s.receipts[q.id]!==q.expectedRevision+1+':'+hash)throw Error('UNCONFIRMED');
     if(!base||s.revision>=base.revision){continuity(base,s);persist(s,id);base=s;}
     await settle(base,id,g);if(!same(id,g))return;ready=true;success=true;showPlan();notice=readRows().length?'Enviando alterações restantes…':'Sincronizado com o servidor.';
-  }catch(e){if(!same(id,g))return;if(e?.message==='CONFLICT'){notice='Conflito de revisão. Fila preservada, sem sobrescrever o servidor.';ready=false;}else if(e?.code==='permission-denied'){fail(e,id,g);}else{notice='Envio não confirmado. Fila guardada para nova tentativa.';ready=false;}}
-  finally{if(same(id,g)){busy=false;paint();if(success)schedule();else if(navigator.onLine&&!denied&&!storageFault)setTimeout(()=>{if(same(id,g)&&!busy&&!ready)connect();},3000);}}
+  }catch(e){if(!same(id,g))return;if(e?.message==='CONFLICT'){notice='Conflito de revisão. Fila preservada, sem sobrescrever o servidor.';ready=false;}else if(e?.code==='resource-exhausted'){pauseQuota();schedule();}else if(e?.code==='permission-denied'){fail(e,id,g);}else{notice='Envio não confirmado. Fila guardada para nova tentativa.';ready=false;}}
+  finally{if(same(id,g)){busy=false;paint();if(success)schedule();else if(Date.now()>=quotaPauseUntil&&navigator.onLine&&!denied&&!storageFault)setTimeout(()=>{if(same(id,g)&&!busy&&!ready)connect();},3000);}}
 }
 window.raytechCloudSave=function(candidate){
   if(!uid||auth.currentUser?.uid!==uid||!loaded||!authorized||denied||storageFault||routeMismatch||busy||recoverBusy||!view){if(view)appDb=validatePayload(viewPayload);throw Error('Gravação bloqueada');}
@@ -213,7 +218,7 @@ retry.addEventListener('click',()=>{if(!ready)connect();else schedule();});
 download.addEventListener('click',async()=>{const id=uid,g=generation,rows=readRows();if(!id||!rows.length||busy||recoverBusy||storageFault)return;try{const pack=adaptiveBackup(id,rows),payload=JSON.stringify(version===2?{format:'raytech-active-v2-queue',uid:id,queue:pack}:pack),digest=await sha(payload);if(!same(id,g))return;const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify({payload,sha256:digest})],{type:'application/json'}));a.href=url;a.download='raytech-fila-teste.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);}catch{notice='Não foi possível exportar. Fila preservada.';paint();}});
 restore.addEventListener('click',()=>{if(!uid||!authorized||routeMismatch||version===2&&!ready||busy||recoverBusy||readRows().length||hasJournal())return;fileInput.value='';fileInput.click();});
 fileInput.addEventListener('change',async()=>{const f=fileInput.files?.[0],id=uid,g=generation;if(!f||!id||!same(id,g)||!authorized||routeMismatch||version===2&&!ready||busy||recoverBusy||storageFault||readRows().length||f.size>5000000)return;recoverBusy=true;paint();
-  try{const outer=JSON.parse(await f.text());let rows;if(outer.format==='raytech-test-recovery-v1'){if(version===2)throw Error('Arquivo de fila V1 não pode ser enviado ao V2.');const q=validateRecovery(outer,id);if(await sha(q.payload)!==outer.sha256)throw Error('HASH');rows=[q];}else{if(typeof outer.payload!=='string'||await sha(outer.payload)!==outer.sha256)throw Error('HASH');const decoded=JSON.parse(outer.payload);if(version===2){if(decoded.format!=='raytech-active-v2-queue'||decoded.uid!==id)throw Error('Fila de outro banco.');rows=readAdaptiveBackup(decoded.queue,id);}else rows=readAdaptiveBackup(decoded,id);}
+  try{const outer=JSON.parse(await f.text());let rows;if(outer.format==='raytech-test-recovery-v1'){if(version===2)throw Error('Arquivo de fila V1 não pode ser enviado ao V2.');const q=validateRecovery(outer,id);if(await sha(q.payload)!==outer.sha256)throw Error('HASH');rows=[q];}else{if(typeof outer.payload!=='string'||await sha(outer.payload)!==outer.sha256)throw Error('HASH');const decoded=JSON.parse(outer.payload);if(version===2){if(decoded.format!=='raytech-active-v2-queue'||decoded.uid!==id)throw Error('Fila de outro banco.');rows=readAdaptiveBackup(decoded.queue,id);}else {rows=readAdaptiveBackup(decoded,id);if(rows.some(q=>q.expectedRevision>=500))throw Error('Revisão incompatível com V1.');}}
     if(!same(id,g)||!authorized||readRows().length)return;
     const unconfirmed=[];for(const q of rows){if(localStorage.getItem(mergedKey(id,q.id))!==null)throw Error('Operação já conciliada neste aparelho.');const receipt=version===2?await readReceipt(id,q.id):base?.receipts[q.id];if(receipt){if(receipt!==q.expectedRevision+1+':'+await sha(q.payload))throw Error('ID_REUSE');}else unconfirmed.push(q);}
     if(!same(id,g)||!authorized||readRows().length)return;
@@ -317,7 +322,7 @@ rollbackBtn.addEventListener('click',async()=>{
  catch(e){if(same(id,g))notice='Reversão bloqueada: '+e.message;}
  finally{if(same(id,g)){recoverBusy=false;paint();connect();}}
 });
-switchBtn.addEventListener('click',()=>{if(!uid||!routeMismatch||!routeObserved||busy||recoverBusy)return;if(confirm('Abrir banco ativo? A fila do banco anterior ficará arquivada neste aparelho, sem ser enviada ou excluída. Salve o arquivo de recuperação antes.'))selectVersion(routeObserved,uid);});
+switchBtn.addEventListener('click',()=>{if(!uid||!routeMismatch||!routeObserved||busy||recoverBusy||storageFault)return;if(confirm('Abrir banco ativo? A fila do banco anterior ficará arquivada neste aparelho, sem ser enviada ou excluída. Rascunhos ainda não salvos serão descartados. Salve o arquivo de recuperação antes.'))selectVersion(routeObserved,uid);});
 function enqueueMigration(payload,q){put(q);showPayload(payload,q.expectedRevision+1,q.id);notice='Operação salva. Aguardando confirmação do servidor.';paint();schedule();}
 importFile.addEventListener('change',async()=>{
  const file=importFile.files?.[0],id=uid,g=generation;if(!file||!canMigrate())return;if(file.size>2000000){notice='Arquivo excede o limite de 2 MB.';paint();return;}
@@ -353,7 +358,7 @@ leave.addEventListener('click',e=>{if((dirty||modalOpen())&&!confirm('Sair sem s
 window.addEventListener('beforeunload',e=>{if(dirty||modalOpen()){e.preventDefault();e.returnValue='';}});
 window.addEventListener('pageshow',e=>{if(e.persisted)location.reload();});
 onAuthStateChanged(auth,async user=>{
-  const g=++generation;++epoch;++serial;if(unsub)unsub();unsub=null;if(routeUnsub)routeUnsub();routeUnsub=null;routeMismatch=false;routeAvailable=false;routeObserved=null;version=1;if(timer!==null)clearTimeout(timer);timer=null;uid=null;base=null;busy=false;recoverBusy=false;dirty=false;denied=false;storageFault=false;scrub();
+  const g=++generation;++epoch;++serial;if(unsub)unsub();unsub=null;if(routeUnsub)routeUnsub();routeUnsub=null;routeMismatch=false;routeAvailable=false;routeObserved=null;quotaPauseUntil=0;version=1;if(timer!==null)clearTimeout(timer);timer=null;uid=null;base=null;busy=false;recoverBusy=false;dirty=false;denied=false;storageFault=false;scrub();
   if(!user||!/^[a-zA-Z0-9_-]{1,128}$/.test(user.uid)){notice='Entre com Google no aplicativo local. Nenhum banco de outra conta será aberto.';paint();return;}
   const id=uid=user.uid;
   try{version=localStorage.getItem(routeKey(id))==='2'?2:1;const raw=localStorage.getItem(checkpoint(id));if(raw!==null){const c=JSON.parse(raw);if(c.format!=='raytech-test-checkpoint-v1'||c.uid!==id||!Object.hasOwn(c,'state'))throw Error('CHECKPOINT');const s=await verify(c.state);if(!same(id,g))return;base=s;authorized=true;if(version===1)await settle(base,id,g);if(!same(id,g))return;showPlan();notice='Banco fictício recuperado neste dispositivo.';paint();}}
