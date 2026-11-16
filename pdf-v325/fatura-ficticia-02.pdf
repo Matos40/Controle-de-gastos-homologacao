@@ -1,0 +1,282 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R 9 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 3446 >>
+stream
+0.06 0.11 0.2 rg
+0 746 595 96 re f
+1 1 1 rg
+BT /F2 19 Tf 1 0 0 1 36 800 Tm (BANCO MODELO | FATURA DE CARTAO) Tj ET
+BT /F1 11 Tf 1 0 0 1 36 775 Tm (DOCUMENTO FICTICIO - SEM VALIDADE FINANCEIRA) Tj ET
+BT /F1 10 Tf 1 0 0 1 36 758 Tm (Novembro 2026  |  Teste PDF 02  |  Pagina 1 de 3) Tj ET
+0.08 0.12 0.19 rg
+BT /F2 16 Tf 1 0 0 1 36 710 Tm (Compras e parcelas do periodo) Tj ET
+BT /F1 10 Tf 1 0 0 1 36 686 Tm (Vencimento simulado: 25/11/2026   |   Cartao final 0000) Tj ET
+0.90 0.93 0.96 rg
+36 642 523 28 re f
+0.08 0.12 0.19 rg
+BT /F2 10 Tf 1 0 0 1 43 652 Tm (Data) Tj ET
+BT /F2 10 Tf 1 0 0 1 128 652 Tm (Estabelecimento) Tj ET
+BT /F2 10 Tf 1 0 0 1 320 652 Tm (Parcela) Tj ET
+BT /F2 10 Tf 1 0 0 1 395 652 Tm (Valor R$) Tj ET
+BT /F2 10 Tf 1 0 0 1 477 652 Tm (Total R$) Tj ET
+0.96 0.97 0.98 rg
+36 610 523 27 re f
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 620 Tm (12/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 620 Tm (LIVRARIA TESTE) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 620 Tm (A vista) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 620 Tm (48,90) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 620 Tm (48,90) Tj ET
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 588 Tm (13/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 588 Tm (LOJA TESTE) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 588 Tm (2/4) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 588 Tm (25,00) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 588 Tm (100,00) Tj ET
+0.96 0.97 0.98 rg
+36 546 523 27 re f
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 556 Tm (01/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 556 Tm (MERCADO ALFA) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 556 Tm (A vista) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 556 Tm (119,90) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 556 Tm (119,90) Tj ET
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 524 Tm (02/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 524 Tm (CAFE CENTRAL) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 524 Tm (A vista) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 524 Tm (18,50) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 524 Tm (18,50) Tj ET
+0.96 0.97 0.98 rg
+36 482 523 27 re f
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 492 Tm (03/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 492 Tm (FARMACIA SOL) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 492 Tm (A vista) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 492 Tm (67,45) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 492 Tm (67,45) Tj ET
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 460 Tm (04/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 460 Tm (TECNO BETA) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 460 Tm (1/6) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 460 Tm (89,90) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 460 Tm (539,40) Tj ET
+0.96 0.97 0.98 rg
+36 418 523 27 re f
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 428 Tm (05/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 428 Tm (TRANSPORTE LUZ) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 428 Tm (A vista) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 428 Tm (24,00) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 428 Tm (24,00) Tj ET
+BT /F2 12 Tf 1 0 0 1 36 365 Tm (Subtotal de compras desta pagina: R$ 393,65) Tj ET
+0.91 0.94 0.97 rg
+36 166 523 165 re f
+0.08 0.12 0.19 rg
+BT /F2 12 Tf 1 0 0 1 48 310 Tm (Outros registros da fatura \(nao sao compras\)) Tj ET
+BT /F1 11 Tf 1 0 0 1 48 283 Tm (01/11/2026  Saldo anterior: R$ 600,00) Tj ET
+BT /F1 11 Tf 1 0 0 1 48 258 Tm (02/11/2026  Pagamento recebido: -R$ 600,00) Tj ET
+BT /F1 11 Tf 1 0 0 1 48 233 Tm (Limite total do cartao: R$ 5.000,00) Tj ET
+BT /F1 10 Tf 1 0 0 1 36 115 Tm (Dados inventados para homologacao do Raytech CG.) Tj ET
+BT /F1 10 Tf 1 0 0 1 36 98 Tm (Nao efetuar pagamento. Sem codigo de barras ou dados pessoais.) Tj ET
+BT /F2 10 Tf 1 0 0 1 36 45 Tm (TESTE PDF 02 | 1/3) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 8 0 R >>
+endobj
+8 0 obj
+<< /Length 3479 >>
+stream
+0.06 0.11 0.2 rg
+0 746 595 96 re f
+1 1 1 rg
+BT /F2 19 Tf 1 0 0 1 36 800 Tm (BANCO MODELO | FATURA DE CARTAO) Tj ET
+BT /F1 11 Tf 1 0 0 1 36 775 Tm (DOCUMENTO FICTICIO - SEM VALIDADE FINANCEIRA) Tj ET
+BT /F1 10 Tf 1 0 0 1 36 758 Tm (Novembro 2026  |  Teste PDF 02  |  Pagina 2 de 3) Tj ET
+0.08 0.12 0.19 rg
+BT /F2 16 Tf 1 0 0 1 36 710 Tm (Compras e parcelas do periodo) Tj ET
+BT /F1 10 Tf 1 0 0 1 36 686 Tm (Vencimento simulado: 25/11/2026   |   Cartao final 0000) Tj ET
+0.90 0.93 0.96 rg
+36 642 523 28 re f
+0.08 0.12 0.19 rg
+BT /F2 10 Tf 1 0 0 1 43 652 Tm (Data) Tj ET
+BT /F2 10 Tf 1 0 0 1 128 652 Tm (Estabelecimento) Tj ET
+BT /F2 10 Tf 1 0 0 1 320 652 Tm (Parcela) Tj ET
+BT /F2 10 Tf 1 0 0 1 395 652 Tm (Valor R$) Tj ET
+BT /F2 10 Tf 1 0 0 1 477 652 Tm (Total R$) Tj ET
+0.96 0.97 0.98 rg
+36 610 523 27 re f
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 620 Tm (06/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 620 Tm (CAFE CENTRAL) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 620 Tm (A vista) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 620 Tm (18,50) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 620 Tm (18,50) Tj ET
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 588 Tm (07/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 588 Tm (MODA NORTE) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 588 Tm (3/5) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 588 Tm (75,00) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 588 Tm (375,00) Tj ET
+0.96 0.97 0.98 rg
+36 546 523 27 re f
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 556 Tm (08/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 556 Tm (RESTAURANTE MAR) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 556 Tm (A vista) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 556 Tm (92,35) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 556 Tm (92,35) Tj ET
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 524 Tm (09/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 524 Tm (POSTO ESTRELA) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 524 Tm (A vista) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 524 Tm (150,00) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 524 Tm (150,00) Tj ET
+0.96 0.97 0.98 rg
+36 482 523 27 re f
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 492 Tm (10/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 492 Tm (ELETRO FICTICIO) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 492 Tm (4/10) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 492 Tm (125,00) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 492 Tm (1250,00) Tj ET
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 460 Tm (11/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 460 Tm (PAPELARIA AZUL) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 460 Tm (A vista) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 460 Tm (32,70) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 460 Tm (32,70) Tj ET
+0.96 0.97 0.98 rg
+36 418 523 27 re f
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 428 Tm (14/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 428 Tm (STREAM TESTE) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 428 Tm (A vista) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 428 Tm (39,90) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 428 Tm (39,90) Tj ET
+BT /F2 12 Tf 1 0 0 1 36 365 Tm (Subtotal de compras desta pagina: R$ 533,45) Tj ET
+0.91 0.94 0.97 rg
+36 166 523 165 re f
+0.08 0.12 0.19 rg
+BT /F2 12 Tf 1 0 0 1 48 310 Tm (Outros registros da fatura \(nao sao compras\)) Tj ET
+BT /F1 11 Tf 1 0 0 1 48 283 Tm (09/11/2026  Estorno de compra anterior: -R$ 35,00) Tj ET
+BT /F1 11 Tf 1 0 0 1 48 258 Tm (10/11/2026  Credito promocional: -R$ 10,00) Tj ET
+BT /F1 11 Tf 1 0 0 1 48 233 Tm (Limite disponivel \(informativo\): R$ 2.500,00) Tj ET
+BT /F1 10 Tf 1 0 0 1 36 115 Tm (Dados inventados para homologacao do Raytech CG.) Tj ET
+BT /F1 10 Tf 1 0 0 1 36 98 Tm (Nao efetuar pagamento. Sem codigo de barras ou dados pessoais.) Tj ET
+BT /F2 10 Tf 1 0 0 1 36 45 Tm (TESTE PDF 02 | 2/3) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 10 0 R >>
+endobj
+10 0 obj
+<< /Length 3243 >>
+stream
+0.06 0.11 0.2 rg
+0 746 595 96 re f
+1 1 1 rg
+BT /F2 19 Tf 1 0 0 1 36 800 Tm (BANCO MODELO | FATURA DE CARTAO) Tj ET
+BT /F1 11 Tf 1 0 0 1 36 775 Tm (DOCUMENTO FICTICIO - SEM VALIDADE FINANCEIRA) Tj ET
+BT /F1 10 Tf 1 0 0 1 36 758 Tm (Novembro 2026  |  Teste PDF 02  |  Pagina 3 de 3) Tj ET
+0.08 0.12 0.19 rg
+BT /F2 16 Tf 1 0 0 1 36 710 Tm (Compras e parcelas do periodo) Tj ET
+BT /F1 10 Tf 1 0 0 1 36 686 Tm (Vencimento simulado: 25/11/2026   |   Cartao final 0000) Tj ET
+0.90 0.93 0.96 rg
+36 642 523 28 re f
+0.08 0.12 0.19 rg
+BT /F2 10 Tf 1 0 0 1 43 652 Tm (Data) Tj ET
+BT /F2 10 Tf 1 0 0 1 128 652 Tm (Estabelecimento) Tj ET
+BT /F2 10 Tf 1 0 0 1 320 652 Tm (Parcela) Tj ET
+BT /F2 10 Tf 1 0 0 1 395 652 Tm (Valor R$) Tj ET
+BT /F2 10 Tf 1 0 0 1 477 652 Tm (Total R$) Tj ET
+0.96 0.97 0.98 rg
+36 610 523 27 re f
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 620 Tm (15/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 620 Tm (PET SHOP LUA) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 620 Tm (A vista) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 620 Tm (58,00) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 620 Tm (58,00) Tj ET
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 588 Tm (15/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 588 Tm (CURSO DIGITAL) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 588 Tm (1/3) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 588 Tm (49,90) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 588 Tm (149,70) Tj ET
+0.96 0.97 0.98 rg
+36 546 523 27 re f
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 556 Tm (16/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 556 Tm (MERCADO ALFA) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 556 Tm (A vista) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 556 Tm (119,90) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 556 Tm (119,90) Tj ET
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 524 Tm (16/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 524 Tm (MOVEIS TESTE) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 524 Tm (6/12) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 524 Tm (199,00) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 524 Tm (2388,00) Tj ET
+0.96 0.97 0.98 rg
+36 482 523 27 re f
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 492 Tm (16/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 492 Tm (CINEMA VIRTUAL) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 492 Tm (A vista) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 492 Tm (42,00) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 492 Tm (42,00) Tj ET
+0.08 0.12 0.19 rg
+BT /F1 10 Tf 1 0 0 1 43 460 Tm (16/11/2026) Tj ET
+BT /F1 10 Tf 1 0 0 1 128 460 Tm (PADARIA DOIS) Tj ET
+BT /F1 10 Tf 1 0 0 1 320 460 Tm (A vista) Tj ET
+BT /F1 10 Tf 1 0 0 1 395 460 Tm (21,75) Tj ET
+BT /F1 10 Tf 1 0 0 1 477 460 Tm (21,75) Tj ET
+BT /F2 12 Tf 1 0 0 1 36 365 Tm (Subtotal de compras desta pagina: R$ 490,55) Tj ET
+0.91 0.94 0.97 rg
+36 166 523 165 re f
+0.08 0.12 0.19 rg
+BT /F2 12 Tf 1 0 0 1 48 310 Tm (Outros registros da fatura \(nao sao compras\)) Tj ET
+BT /F1 11 Tf 1 0 0 1 48 283 Tm (Total de compras das 3 paginas: R$ 1417,65) Tj ET
+BT /F1 11 Tf 1 0 0 1 48 258 Tm (Total de creditos do periodo: -R$ 45,00) Tj ET
+BT /F1 11 Tf 1 0 0 1 48 233 Tm (Saldo anterior e pagamento se compensam.) Tj ET
+BT /F1 11 Tf 1 0 0 1 48 208 Tm (Total liquido simulado a pagar: R$ 1372,65) Tj ET
+BT /F1 10 Tf 1 0 0 1 36 115 Tm (Dados inventados para homologacao do Raytech CG.) Tj ET
+BT /F1 10 Tf 1 0 0 1 36 98 Tm (Nao efetuar pagamento. Sem codigo de barras ou dados pessoais.) Tj ET
+BT /F2 10 Tf 1 0 0 1 36 45 Tm (TESTE PDF 02 | 3/3) Tj ET
+endstream
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000127 00000 n 
+0000000197 00000 n 
+0000000272 00000 n 
+0000000408 00000 n 
+0000003905 00000 n 
+0000004041 00000 n 
+0000007571 00000 n 
+0000007708 00000 n 
+trailer
+<< /Size 11 /Root 1 0 R >>
+startxref
+11003
+%%EOF
