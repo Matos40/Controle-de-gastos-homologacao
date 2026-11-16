@@ -1,0 +1,113 @@
+body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Estilização para o calendário nativo escuro */
+    input[type="date"] {
+      color-scheme: dark;
+      cursor: pointer;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      cursor: pointer;
+      opacity: 0.85;
+      filter: invert(0.85) sepia(10%) saturate(300%) hue-rotate(180deg);
+      transition: transform 0.15s ease, opacity 0.15s ease;
+      padding: 4px;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator:hover {
+      transform: scale(1.15);
+      opacity: 1;
+    }
+
+    /* Ajustes quando instalado em tela cheia (Standalone PWA) */
+    @media all and (display-mode: standalone) {
+      header {
+        padding-top: env(safe-area-inset-top);
+      }
+    }
+
+/* V32.4: layout and locally rendered controls; no financial logic. */
+.raytech-header-brand{flex:1 1 auto;min-width:36px}
+.raytech-header-controls{flex:0 1 auto;min-width:0}
+.raytech-month-nav{flex:1 1 auto;min-width:0}
+.raytech-month-nav button{flex-shrink:0}
+#currentMonthDisplay{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.raytech-cloud-icon{display:block;margin:auto;flex-shrink:0}
+.raytech-sync-spin{animation:raytech-spin 1s linear infinite}
+@keyframes raytech-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.raytech-sync-spin{animation:none}}
+@media(max-width:639px){
+ .raytech-header-row{gap:4px}
+ .raytech-header-brand{flex:0 0 36px}
+ .raytech-header-brand>.truncate{display:none}
+ .raytech-header-controls{flex:1 1 0;gap:4px;justify-content:flex-end}
+ .raytech-month-nav{padding-inline:2px}
+ .raytech-month-nav button{width:24px}
+ #currentMonthDisplay{font-size:11px;padding-inline:2px}
+}
+.raytech-category-wrap{position:relative;width:100%}
+.raytech-category-trigger{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:40px;padding:8px 12px;border:1px solid #334155;border-radius:12px;background:#020617;color:#e2e8f0;font-size:13px;text-align:left}
+.raytech-category-trigger:focus-visible,.raytech-category-option:focus-visible{outline:2px solid #34d399;outline-offset:2px}
+.raytech-category-list{position:absolute;left:0;right:0;top:calc(100% + 4px);max-height:min(330px,45vh);overflow:auto;z-index:55;background:#0f172a;border:1px solid #334155;border-radius:12px;padding:4px;box-shadow:0 8px 24px #0008}
+.raytech-category-list[hidden]{display:none}
+.raytech-category-option{display:block;width:100%;text-align:left;padding:10px 9px;font-size:13px;line-height:1.4;color:#e2e8f0;border-radius:8px}
+.raytech-category-option[aria-checked=true]{background:#064e3b;color:#a7f3d0}
+.raytech-category-option:hover{background:#1e293b}
+
+/* Core header geometry must work independently of the Tailwind CDN. */
+.raytech-header-row,.raytech-header-brand,.raytech-header-controls,.raytech-month-nav{display:flex;align-items:center}
+.raytech-header-row{justify-content:space-between;gap:8px}
+.raytech-header-brand>div:first-child{width:36px;height:36px;flex:0 0 36px;overflow:hidden}
+.raytech-header-brand img{display:block;width:100%;height:100%;object-fit:contain}
+.raytech-header-controls{gap:6px}
+.raytech-header-controls>button{flex-shrink:0;min-width:32px;min-height:36px}
+.raytech-month-nav{flex:1 1 auto}
+.raytech-month-nav button{width:28px;height:28px;display:flex;align-items:center;justify-content:center}
+#currentMonthDisplay{display:block;flex:1 1 auto}
+@media(min-width:640px){.raytech-header-brand>div:first-child{width:40px;height:40px;flex-basis:40px}}
+@media(max-width:639px){.raytech-header-row,.raytech-header-controls{gap:4px}.raytech-month-nav button{width:24px}.raytech-header-controls>button{max-width:48px}.raytech-header-controls>button>span{display:none}}
+
+/* V32.4.4: compact anchored overlay; opening does not change header height. */
+.raytech-header-anchor{position:relative}
+#headerToolsDrawer{position:absolute;box-sizing:border-box;top:calc(100% + 6px);right:24px;width:360px;max-width:calc(100% - 24px);max-height:calc(100vh - 100px);max-height:calc(100dvh - 100px);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;z-index:45;padding:8px;background:#0f172a;border:1px solid #334155;border-radius:14px;box-shadow:0 12px 32px #0009;color:#e2e8f0;scrollbar-gutter:stable}
+#headerToolsDrawer.hidden{display:none!important}
+.raytech-options-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
+.raytech-options-grid>div{min-width:0;padding:8px;align-self:start}
+.raytech-options-grid>div>div:first-child{margin-bottom:4px}
+#headerToolsDrawer .space-y-2>:not([hidden])~:not([hidden]),#headerToolsDrawer .space-y-3>:not([hidden])~:not([hidden]){margin-top:5px;margin-bottom:0}
+#headerToolsDrawer button:not([hidden]){min-height:32px}
+#headerToolsDrawer input[type=file].sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+#headerToolsDrawer #productionCloudProfile{gap:8px}
+#headerToolsDrawer #productionCloudPhoto,#headerToolsDrawer #productionCloudInitial{width:32px;height:32px}
+#headerToolsDrawer #productionCloudGoogle{padding:8px}
+#headerToolsDrawer:focus-visible,#headerToolsDrawer button:focus-visible{outline:2px solid #34d399;outline-offset:-2px}
+@media(max-width:639px){
+ #headerToolsDrawer{right:8px;width:min(360px,calc(100% - 16px));max-width:calc(100% - 16px);padding:8px;max-height:calc(100dvh - 90px - env(safe-area-inset-bottom,0px))}
+ #headerToolsDrawer button:not([hidden]){min-height:44px}
+ .raytech-options-grid>div{padding:8px}
+}
+
+/* V32.4.4.1: four backup actions on desktop, two by two on smaller screens. */
+#headerToolsDrawer .raytech-backup-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+#headerToolsDrawer .raytech-backup-grid>input[type=file]{display:none}
+@media(min-width:1024px){
+ #headerToolsDrawer .raytech-backup-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+ #headerToolsDrawer .raytech-backup-grid>button{min-width:0;padding:8px 3px;line-height:1.2;overflow-wrap:normal}
+ #headerToolsDrawer .raytech-backup-grid>button>span{white-space:normal;font-size:10px}
+}

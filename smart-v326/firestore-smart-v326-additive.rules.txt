@@ -1,0 +1,57 @@
+// INSERT INSIDE existing match /databases/{database}/documents. HOMOLOGATION ONLY.
+    match /raytechSmart326AccessV1/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
+    match /raytechSmart326FinanceV1/{uid} {
+      function approved() {
+        return request.auth != null && request.auth.uid == uid
+          && exists(/databases/$(database)/documents/raytechSmart326AccessV1/$(uid))
+          && get(/databases/$(database)/documents/raytechSmart326AccessV1/$(uid)).data.enabled == true;
+      }
+      function writable() { return approved() && get(/databases/$(database)/documents/raytechSmart326AccessV1/$(uid)).data.writeEnabled == true; }
+      function uuid(x) { return x is string && x.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'); }
+      function validHash(x) { return x is string && x.matches('^[0-9a-f]{64}$'); }
+      function validHead(h) {
+        return h.keys().hasAll(['marker','revision','payload','lastOperationId','hash'])
+          && h.keys().hasOnly(['marker','revision','payload','lastOperationId','hash'])
+          && h.marker == 'raytech-financial-smart-hml-v326'
+          && h.revision is int && h.revision >= 1 && h.revision <= 9007199254740991
+          && h.payload is string && h.payload.size() <= 180000
+          && uuid(h.lastOperationId) && validHash(h.hash);
+      }
+      function validReceipt(r, op) {
+        return r.keys().hasAll(['operationId','revision','parentId','hash'])
+          && r.keys().hasOnly(['operationId','revision','parentId','hash'])
+          && uuid(op) && r.operationId == op
+          && r.revision is int && r.revision >= 1 && r.revision <= 9007199254740991
+          && ((r.revision == 1 && r.parentId == '') || (r.revision > 1 && uuid(r.parentId) && r.parentId != op))
+          && validHash(r.hash);
+      }
+      function paired(h, parent) {
+        let p = /databases/$(database)/documents/raytechSmart326FinanceV1/$(uid)/receipts/$(h.lastOperationId);
+        let r = getAfter(p).data;
+        return !exists(p) && existsAfter(p) && validReceipt(r,h.lastOperationId)
+          && r.revision == h.revision && r.parentId == parent && r.hash == h.hash;
+      }
+      allow get: if approved();
+      allow list, delete: if false;
+      allow create: if writable() && validHead(request.resource.data) && request.resource.data.revision == 1 && paired(request.resource.data,'');
+      allow update: if writable() && validHead(request.resource.data)
+        && request.resource.data.revision == resource.data.revision + 1
+        && paired(request.resource.data,resource.data.lastOperationId);
+      match /receipts/{op} {
+        function pairedHead(r) {
+          let p = /databases/$(database)/documents/raytechSmart326FinanceV1/$(uid);
+          let h = getAfter(p).data;
+          return existsAfter(p) && validHead(h) && h.lastOperationId == op && h.revision == r.revision && h.hash == r.hash
+            && ((!exists(p) && r.revision == 1 && r.parentId == '') ||
+                (exists(p) && r.revision == get(p).data.revision + 1 && r.parentId == get(p).data.lastOperationId));
+        }
+        allow get: if approved();
+        allow create: if writable() && validReceipt(request.resource.data,op) && pairedHead(request.resource.data);
+        allow list, update, delete: if false;
+      }
+    }
+    
+

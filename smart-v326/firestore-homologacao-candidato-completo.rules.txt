@@ -1,0 +1,286 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      match /{document=**} { allow read, write: if request.auth != null && request.auth.uid == userId; }
+    }
+    // INSERIR DENTRO de match /databases/{database}/documents, preservando as demais regras.
+    // Antes de publicar, verificar que nenhuma regra recursiva/permissiva concede acesso a estas duas coleções.
+    // Somente para o projeto raytech-cg-homologacao; NÃO usar na produção.
+    match /raytechSyncPilotAccessV1/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
+    match /raytechSyncPilotV1/{uid} {
+      function approved() {
+        return request.auth != null && request.auth.uid == uid
+          && exists(/databases/$(database)/documents/raytechSyncPilotAccessV1/$(uid))
+          && get(/databases/$(database)/documents/raytechSyncPilotAccessV1/$(uid)).data.enabled == true;
+      }
+      function valid(d) {
+        return d.keys().hasAll(['marker', 'revision', 'receipts', 'lastOperationId', 'salary', 'energy', 'food', 'card', 'extra', 'energyPaid', 'foodPaid', 'cardPaid'])
+          && d.keys().hasOnly(['marker', 'revision', 'receipts', 'lastOperationId', 'salary', 'energy', 'food', 'card', 'extra', 'energyPaid', 'foodPaid', 'cardPaid'])
+          && d.marker == 'raytech-synthetic-financial-pilot-v1'
+          && d.revision is int && d.revision >= 1 && d.revision <= 100
+          && d.receipts is map && d.receipts.keys().size() == d.revision
+          && d.lastOperationId is string
+          && d.lastOperationId.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+          && d.receipts.keys().hasAny([d.lastOperationId])
+          && d.receipts[d.lastOperationId] is string
+          && d.receipts[d.lastOperationId].size() <= 80
+          && d.receipts[d.lastOperationId].matches('^(salary|energy|food|card|extra|energyPaid|foodPaid|cardPaid):(true|false|[0-9]+):[0-9]+$')
+          && d.salary is int && d.salary in [0, 400000, 500000, 550000]
+          && d.energy is int && d.energy in [0, 15000, 18000, 21000]
+          && d.energyPaid is bool && (d.energy != 0 || d.energyPaid == false)
+          && d.food is int && d.food in [0, 25000, 30000, 35000]
+          && d.foodPaid is bool && (d.food != 0 || d.foodPaid == false)
+          && d.card is int && d.card in [0, 10000, 20000, 30000]
+          && d.cardPaid is bool && (d.card != 0 || d.cardPaid == false)
+          && d.extra is int && d.extra in [0, 10000, 25000, 50000];
+      }
+      allow get: if approved();
+      allow list, delete: if false;
+      allow create: if approved() && valid(request.resource.data)
+        && request.resource.data.revision == 1
+        && request.resource.data.receipts.keys().hasOnly([request.resource.data.lastOperationId]);
+      allow update: if approved() && valid(request.resource.data)
+        && request.resource.data.revision == resource.data.revision + 1
+        && !resource.data.receipts.keys().hasAny([request.resource.data.lastOperationId])
+        && request.resource.data.receipts.diff(resource.data.receipts).addedKeys().hasOnly([request.resource.data.lastOperationId])
+        && request.resource.data.receipts.diff(resource.data.receipts).affectedKeys().hasOnly([request.resource.data.lastOperationId]);
+    }
+    
+
+    // Adicionar dentro de match /databases/{database}/documents. Não substituir as regras existentes.
+    match /raytechFinancialTestV1/{uid} {
+      function approved() {
+        return request.auth != null && request.auth.uid == uid
+          && exists(/databases/$(database)/documents/raytechSyncPilotAccessV1/$(uid))
+          && get(/databases/$(database)/documents/raytechSyncPilotAccessV1/$(uid)).data.enabled == true;
+      }
+      function valid(d) {
+        return d.keys().hasAll(['marker','revision','payload','receipts','lastOperationId'])
+          && d.keys().hasOnly(['marker','revision','payload','receipts','lastOperationId'])
+          && d.marker == 'raytech-financial-test-v1'
+          && d.revision is int && d.revision >= 1 && d.revision <= 500
+          && d.payload is string && d.payload.size() <= 180000
+          && d.receipts is map && d.receipts.keys().size() == d.revision
+          && d.lastOperationId is string
+          && d.lastOperationId.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+          && d.receipts.keys().hasAny([d.lastOperationId])
+          && d.receipts[d.lastOperationId] is string
+          && d.receipts[d.lastOperationId].matches('^[1-9][0-9]{0,2}:[0-9a-f]{64}$');
+      }
+      allow get: if approved();
+      allow list, delete: if false;
+      allow create: if approved() && !existsAfter(/databases/$(database)/documents/raytechFinancialRouteV2/$(uid)) && valid(request.resource.data)
+        && request.resource.data.revision == 1
+        && request.resource.data.receipts.keys().hasOnly([request.resource.data.lastOperationId]);
+      allow update: if approved() && !existsAfter(/databases/$(database)/documents/raytechFinancialRouteV2/$(uid)) && valid(request.resource.data)
+        && request.resource.data.revision == resource.data.revision + 1
+        && !resource.data.receipts.keys().hasAny([request.resource.data.lastOperationId])
+        && request.resource.data.receipts.diff(resource.data.receipts).addedKeys().hasOnly([request.resource.data.lastOperationId])
+        && request.resource.data.receipts.diff(resource.data.receipts).affectedKeys().hasOnly([request.resource.data.lastOperationId]);
+    }
+    
+
+    // Adicionar exclusivamente ao projeto raytech-cg-homologacao, junto das regras existentes.
+    // Protocolo separado: não altera V1 nem /users. Não publicar na produção.
+    match /raytechFinancialTestV2/{uid} {
+      function approved() {
+        return request.auth != null && request.auth.uid == uid
+          && exists(/databases/$(database)/documents/raytechSyncPilotAccessV1/$(uid))
+          && get(/databases/$(database)/documents/raytechSyncPilotAccessV1/$(uid)).data.enabled == true;
+      }
+      function uuid(x) { return x is string && x.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'); }
+      function validHash(x) { return x is string && x.matches('^[0-9a-f]{64}$'); }
+      function validHead(h) {
+        return h.keys().hasAll(['marker','revision','payload','lastOperationId','hash'])
+          && h.keys().hasOnly(['marker','revision','payload','lastOperationId','hash'])
+          && h.marker == 'raytech-financial-test-v2'
+          && h.revision is int && h.revision >= 1 && h.revision <= 9007199254740991
+          && h.payload is string && h.payload.size() <= 180000
+          && uuid(h.lastOperationId) && validHash(h.hash);
+      }
+      function validReceipt(r, op) {
+        return r.keys().hasAll(['operationId','revision','parentId','hash'])
+          && r.keys().hasOnly(['operationId','revision','parentId','hash'])
+          && uuid(op) && r.operationId == op
+          && r.revision is int && r.revision >= 1 && r.revision <= 9007199254740991
+          && ((r.revision == 1 && r.parentId == '') || (r.revision > 1 && uuid(r.parentId) && r.parentId != op))
+          && validHash(r.hash);
+      }
+      function paired(h, parent) {
+        let p = /databases/$(database)/documents/raytechFinancialTestV2/$(uid)/receipts/$(h.lastOperationId);
+        let r = getAfter(p).data;
+        return !exists(p) && existsAfter(p) && validReceipt(r,h.lastOperationId)
+          && r.revision == h.revision && r.parentId == parent && r.hash == h.hash;
+      }
+      allow get: if approved();
+      allow list, delete: if false;
+      allow create: if approved() && validHead(request.resource.data) && request.resource.data.revision == 1 && paired(request.resource.data,'');
+      allow update: if approved() && validHead(request.resource.data)
+        && request.resource.data.revision == resource.data.revision + 1
+        && paired(request.resource.data,resource.data.lastOperationId);
+      match /receipts/{op} {
+        function pairedHead(r) {
+          let p = /databases/$(database)/documents/raytechFinancialTestV2/$(uid);
+          let h = getAfter(p).data;
+          return existsAfter(p) && validHead(h) && h.lastOperationId == op && h.revision == r.revision && h.hash == r.hash
+            && ((!exists(p) && r.revision == 1 && r.parentId == '') ||
+                (exists(p) && r.revision == get(p).data.revision + 1 && r.parentId == get(p).data.lastOperationId));
+        }
+        allow get: if approved();
+        allow create: if approved() && validReceipt(request.resource.data,op) && pairedHead(request.resource.data);
+        allow list, update, delete: if false;
+      }
+    }
+    
+
+    // Adicionar exclusivamente ao projeto raytech-cg-homologacao, junto das regras existentes.
+    // Protocolo separado: não altera V1 nem /users. Não publicar na produção.
+    match /raytechFinancialActiveV2/{uid} {
+      function approved() {
+        return request.auth != null && request.auth.uid == uid
+          && exists(/databases/$(database)/documents/raytechSyncPilotAccessV1/$(uid))
+          && get(/databases/$(database)/documents/raytechSyncPilotAccessV1/$(uid)).data.enabled == true;
+      }
+      function uuid(x) { return x is string && x.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'); }
+      function validHash(x) { return x is string && x.matches('^[0-9a-f]{64}$'); }
+      function validHead(h) {
+        return h.keys().hasAll(['marker','revision','payload','lastOperationId','hash'])
+          && h.keys().hasOnly(['marker','revision','payload','lastOperationId','hash'])
+          && h.marker == 'raytech-financial-test-v2'
+          && h.revision is int && h.revision >= 1 && h.revision <= 9007199254740991
+          && h.payload is string && h.payload.size() <= 180000
+          && uuid(h.lastOperationId) && validHash(h.hash);
+      }
+      function validReceipt(r, op) {
+        return r.keys().hasAll(['operationId','revision','parentId','hash'])
+          && r.keys().hasOnly(['operationId','revision','parentId','hash'])
+          && uuid(op) && r.operationId == op
+          && r.revision is int && r.revision >= 1 && r.revision <= 9007199254740991
+          && ((r.revision == 1 && r.parentId == '') || (r.revision > 1 && uuid(r.parentId) && r.parentId != op))
+          && validHash(r.hash);
+      }
+      function paired(h, parent) {
+        let p = /databases/$(database)/documents/raytechFinancialActiveV2/$(uid)/receipts/$(h.lastOperationId);
+        let r = getAfter(p).data;
+        return !exists(p) && existsAfter(p) && validReceipt(r,h.lastOperationId)
+          && r.revision == h.revision && r.parentId == parent && r.hash == h.hash;
+      }
+      allow get: if approved();
+      allow list, delete: if false;
+      function activeAfter() { return existsAfter(/databases/$(database)/documents/raytechFinancialRouteV2/$(uid)); }
+      allow create: if approved() && activeAfter() && validHead(request.resource.data) && request.resource.data.revision == 1 && paired(request.resource.data,'');
+      allow update: if approved() && activeAfter() && validHead(request.resource.data)
+        && request.resource.data.revision == resource.data.revision + 1
+        && paired(request.resource.data,resource.data.lastOperationId);
+      match /receipts/{op} {
+        function pairedHead(r) {
+          let p = /databases/$(database)/documents/raytechFinancialActiveV2/$(uid);
+          let h = getAfter(p).data;
+          return existsAfter(p) && validHead(h) && h.lastOperationId == op && h.revision == r.revision && h.hash == r.hash
+            && ((!exists(p) && r.revision == 1 && r.parentId == '') ||
+                (exists(p) && r.revision == get(p).data.revision + 1 && r.parentId == get(p).data.lastOperationId));
+        }
+        allow get: if approved();
+        allow create: if approved() && activeAfter() && validReceipt(request.resource.data,op) && pairedHead(request.resource.data);
+        allow list, update, delete: if false;
+      }
+    }
+    
+
+    match /raytechFinancialRouteV2/{uid} {
+      function approved() {
+        return request.auth != null && request.auth.uid == uid
+          && exists(/databases/$(database)/documents/raytechSyncPilotAccessV1/$(uid))
+          && get(/databases/$(database)/documents/raytechSyncPilotAccessV1/$(uid)).data.enabled == true;
+      }
+      function validRoute(d) {
+        let p = /databases/$(database)/documents/raytechFinancialTestV1/$(uid);
+        let h = /databases/$(database)/documents/raytechFinancialActiveV2/$(uid);
+        let v = get(p).data;
+        let n = getAfter(h).data;
+        return exists(p) && existsAfter(h) && d.keys().hasAll(['sourceRevision','sourceLast','seed','hash'])
+          && d.keys().hasOnly(['sourceRevision','sourceLast','seed','hash'])
+          && d.sourceRevision == v.revision && d.sourceLast == v.lastOperationId
+          && d.hash is string && d.hash.matches('^[0-9a-f]{64}$')
+          && v.receipts[v.lastOperationId].matches('^[1-9][0-9]{0,2}:' + d.hash + '$')
+          && n.revision == 1 && n.lastOperationId == d.seed && n.payload == v.payload && n.hash == d.hash;
+      }
+      function unchangedSeed() {
+        let p = /databases/$(database)/documents/raytechFinancialTestV1/$(uid);
+        let h = /databases/$(database)/documents/raytechFinancialActiveV2/$(uid);
+        let v = get(p).data;
+        let n = getAfter(h).data;
+        return exists(p) && existsAfter(h) && n.revision == 1 && n.lastOperationId == resource.data.seed
+          && n.hash == resource.data.hash && n.payload == v.payload
+          && v.revision == resource.data.sourceRevision && v.lastOperationId == resource.data.sourceLast;
+      }
+      allow get: if approved();
+      allow create: if approved() && validRoute(request.resource.data);
+      allow delete: if approved() && unchangedSeed();
+      allow list, update: if false;
+    }
+
+    // Smart Sync V32.6: isolated collections, no existing rules changed.
+    match /raytechSmart326AccessV1/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
+    match /raytechSmart326FinanceV1/{uid} {
+      function approved() {
+        return request.auth != null && request.auth.uid == uid
+          && exists(/databases/$(database)/documents/raytechSmart326AccessV1/$(uid))
+          && get(/databases/$(database)/documents/raytechSmart326AccessV1/$(uid)).data.enabled == true;
+      }
+      function writable() { return approved() && get(/databases/$(database)/documents/raytechSmart326AccessV1/$(uid)).data.writeEnabled == true; }
+      function uuid(x) { return x is string && x.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'); }
+      function validHash(x) { return x is string && x.matches('^[0-9a-f]{64}$'); }
+      function validHead(h) {
+        return h.keys().hasAll(['marker','revision','payload','lastOperationId','hash'])
+          && h.keys().hasOnly(['marker','revision','payload','lastOperationId','hash'])
+          && h.marker == 'raytech-financial-smart-hml-v326'
+          && h.revision is int && h.revision >= 1 && h.revision <= 9007199254740991
+          && h.payload is string && h.payload.size() <= 180000
+          && uuid(h.lastOperationId) && validHash(h.hash);
+      }
+      function validReceipt(r, op) {
+        return r.keys().hasAll(['operationId','revision','parentId','hash'])
+          && r.keys().hasOnly(['operationId','revision','parentId','hash'])
+          && uuid(op) && r.operationId == op
+          && r.revision is int && r.revision >= 1 && r.revision <= 9007199254740991
+          && ((r.revision == 1 && r.parentId == '') || (r.revision > 1 && uuid(r.parentId) && r.parentId != op))
+          && validHash(r.hash);
+      }
+      function paired(h, parent) {
+        let p = /databases/$(database)/documents/raytechSmart326FinanceV1/$(uid)/receipts/$(h.lastOperationId);
+        let r = getAfter(p).data;
+        return !exists(p) && existsAfter(p) && validReceipt(r,h.lastOperationId)
+          && r.revision == h.revision && r.parentId == parent && r.hash == h.hash;
+      }
+      allow get: if approved();
+      allow list, delete: if false;
+      allow create: if writable() && validHead(request.resource.data) && request.resource.data.revision == 1 && paired(request.resource.data,'');
+      allow update: if writable() && validHead(request.resource.data)
+        && request.resource.data.revision == resource.data.revision + 1
+        && paired(request.resource.data,resource.data.lastOperationId);
+      match /receipts/{op} {
+        function pairedHead(r) {
+          let p = /databases/$(database)/documents/raytechSmart326FinanceV1/$(uid);
+          let h = getAfter(p).data;
+          return existsAfter(p) && validHead(h) && h.lastOperationId == op && h.revision == r.revision && h.hash == r.hash
+            && ((!exists(p) && r.revision == 1 && r.parentId == '') ||
+                (exists(p) && r.revision == get(p).data.revision + 1 && r.parentId == get(p).data.lastOperationId));
+        }
+        allow get: if approved();
+        allow create: if writable() && validReceipt(request.resource.data,op) && pairedHead(request.resource.data);
+        allow list, update, delete: if false;
+      }
+    }
+    
+
+  }
+}
