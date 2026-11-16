@@ -1,0 +1,2 @@
+# Homologação PDF V32.5
+Origem: Matos40/Controle-de-gastos-2.0@57fe4dced7a6fb48c41bda7e1c971278c5f6986c. Overlay exclusivo: chaves locais e cache novos, workspace fixo v2-clean, adaptador Firebase e cloudPanel ausentes, CSP connect-src somente self e Gemini. Não usar dados/backup reais. Chave Gemini deve ser própria e informada na tela. Fatura fictícia: R$ 48,90 + R$ 25,00 (2/4, total R$ 100,00) = R$ 73,90. Nenhuma alteração na raiz da homologação ou produção.
