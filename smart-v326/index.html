@@ -631,7 +631,8 @@
               <details id="productionCloudReviewDetails"><summary class="text-sm">Conflitos e restauração revisada (JSON)</summary>
                 <input type="file" id="productionCloudBackupFile" accept=".json" class="text-xs w-full">
                 <button type="button" disabled id="productionCloudStage" class="p-2 rounded-lg text-xs disabled:opacity-40">Preparar restauração</button>
-                <pre id="productionCloudReview" class="text-xs whitespace-pre-wrap break-all max-h-64 overflow-auto"></pre>
+                <div id="productionCloudReview" class="text-xs space-y-2 max-h-96 overflow-auto"></div>
+                <button type="button" id="productionCloudExportReview" class="w-full p-2 rounded-lg border border-slate-700 text-xs">Exportar versões em revisão</button>
                 <select id="productionCloudChoice" class="text-xs bg-slate-900"><option value="">Selecione</option><option value="local">Preservar versão local</option><option value="remote">Receber versão da nuvem</option><option value="restore">Aplicar backup revisado</option></select>
                 <label class="block text-xs"><input type="checkbox" id="productionCloudReviewConsent"> Revisei as versões e confirmo</label>
                 <label class="block text-xs"><input type="checkbox" id="productionCloudReviewBackup"> Exportei e guardei as versões</label>

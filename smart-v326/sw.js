@@ -1,4 +1,4 @@
-const CACHE_NAME = 'raytech-hml-smart326-shell-v1';
+const CACHE_NAME = 'raytech-hml-smart326-shell-v2';
 const APP_SHELL = [
   './', './index.html', './manifest.json', './favicon.ico', './raytech-icon-192.png', './raytech-icon-512.png', './css/styles.css',
   './js/state.js', './js/app.js', './js/onboarding.js', './js/ui/categoryPicker.js', './js/productionV2/preview.mjs', './js/productionV2/legacyPhase2.mjs', './js/productionV2/cleanWorkspace.mjs', './js/productionV2/model.mjs', './js/productionV2/cloudPanel.mjs', './js/productionV2/eventRuntime.mjs', './js/productionV2/initialTransfer.mjs', './js/productionV2/config.mjs', './js/productionV2/queue.mjs', './js/productionV2/capacity.mjs', './js/productionV2/firebaseAdapter.mjs', './js/productionV2/syncEngine.mjs', './js/experimentalSync/session.mjs', './js/experimentalSync/engine.mjs', './js/experimentalSync/history.mjs', './js/experimentalSync/runtime.mjs', './js/experimentalSync/backupFiles.mjs',
