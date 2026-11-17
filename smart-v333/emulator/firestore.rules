@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+match /databases/{database}/documents {
+// Candidate: insert within /databases/{database}/documents in homologation only.
+// Existing versions and financial collections remain unchanged.
+function smart333Operator() {
+  return request.auth != null &&
+    exists(/databases/$(database)/documents/raytechAdminRolesV333/$(request.auth.uid)) &&
+    get(/databases/$(database)/documents/raytechAdminRolesV333/$(request.auth.uid)).data.active == true &&
+    get(/databases/$(database)/documents/raytechAdminRolesV333/$(request.auth.uid)).data.role in ['owner','admin'];
+}
+match /raytechAdminRolesV333/{uid} {
+  allow get: if request.auth != null && request.auth.uid == uid;
+  allow list, create, update, delete: if false;
+}
+match /raytechAccountsV333/{uid} {
+  function self() { return request.auth != null && request.auth.uid == uid; }
+  function isOperatorTarget() {
+    return exists(/databases/$(database)/documents/raytechAdminRolesV333/$(uid));
+  }
+  function auditMatches(d) {
+    let p = /databases/$(database)/documents/raytechAdminAuditV333/$(d.lastAudit);
+    let a = getAfter(p).data;
+    return !exists(p) && existsAfter(p) && a.actor == request.auth.uid && a.target == uid
+      && a.beforePlan == resource.data.plan && a.afterPlan == d.plan
+      && a.beforeBlocked == resource.data.blocked && a.afterBlocked == d.blocked
+      && a.at == request.time;
+  }
+  allow get: if self() || smart333Operator();
+  allow list: if smart333Operator() && request.query.limit <= 100;
+  allow create: if self() && request.resource.data.keys().hasOnly(['uid','plan','blocked','createdAt','lastAccess'])
+    && request.resource.data.keys().hasAll(['uid','plan','blocked','createdAt','lastAccess'])
+    && request.resource.data.uid == uid && request.resource.data.plan == 'free'
+    && request.resource.data.blocked == false && request.resource.data.createdAt == request.time
+    && request.resource.data.lastAccess == request.time;
+  allow update: if (self() && resource.data.blocked == false
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastAccess'])
+    && request.resource.data.lastAccess == request.time)
+    || (smart333Operator() && !isOperatorTarget()
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plan','blocked','lastAudit'])
+      && request.resource.data.plan in ['free','premium'] && request.resource.data.blocked is bool
+      && (request.resource.data.plan != resource.data.plan || request.resource.data.blocked != resource.data.blocked)
+      && request.resource.data.lastAudit is string && auditMatches(request.resource.data));
+  allow delete: if false;
+}
+match /raytechAdminAuditV333/{id} {
+  allow get: if smart333Operator();
+  allow list: if smart333Operator() && request.query.limit <= 100;
+  allow create: if smart333Operator() && request.resource.data.keys().hasAll(['actor','target','beforePlan','afterPlan','beforeBlocked','afterBlocked','at'])
+    && request.resource.data.keys().hasOnly(['actor','target','beforePlan','afterPlan','beforeBlocked','afterBlocked','at'])
+    && request.resource.data.actor == request.auth.uid && request.resource.data.target is string
+    && request.resource.data.at == request.time
+    && getAfter(/databases/$(database)/documents/raytechAccountsV333/$(request.resource.data.target)).data.lastAudit == id
+    && get(/databases/$(database)/documents/raytechAccountsV333/$(request.resource.data.target)).data.get('lastAudit','') != id;
+  allow update, delete: if false;
+}
+match /raytechSmartCloudV333/{uid} {
+  function eligible() { return request.auth != null && request.auth.uid == uid
+    && exists(/databases/$(database)/documents/raytechAccountsV333/$(uid))
+    && get(/databases/$(database)/documents/raytechAccountsV333/$(uid)).data.blocked == false; }
+  function valid(d) { return d.keys().hasAll(['revision','payload']) && d.keys().hasOnly(['revision','payload'])
+    && d.revision is int && d.revision >= 1 && d.revision <= 9007199254740991
+    && d.payload is string && d.payload.size() <= 180000; }
+  allow get: if eligible();
+  allow list, delete: if false;
+  allow create: if eligible() && valid(request.resource.data) && request.resource.data.revision == 1;
+  allow update: if eligible() && valid(request.resource.data) && request.resource.data.revision == resource.data.revision + 1;
+}
+
+}
+}
