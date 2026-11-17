@@ -1,11 +1,12 @@
-import {mountSmartLoginView} from './smartLoginView.mjs';
+import {startupMessage} from './smartCloudDiagnostics.mjs';
+import {mountSmartLoginView} from './smartLoginView.mjs?v=3321';
 import {openSmartLoginAuth} from './smartLoginAuth.mjs';
-import {startSmartCloud} from './smartCloudRuntime.mjs';
+import {startSmartCloud} from './smartCloudRuntime.mjs?v=3321';
 import {scopedAccountStorage} from './smartLoginStorage.mjs';
 const root=document.getElementById('smartLogin'),panel=document.getElementById('smartAccountApp');
 let auth,off,generation=0,started=false,active=null,ready=false,stopCloud=()=>{};
 const lock=()=>{stopCloud();panel.hidden=true;panel.inert=true;root.hidden=false;};
-const view=mountSmartLoginView(root,{signIn:()=>auth.signIn(),signOut:()=>auth.signOut(),onRetry:()=>start()});
+const view=mountSmartLoginView(root,{signIn:()=>auth.signIn(),signOut:()=>auth.signOut(),onRetry:()=>location.reload()});
 async function loadScripts(){for(const path of ["./js/smartAccount/state.js","./js/smartAccount/services/storageService.js","./js/smartAccount/services/geminiService.js","./js/smartAccount/services/excelService.js","./js/smartAccount/ui/renderSummary.js","./js/smartAccount/ui/renderExpenses.js","./js/smartAccount/ui/renderCards.js","./js/smartAccount/ui/renderAnalytics.js","./js/smartAccount/ui/renderHistory.js","./js/smartAccount/app.js","./js/smartAccount/onboarding.js","./js/smartAccount/ui/categoryPicker.js"])await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=path;s.onload=resolve;s.onerror=reject;document.body.appendChild(s);});}
 async function observe(user){
  if(started&&ready&&user?.uid===active&&auth.currentUid()===active)return;
@@ -14,14 +15,15 @@ async function observe(user){
  if(!user){view.paint({phase:'signed-out'});return;}
  if(started){location.reload();return;}
  view.paint({phase:'checking-workspace'});
+ let stage='profile';
  try{
  const uid=user.uid;let plan;if(!navigator.onLine&&localStorage.getItem('raytech-smart-v332:'+uid+':profile-ok')==='free')plan='free';else plan=await auth.profile(uid);
  if(token!==generation||auth.currentUid()!==uid)return;
- active=uid;window.smartAccountStorage=scopedAccountStorage(window.localStorage,uid,who=>auth.currentUid()===who&&active===who);
+ stage='storage';active=uid;window.smartAccountStorage=scopedAccountStorage(window.localStorage,uid,who=>auth.currentUid()===who&&active===who);
  if(plan==='free')window.smartAccountStorage.setItem('profile-ok','free');
- started=true;await loadScripts();
+ stage='scripts';started=true;await loadScripts();
  if(token!==generation||auth.currentUid()!==uid)return;
- const logout=document.getElementById('productionCloudLogout');
+ stage='panel';const logout=document.getElementById('productionCloudLogout');
  const profile=document.getElementById('productionCloudProfile');
  if(profile){profile.hidden=false;profile.classList.add('flex');}
  document.getElementById('productionCloudName').textContent=user.displayName||'Conta Google';
@@ -30,11 +32,11 @@ async function observe(user){
  document.getElementById('productionCloudB2').hidden=true;
  document.getElementById('productionCloudHeader').hidden=true;
  document.getElementById('productionCloudState').hidden=true;
- if(new URLSearchParams(location.search).get('workspace')===null||new URLSearchParams(location.search).get('workspace')==='v2-main')stopCloud=startSmartCloud({storage:window.smartAccountStorage,remote:auth.cloud(uid),current:()=>auth.currentUid()===uid&&active===uid,status:s=>{state.textContent='Plano '+(plan==='free'?'Free':plan)+' · '+s;state.style.color=s.includes('Sincronizado')?'#4ade80':s.includes('Offline')?'#94a3b8':s.includes('⚠')?'#fbbf24':'#38bdf8';}});
- await stopCloud.prepare?.();if(token!==generation||auth.currentUid()!==uid)return;
+ stage='cloud';if(new URLSearchParams(location.search).get('workspace')===null||new URLSearchParams(location.search).get('workspace')==='v2-main')stopCloud=startSmartCloud({storage:window.smartAccountStorage,remote:auth.cloud(uid),current:()=>auth.currentUid()===uid&&active===uid,status:s=>{state.textContent='Plano '+(plan==='free'?'Free':plan)+' · '+s;state.style.color=s.includes('Sincronizado')?'#4ade80':s.includes('Offline')?'#94a3b8':s.includes('⚠')?'#fbbf24':'#38bdf8';}});
+ await stopCloud.prepare?.();stage='panel-start';if(token!==generation||auth.currentUid()!==uid)return;
  window.dispatchEvent(new Event('raytech-account-start'));document.dispatchEvent(new Event('raytech-account-start'));
  ready=true;panel.hidden=false;panel.inert=false;view.paint({phase:'ready'});
- }catch{lock();active=null;view.paint({phase:'workspace-blocked'});}
+ }catch(error){lock();active=null;console.error('[V33.2.1 startup]',stage,error);view.paint({phase:'workspace-blocked',message:startupMessage(stage,error)});}
 }
 async function start(){lock();view.paint({phase:'checking'});try{off?.();auth=await openSmartLoginAuth();off=auth.onSession(user=>void observe(user),()=>{generation++;active=null;ready=false;lock();view.paint({phase:'error'});});}catch{view.paint({phase:'error'});}}
 void start();

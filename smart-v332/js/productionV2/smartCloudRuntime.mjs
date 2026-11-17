@@ -2,14 +2,14 @@ import {syncOnce} from './smartCloud.mjs';
 import {MAIN_KEY,MAIN_INITIALIZED_KEY} from './cleanWorkspace.mjs';
 const checkpoint='smart-cloud-checkpoint-v332';
 export function startSmartCloud({storage,remote,current,status}){
- let stopped=false,busy=false,pending=false,timer=null,off=()=>{};
+ let stopped=false,busy=false,pending=false,timer=null,off=()=>{},prepared=false;
  const alive=()=>!stopped&&current();
  const local=()=>storage.getItem(MAIN_KEY);
  const base=()=>JSON.parse(storage.getItem(checkpoint)||'null');
  const ack=head=>storage.setItem(checkpoint,JSON.stringify(head));
  const schedule=(ms=350)=>{if(!alive())return;clearTimeout(timer);timer=setTimeout(run,ms);};
  async function run(){
-  if(!alive())return;
+  if(!alive()||!prepared)return;
   if(busy){pending=true;return;}
   if(!navigator.onLine){status('☁ Offline');return;}
   if(window.productionCleanWorkspaceReady!==true){schedule(1500);return;}
@@ -36,5 +36,5 @@ export function startSmartCloud({storage,remote,current,status}){
  window.addEventListener('raytech-finance-saved',trigger);window.addEventListener('online',trigger);window.addEventListener('offline',offline);
  try{off=remote.listen(trigger,()=>{if(alive())status('⚠ Nuvem indisponível');});}catch{}
  const stop=()=>{stopped=true;clearTimeout(timer);off();window.removeEventListener('raytech-finance-saved',trigger);window.removeEventListener('online',trigger);window.removeEventListener('offline',offline);};
- stop.prepare=prepare;schedule();return stop;
+ stop.prepare=async()=>{await prepare();if(alive()){prepared=true;schedule();}};return stop;
 }
