@@ -1,0 +1,367 @@
+{
+  "source": "Matos40/Controle-de-gastos-2.0",
+  "commit": "fee3d5d25bcbed204a776298869e5e8d21191b16",
+  "files": [
+    {
+      "path": "assets/neon-scene.svg",
+      "sha": "89362903de0a842cd1c02910cf5aa51aa0b47113"
+    },
+    {
+      "path": "css/smart-login.css",
+      "sha": "254ce00fb5018ca15ae532637e2f43535142b5e7"
+    },
+    {
+      "path": "css/styles.css",
+      "sha": "1b4a9aa456ac3d681435547ba18b579fee61979d"
+    },
+    {
+      "path": "favicon.ico",
+      "sha": "08a3a845085d1e1092403e7705a28ed9f1a4de17"
+    },
+    {
+      "path": "index.html",
+      "sha": "2f75cb382258235bfe9d9e7efdff596019f738d1"
+    },
+    {
+      "path": "js/app.js",
+      "sha": "51f560e353f76b1f79e5be89d980fb8fbbde3d5f"
+    },
+    {
+      "path": "js/experimentalSync/backupFiles.mjs",
+      "sha": "6de7b0e82ccbdd1fb08e31332392ab521fd8fe8d"
+    },
+    {
+      "path": "js/experimentalSync/engine.mjs",
+      "sha": "26d9de3d338ab17342affdfe79e4b763b737e331"
+    },
+    {
+      "path": "js/experimentalSync/history.mjs",
+      "sha": "64d3781c279c2d42de116a018405d8b3b45000d0"
+    },
+    {
+      "path": "js/experimentalSync/runtime.mjs",
+      "sha": "23081d6533cd60dc222adfe3d492825310d9edee"
+    },
+    {
+      "path": "js/experimentalSync/session.mjs",
+      "sha": "ca0f922a523ae14a143e5b04e4d172626e7c46d9"
+    },
+    {
+      "path": "js/onboarding.js",
+      "sha": "a5e1daf6b9153d9e8205c130a5d41f4e77cf08bc"
+    },
+    {
+      "path": "js/productionV2/capacity.mjs",
+      "sha": "fbfebce80e3fef83869f98828ea0293c50c66a74"
+    },
+    {
+      "path": "js/productionV2/cleanWorkspace.mjs",
+      "sha": "f0345bd2ab08462a47a58091de7113fa2ba6e381"
+    },
+    {
+      "path": "js/productionV2/cloudPanel.mjs",
+      "sha": "b4f05e850165e1267d80ac0b6800ca9e82a7d3b7"
+    },
+    {
+      "path": "js/productionV2/config.mjs",
+      "sha": "1ac5a818c68d7994c9b13537fca13b99f145c9d6"
+    },
+    {
+      "path": "js/productionV2/eventRuntime.mjs",
+      "sha": "04a29ee3f01b85ab2baa4482a4bef36e1dff9c4b"
+    },
+    {
+      "path": "js/productionV2/firebaseAdapter.mjs",
+      "sha": "6e666d7379aefd56cdfe305cda1e39cbdd8aeb4a"
+    },
+    {
+      "path": "js/productionV2/initialTransfer.mjs",
+      "sha": "4d2a102db3ac0a345e610bf070f9f810c1c01bea"
+    },
+    {
+      "path": "js/productionV2/legacyPhase2.mjs",
+      "sha": "d9c090ff744d1114488ab576989db3fe87535a7c"
+    },
+    {
+      "path": "js/productionV2/model.mjs",
+      "sha": "93b037e65df31cdecf2e0d9944859929eed9dc47"
+    },
+    {
+      "path": "js/productionV2/preview.mjs",
+      "sha": "45c89f3a1bcd85633eabaabfcfbc0c56daa5546b"
+    },
+    {
+      "path": "js/productionV2/queue.mjs",
+      "sha": "41c25fa097bab25e6d83352e1797b305021c922f"
+    },
+    {
+      "path": "js/productionV2/smartAdminIdentity.mjs",
+      "sha": "c623813da6feac0912e5f91a703551877cc7f120"
+    },
+    {
+      "path": "js/productionV2/smartAdminPolicy.mjs",
+      "sha": "3db551f32c8a588027033d6e95d3574737b45fbd"
+    },
+    {
+      "path": "js/productionV2/smartAdminView.mjs",
+      "sha": "236c7aece6cd38f04458cf8a12bf2035a536b672"
+    },
+    {
+      "path": "js/productionV2/smartLoginOfficialAuth.mjs",
+      "sha": "682c95354779a21f8fb2651092aee066d10d08bb"
+    },
+    {
+      "path": "js/productionV2/smartLoginOfficialBootstrap.mjs",
+      "sha": "dde2ee02c486f06f6aea885fbd829aeaa9362760"
+    },
+    {
+      "path": "js/productionV2/smartLoginOfficialIdentity.mjs",
+      "sha": "c1b220e079b848085bf132d47768fa72ef088b43"
+    },
+    {
+      "path": "js/productionV2/smartLoginProfiles.mjs",
+      "sha": "35a4dbc0d9c3a4f2463ce61bc25a2e0f8f2d9b65"
+    },
+    {
+      "path": "js/productionV2/smartLoginView.mjs",
+      "sha": "efa385408ba795ad02d9e04309eba2c19e08b21b"
+    },
+    {
+      "path": "js/productionV2/smartPremiumInitialMerge.mjs",
+      "sha": "e0d4eedba27d7bb09f20201309bca570c725020f"
+    },
+    {
+      "path": "js/productionV2/smartPremiumPolicy.mjs",
+      "sha": "e54a68432270f2d127a69685f7d0f11e2f184171"
+    },
+    {
+      "path": "js/productionV2/syncEngine.mjs",
+      "sha": "954ff964fce0341f7d3f776ca4e4f98b9baf9c04"
+    },
+    {
+      "path": "js/services/excelService.js",
+      "sha": "511cf22cd97343ab4a3254a4888ee697f34aca59"
+    },
+    {
+      "path": "js/services/geminiService.js",
+      "sha": "5484f6d6e4f1f8a788ac5ccec1c2a4e06f225fef"
+    },
+    {
+      "path": "js/services/storageService.js",
+      "sha": "3ade27c03d996ef012ccc8501abc1a2a66797232"
+    },
+    {
+      "path": "js/state.js",
+      "sha": "4f7508dab183b570b8417828cc700fb632a9fa76"
+    },
+    {
+      "path": "js/ui/categoryPicker.js",
+      "sha": "df06c4e8e65deed0362855c69953509be8b65f38"
+    },
+    {
+      "path": "js/ui/renderAnalytics.js",
+      "sha": "a60fbec30359455b945eaabb07d8136970ffbd0b"
+    },
+    {
+      "path": "js/ui/renderCards.js",
+      "sha": "89b866c1f0968337b0c4c4960ced5af7dae443f8"
+    },
+    {
+      "path": "js/ui/renderExpenses.js",
+      "sha": "0ae0383e875a43cf4526bed35e1b953e52d504ee"
+    },
+    {
+      "path": "js/ui/renderHistory.js",
+      "sha": "bd95c23cce8de4e753c3a778499652f448cfe12e"
+    },
+    {
+      "path": "js/ui/renderSummary.js",
+      "sha": "666b0a58eb17a8d0d341244589d162f0b8e5e2b5"
+    },
+    {
+      "path": "manifest.json",
+      "sha": "8babd8f95ff9d1c6b54ce1a1a75486851b2ef656"
+    },
+    {
+      "path": "raytech-icon-192.png",
+      "sha": "dad7cbfb1b50e0a22a3c46e32131b0ba7aafd991"
+    },
+    {
+      "path": "raytech-icon-512.png",
+      "sha": "55c7edb01e67a46d827eb11206d46b8185bd3796"
+    },
+    {
+      "path": "sw.js",
+      "sha": "7e7d74fa8aebf546bb141a3fd1701ee8a9f88e17"
+    },
+    {
+      "path": "tests/backup-security.test.cjs",
+      "sha": "3a36b08a99d931714ebe0b986a801a8f3deecb8c"
+    },
+    {
+      "path": "tests/experimental-sync-b2.test.cjs",
+      "sha": "f58f800e68dd24fb079ec52156fdfbf3e44c486e"
+    },
+    {
+      "path": "tests/experimental-sync.test.cjs",
+      "sha": "fc511ff422d66280f1c6ce89bef849bb2e58b4f7"
+    },
+    {
+      "path": "tests/offline-shell-production.test.cjs",
+      "sha": "ffa613bbf52d25bdc15446b0b5feffc0fe6f82d0"
+    },
+    {
+      "path": "tests/production-v2-candidate.test.cjs",
+      "sha": "c6a05c2f4b6da9dc03ca09653b863f1951ca3322"
+    },
+    {
+      "path": "tests/production-v2-clean-workspace.test.cjs",
+      "sha": "db93526365696895a5cfffe1a85b9924ad2ff09d"
+    },
+    {
+      "path": "tests/production-v2-default-workspace.test.cjs",
+      "sha": "551ef4a7809ca189321a64a3bcfcce7e84fd4ad2"
+    },
+    {
+      "path": "tests/production-v2-initial-transfer.test.cjs",
+      "sha": "82b11d1fa3651c7de97f1b07fc6981c7bb2626c6"
+    },
+    {
+      "path": "tests/production-v2-legacy-compatibility.test.cjs",
+      "sha": "bb1d5ff88af2427ea4c2d2f7955ab70dbd6a381b"
+    },
+    {
+      "path": "tests/production-v2-legacy-phase2.test.cjs",
+      "sha": "130bc9841313824f0526d87e5009b15bccfca081"
+    },
+    {
+      "path": "tests/production-v2-main-workspace.test.cjs",
+      "sha": "58092939467c30c05baa5114916ed4b7237ed96b"
+    },
+    {
+      "path": "tests/production-v2-recovery.test.cjs",
+      "sha": "1984efbbce787faee4b944e8758015fae7929eb6"
+    },
+    {
+      "path": "tests/production-v2-sync-engine.test.cjs",
+      "sha": "f56a7fca9365e68c4548207e8698f624fcce4520"
+    },
+    {
+      "path": "tests/pwa-b2-candidate.test.cjs",
+      "sha": "93e4e29a29ddf58fc07f2669015a411df2f690d7"
+    },
+    {
+      "path": "tests/storage.test.cjs",
+      "sha": "966c5040b7913ce0f468451297d16155ed9a0d1b"
+    },
+    {
+      "path": "tests/v32-event-runtime.test.cjs",
+      "sha": "89f57cb8fc4831a1614865b6d6939a28374c0b17"
+    },
+    {
+      "path": "validation/experimental-sync/.gitignore",
+      "sha": "610c39cb3b8ef4ee323953fa7d94bd2f21198597"
+    },
+    {
+      "path": "validation/experimental-sync/adapter.mjs",
+      "sha": "7baddd1acd6ab5cefe15222c744448a62c2d8e2a"
+    },
+    {
+      "path": "validation/experimental-sync/browser-entry.mjs",
+      "sha": "4ed0c050d28c94e85d8523790109b735a1df4074"
+    },
+    {
+      "path": "validation/experimental-sync/emulator.test.mjs",
+      "sha": "4ceedc62483ef1fbcf60e98e75fd8e99b5827599"
+    },
+    {
+      "path": "validation/experimental-sync/firebase.json",
+      "sha": "8037c4b8a31d782db046e3427203c153b37a1ec4"
+    },
+    {
+      "path": "validation/experimental-sync/lab.mjs",
+      "sha": "0f1c24cc19cb70a624920e12618b78ce5b197ca1"
+    },
+    {
+      "path": "validation/experimental-sync/package.json",
+      "sha": "b94df57124ca36f334f7be3fc711bdc9d7290e45"
+    },
+    {
+      "path": "validation/experimental-sync/panel-entry.mjs",
+      "sha": "625300ce5caae2e5dc1a9e8ddd7df924e6a70633"
+    },
+    {
+      "path": "validation/experimental-sync/panel-server.mjs",
+      "sha": "8e015486c1901bf8f8d330c9ab69517ed893e423"
+    },
+    {
+      "path": "validation/experimental-sync/panel-windows.test.mjs",
+      "sha": "ddcbc8a381c9be74f610fa11d63e93acad902958"
+    },
+    {
+      "path": "validation/experimental-sync/panel.html",
+      "sha": "17dcfeed3c5870e1efbf7265a39d29bdab4fbdf4"
+    },
+    {
+      "path": "validation/experimental-sync/panel.test.mjs",
+      "sha": "0305826e3f8b1419fab89b40db3f3796bf169fcc"
+    },
+    {
+      "path": "validation/production-browser/.gitignore",
+      "sha": "c2658d7d1b31848c3b71960543cb0368e56cd4c7"
+    },
+    {
+      "path": "validation/production-browser/browser-v334.test.mjs",
+      "sha": "cb1288306dbf9ef12a09bfe0aa865fba68989663"
+    },
+    {
+      "path": "validation/production-browser/browser.test.mjs",
+      "sha": "022b1554eea8db381118a6ca7f27eb0aee99d9e3"
+    },
+    {
+      "path": "validation/production-browser/build-v334-demo.mjs",
+      "sha": "32882e9b05ca2d97044693a685be9e769bfa68a8"
+    },
+    {
+      "path": "validation/production-browser/package.json",
+      "sha": "c83013c77417e3e58d08ac76ce2870c1881811bd"
+    },
+    {
+      "path": "validation/production-v2/.gitignore",
+      "sha": "e7915d7a9b5517d143c675a41fe71b1e266e9924"
+    },
+    {
+      "path": "validation/production-v2/firebase.json",
+      "sha": "e4c1b105ad74108a795362b0f23cfd480b7140ca"
+    },
+    {
+      "path": "validation/production-v2/package.json",
+      "sha": "13c761609288f61134f001c95a82303f56e6892a"
+    },
+    {
+      "path": "validation/production-v2/rules-v334.test.mjs",
+      "sha": "6cd262d6e29d5bd7a371361d25a4e1a360766a40"
+    },
+    {
+      "path": "validation/production-v2/rules.test.mjs",
+      "sha": "09974f97c3469ed2d49478f2fb048a04ebfd11b8"
+    },
+    {
+      "path": "validation/smart-login-official/identity.test.mjs",
+      "sha": "2b19877c9a22b17a225dc221b68a5e13de82caab"
+    },
+    {
+      "path": "validation/smart-login-official/integration.test.mjs",
+      "sha": "713881082fe80f10537fa4885a13187e415ba9d8"
+    },
+    {
+      "path": "validation/smart-login-official/offline.test.mjs",
+      "sha": "76c8afaf960856e2e960063357fd35b55330eada"
+    },
+    {
+      "path": "validation/smart-login-official/premium.test.mjs",
+      "sha": "b7857ee5e89dc707f3b21a1ff7067569db3ae060"
+    }
+  ],
+  "status": "snapshot provenance; not runnable until local adapters and safety checks are implemented"
+}
