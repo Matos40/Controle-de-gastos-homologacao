@@ -1,0 +1,42 @@
+import {test,after} from 'node:test';
+import assert from 'node:assert/strict';
+import {spawn} from 'node:child_process';
+import {initializeApp,deleteApp} from 'firebase-admin/app';
+import {getFirestore} from 'firebase-admin/firestore';
+import {ACCOUNT_COLLECTION,ROLE_COLLECTION} from './policy.mjs';
+import {USAGE_COLLECTION} from './usage.mjs';
+import {AUDIT_COLLECTION} from './usage-admin.mjs';
+import {assertLocalEmulators,PROJECT} from './emulator-guard.mjs';
+import {chromium} from '/tmp/raytech-rc-browser/node_modules/playwright/index.mjs';
+assertLocalEmulators();
+const app=initializeApp({projectId:PROJECT}),db=getFirestore(app),root='http://127.0.0.1:15002';
+let server,browser;
+after(async()=>{await browser?.close();server?.kill();await deleteApp(app);});
+async function fixture(name,plan,role){const r=await fetch('http://127.0.0.1:19099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-key',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:name+'@example.invalid',password:'fictional-pass-123',returnSecureToken:true})});assert.equal(r.status,200);const u=await r.json();await db.collection(ACCOUNT_COLLECTION).doc(u.localId).set({uid:u.localId,plan,blocked:false});if(role)await db.collection(ROLE_COLLECTION).doc(u.localId).set({role,active:true});return u;}
+async function expectText(page,selector,text){await page.waitForFunction(({selector,text})=>document.querySelector(selector)?.textContent.includes(text),{selector,text});}
+test('Chromium desktop and mobile: admin quota, Premium review, duplicate, quota denial, Free denial, logout',async()=>{
+ const owner=await fixture('rc-owner','free','owner'),premium=await fixture('rc-premium','premium'),free=await fixture('rc-free','free');
+ server=spawn(process.execPath,['functions/admin-panel-server.mjs'],{stdio:'ignore'});
+ let ready=false;for(let i=0;i<100;i++){try{ready=(await fetch(root+'/rc')).ok;if(ready)break;}catch{}await new Promise(r=>setTimeout(r,100));}assert.ok(ready);
+ browser=await chromium.launch({headless:true});
+ const context=await browser.newContext({viewport:{width:1280,height:800}});await context.route('**/*',route=>route.request().url().startsWith(root+'/')?route.continue():route.abort());
+ const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(root);await page.locator('#token').fill(owner.idToken);await page.locator('#load').click();await expectText(page,'#status','Consulta concluída');
+ await page.locator('#search').fill(premium.localId);await page.locator('#lookup').click();await expectText(page,'#target',premium.localId);
+ for(const k of ['minute','day','month'])await page.locator('#'+k).fill('1');
+ await page.locator('#form button').click();await expectText(page,'#status','Limites atualizados');
+ assert.equal((await db.collection(AUDIT_COLLECTION).where('targetUid','==',premium.localId).get()).size,1);
+ await page.locator('#logout').click();await expectText(page,'#status','Sessão local limpa');
+ await page.goto(root+'/rc');await page.locator('#token').fill(premium.idToken);await page.locator('#login').click();await expectText(page,'#access','Acesso autorizado');await page.locator('#extract').click();await expectText(page,'#status','Extração simulada concluída');await expectText(page,'#review','Compra fictícia');
+ await page.locator('#confirm').click();await expectText(page,'#status','Nenhum lançamento salvo');
+ await page.locator('#retry').click();await expectText(page,'#status','Requisição duplicada');
+ await page.locator('#extract').click();await expectText(page,'#status','Cota atingida');
+ assert.equal((await db.collection(USAGE_COLLECTION).doc(premium.localId).get()).data().month.count,1);
+ await page.locator('#logout').click();assert.ok(await page.locator('#extract').isDisabled());
+ await page.setViewportSize({width:390,height:844});await page.locator('#token').fill(free.idToken);await page.locator('#login').click();await expectText(page,'#access','Acesso negado');assert.ok(await page.locator('#extract').isDisabled());
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);
+ await page.goto(root);await page.locator('#token').fill(owner.idToken);await page.locator('#load').click();await expectText(page,'#status','Consulta concluída');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ await page.locator('#search').fill(premium.localId);await expectText(page,'#rows','1/1');assert.deepEqual(errors,[]);
+ await context.close();
+});
