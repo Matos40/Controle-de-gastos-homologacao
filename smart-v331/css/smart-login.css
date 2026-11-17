@@ -1,0 +1,17 @@
+#smartLogin[hidden],#smartLogin [hidden]{display:none!important}
+.smart-login{position:relative;isolation:isolate;min-height:100vh;min-height:100svh;display:grid;place-items:center;padding:24px;box-sizing:border-box;overflow:hidden;color:#e7f2ff;font:500 16px/1.5 "Plus Jakarta Sans",system-ui,sans-serif;background:radial-gradient(ellipse at 50% 90%,#0b4275 0,transparent 52%),radial-gradient(ellipse at 15% 0%,#103d68 0,transparent 40%),#031022}
+.smart-login:before,.smart-login:after{content:"";position:absolute;z-index:-1;pointer-events:none;inset:auto -25% -38%;height:65%;border:2px solid #16c7ff;border-radius:50%;box-shadow:0 0 38px #00aaff,inset 0 0 45px #007bc8;transform:rotate(-10deg);background:repeating-linear-gradient(90deg,transparent 0 46px,#1da9e811 47px 48px)}
+.smart-login:after{transform:rotate(12deg);bottom:-48%}
+.smart-login__card{position:relative;width:min(100%,510px);box-sizing:border-box;padding:clamp(24px,5vw,44px);border:1px solid #43c9ff;border-radius:32px;background:linear-gradient(150deg,#10436a72,#04172df5 45%,#092c50e8);box-shadow:0 0 40px #009dff48,inset 0 0 28px #189bde33,0 24px 80px #0008;text-align:center}
+.smart-login__logo{width:clamp(108px,25vw,184px);height:auto;aspect-ratio:1;object-fit:contain;filter:drop-shadow(0 0 18px #0bacf25c)}
+.smart-login h1{font-family:"Arial Black",system-ui,sans-serif;font-size:clamp(32px,7vw,52px);font-weight:900;letter-spacing:-.045em;margin:4px 0;line-height:1.13;background:linear-gradient(100deg,#1686d4,#5af4ff 48%,#1686d4);color:#40cfff;background-clip:text;-webkit-text-fill-color:transparent}
+.smart-login__tag{color:#83dcf8;font-size:clamp(14px,3vw,18px);margin:8px 0 24px}
+.smart-login__line{height:1px;background:linear-gradient(90deg,transparent,#50dfff,transparent);box-shadow:0 0 12px #23ccff;margin:18px 0}
+.smart-login__plan{color:#d5edff;border:1px solid #246b97;background:#0e3e6655;border-radius:30px;padding:9px 14px;font-size:13px;margin:14px 0}
+.smart-login button{display:flex;align-items:center;justify-content:center;gap:14px;width:100%;min-height:48px;padding:14px;margin:12px 0;border:1px solid #70eaff;border-radius:28px;background:linear-gradient(110deg,#68efff,#0eb5ef 55%,#087ed6);box-shadow:0 0 20px #0abaff44;color:#04162b;font:inherit;font-weight:800;cursor:pointer}
+.smart-login button[data-login-exit],.smart-login button[data-login-retry]{background:#072644;color:#e7f2ff;box-shadow:none}
+.smart-login button:focus-visible{outline:3px solid white;outline-offset:4px}.smart-login button:disabled{opacity:.55;cursor:wait}
+.smart-login__status{color:#b1cce4;font-size:13px;min-height:20px;margin:12px 0}.smart-login small{display:block;color:#a5c9e3;margin-top:18px;font-size:12px}
+.smart-login__chart{position:absolute;z-index:-1;width:150px;height:100px;border:1px solid #1679b6;border-radius:12px;opacity:.42;background:linear-gradient(135deg,#0b4268,#05203d);padding:14px;color:#27bdff}.smart-login__chart--left{left:4%;top:35%;transform:rotate(7deg)}.smart-login__chart--right{right:4%;top:25%;transform:rotate(-7deg)}
+@media(max-width:760px){.smart-login__chart{display:none}.smart-login{padding:16px}.smart-login__card{border-radius:24px}.smart-login__logo{width:120px}}
+@media(prefers-reduced-motion:reduce){.smart-login *{transition:none!important;animation:none!important}}
