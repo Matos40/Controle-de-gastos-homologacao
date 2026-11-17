@@ -1,0 +1,38 @@
+name: V34.0 Premium backend emulator
+on:
+  push:
+    branches: [feature/v34-0-backend-authorization]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    if: github.repository == 'Matos40/Controle-de-gastos-homologacao'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install isolated dependencies
+        working-directory: backend-v340/functions
+        run: npm install --no-audit --no-fund
+      - name: Policy security tests
+        working-directory: backend-v340/functions
+        run: node --test policy.test.mjs
+      - name: Real local Auth, Firestore and Functions emulator tests
+        working-directory: backend-v340
+        env:
+          GCLOUD_PROJECT: demo-raytech-v340
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:19099
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:18080
+        run: npx --yes firebase-tools@14.12.0 emulators:exec --project demo-raytech-v340 --only auth,firestore,functions "node --test functions/emulator.test.mjs"
+      - name: Existing synthetic regression tests
+        run: node --test tests/cloud-test*.test.mjs

@@ -1,0 +1,9 @@
+# V34.0 — Smart Backend Authorization (laboratório)
+
+Referência de contratos: Matos40/Controle-de-gastos-2.0, stable/v33.4.7, commit fee3d5d25bcbed204a776298869e5e8d21191b16; smartLoginProfiles.mjs, smartAdminPolicy.mjs e smartLoginOfficialAuth.mjs. A base Git é a main de homologação 17ebd46fa481ac4d8306f2379779a159bc44dd51; não se copiou o aplicativo oficial.
+
+Endpoint experimental POST authorizePremiumFeature, Authorization Bearer Firebase ID token, corpo exclusivamente {"feature":"invoice-ai"}. UID derivado do token verificado com checkRevoked=true; plano e papel obtidos em leitura transacional a cada chamada. Perfil existente, UID correspondente, blocked estritamente false, plano reconhecido, Premium ou Owner/Admin ativo. Negação por padrão, respostas sem dados privados, Cache-Control no-store. Nenhuma gravação pelo endpoint. Não autoriza pagamentos ou sincronização financeira. Não emite autorização reutilizável.
+
+Somente demo-raytech-v340 e emuladores loopback. Guardas de execução impedem uso remoto. Regras locais negam acesso cliente a todos os documentos; não publicar estas regras. O workflow executa somente testes e emuladores, sem credenciais, deploy, Gemini ou dados reais. O Admin SDK usado pelas fixtures grava somente no emulador. O Auth Emulator aceita tokens não assinados; testes de rejeição criptográfica/expiração/revogação na camada de política são simulados, não prova criptográfica de produção. Antes de V34.1, validar SDK em ambiente autorizado, implementar App Check, limites, política de privacidade e autorização dentro da própria operação Gemini; este endpoint informativo não protege o processamento atual do navegador.
+
+Executar CI pelo push na branch feature/v34-0-backend-authorization. Dependências diretas fixadas; lockfile transitivo ainda não incluído. Não executar firebase deploy.

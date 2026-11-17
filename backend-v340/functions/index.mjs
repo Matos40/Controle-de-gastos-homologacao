@@ -1,0 +1,23 @@
+import {onRequest} from 'firebase-functions/v2/https';
+import {initializeApp,getApps} from 'firebase-admin/app';
+import {getAuth} from 'firebase-admin/auth';
+import {getFirestore} from 'firebase-admin/firestore';
+import {authorizePremium,ACCOUNT_COLLECTION,ROLE_COLLECTION} from './policy.mjs';
+import {assertLocalEmulators,PROJECT} from './emulator-guard.mjs';
+export const authorizePremiumFeature=onRequest({region:'us-central1',cors:false},async(req,res)=>{
+ res.set('Cache-Control','no-store');
+ try{
+  assertLocalEmulators();
+  const app=getApps()[0]??initializeApp({projectId:PROJECT});
+  if(app.options.projectId!==PROJECT)throw Error('PROJECT_MISMATCH');
+  const db=getFirestore(app);
+  const result=await authorizePremium(req,{
+   verifyToken:token=>getAuth(app).verifyIdToken(token,true),
+   readPermissions:uid=>db.runTransaction(async tx=>{
+    const [account,role]=await tx.getAll(db.collection(ACCOUNT_COLLECTION).doc(uid),db.collection(ROLE_COLLECTION).doc(uid));
+    return {account:account.data(),role:role.data()};
+   },{readOnly:true})
+  });
+  res.status(result.status).json(result.body);
+ }catch{res.status(503).json({allowed:false});}
+});
