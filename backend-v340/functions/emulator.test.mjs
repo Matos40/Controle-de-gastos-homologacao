@@ -1,3 +1,5 @@
+import {randomUUID} from 'node:crypto';
+import {USAGE_COLLECTION,createUsageStore} from './usage.mjs';
 import {test,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {initializeApp,deleteApp} from 'firebase-admin/app';
@@ -32,12 +34,45 @@ test('HTTP Firebase Auth and Firestore emulators: permission matrix and immediat
 test('V34.1 HTTP extraction authorizes within request and never writes financial data',async()=>{
  const f=await fixture('v341-free');const p=await fixture('v341-premium','premium');const a=await fixture('v341-admin','free',false,{role:'admin',active:true});
  const body={feature:'invoice-ai',mimeType:'application/pdf',data:Buffer.from('%PDF-1.4\n% synthetic\n%%EOF\n').toString('base64')};
- const extract=async(u,b=body)=>{const res=await fetch(endpoint.replace('authorizePremiumFeature','extractPremiumInvoice'),{method:'POST',headers:{'content-type':'application/json',...(u?{authorization:'Bearer '+u.token}:{})},body:JSON.stringify(b)});assert.equal(res.headers.get('cache-control'),'no-store');return {status:res.status,body:await res.json()};};
+ const extract=async(u,b=body)=>{const res=await fetch(endpoint.replace('authorizePremiumFeature','extractPremiumInvoice'),{method:'POST',headers:{'content-type':'application/json','x-request-id':randomUUID(),...(u?{authorization:'Bearer '+u.token}:{})},body:JSON.stringify(b)});assert.equal(res.headers.get('cache-control'),'no-store');return {status:res.status,body:await res.json()};};
  assert.equal((await extract(null)).status,401);assert.equal((await extract(f)).status,403);assert.equal((await extract(f,{...body,uid:p.uid})).status,403);
  const success=await extract(p);assert.equal(success.status,200);assert.equal(success.body.simulated,true);assert.equal(success.body.requiresReview,true);assert.equal(success.body.items.length,1);
  assert.equal((await extract(a)).status,200);assert.equal((await extract(p,{...body,data:'bad'})).status,400);
  await f.profile.update({plan:'premium'});assert.equal((await extract(f)).status,200);await f.profile.update({plan:'free'});assert.equal((await extract(f)).status,403);
  await a.operator.update({active:false});assert.equal((await extract(a)).status,403);
  assert.deepEqual((await p.profile.get()).data(),{uid:p.uid,plan:'premium',blocked:false});
- const collections=await db.listCollections();assert.ok(collections.every(c=>[ACCOUNT_COLLECTION,ROLE_COLLECTION].includes(c.id)));
+ const collections=await db.listCollections();assert.ok(collections.every(c=>[ACCOUNT_COLLECTION,ROLE_COLLECTION,USAGE_COLLECTION].includes(c.id)));
+});
+
+test('V34.2 real HTTP concurrent requests never exceed per-UID minute quota and duplicates do not count',async()=>{
+ const p=await fixture('v342-premium','premium');const q=await fixture('v342-other','premium');
+ const body={feature:'invoice-ai',mimeType:'application/pdf',data:Buffer.from('%PDF-1.4\n% synthetic\n%%EOF\n').toString('base64')};
+ const run=async(u,id)=>{const res=await fetch(endpoint.replace('authorizePremiumFeature','extractPremiumInvoice'),{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+u.token,...(id?{'x-request-id':id}:{})},body:JSON.stringify(body),signal:AbortSignal.timeout(45000)});return res.status;};
+ assert.equal(await run(p,null),400);
+ const id=randomUUID();assert.equal(await run(p,id),200);assert.equal(await run(p,id),409);
+ const statuses=await Promise.all(Array.from({length:5},()=>run(p,randomUUID())));
+ // Minute boundary can legitimately reset the minute cap; verify exact hard limit separately with fixed clock.
+ assert.ok(statuses.every(x=>[200,429].includes(x)));
+ const usage=await db.collection(USAGE_COLLECTION).doc(p.uid).get();
+ assert.equal(usage.data().day.count,1+statuses.filter(x=>x===200).length);
+ assert.equal((await db.collection(USAGE_COLLECTION).doc(p.uid).collection('attempts').get()).size,usage.data().day.count);
+ assert.equal(await run(q,id),200);
+ assert.equal((await db.collection(USAGE_COLLECTION).doc(q.uid).get()).data().day.count,1);
+});
+test('V34.2 real Firestore atomic reserve, fixed clock, concurrent duplicate, downgrade and rollover',async()=>{
+ const p=await fixture('v342-fixed','premium');let now=Date.parse('2026-11-17T12:00:00Z');
+ const reserve=createUsageStore(db,{limits:{minute:2,day:3,month:4},clock:()=>now});
+ const id=randomUUID();const duplicate=await Promise.all([reserve({uid:p.uid,requestId:id}),reserve({uid:p.uid,requestId:id})]);
+ assert.deepEqual(duplicate.map(x=>x.status).sort(),[200,409]);
+ const statuses=await Promise.all(Array.from({length:4},()=>reserve({uid:p.uid,requestId:randomUUID()})));
+ assert.equal(statuses.filter(x=>x.status===200).length,1);assert.equal(statuses.filter(x=>x.status===429).length,3);
+ now+=60000;assert.equal((await reserve({uid:p.uid,requestId:randomUUID()})).status,200);
+ now+=60000;assert.equal((await reserve({uid:p.uid,requestId:randomUUID()})).status,429);
+ now+=86400000;assert.equal((await reserve({uid:p.uid,requestId:randomUUID()})).status,200);
+ now+=86400000;assert.equal((await reserve({uid:p.uid,requestId:randomUUID()})).status,429);
+ now=Date.parse('2026-12-01T00:00:00Z');assert.equal((await reserve({uid:p.uid,requestId:id})).status,409);
+ await p.profile.update({plan:'free'});assert.equal((await reserve({uid:p.uid,requestId:randomUUID()})).status,403);
+ await p.profile.update({plan:'premium'});assert.equal((await reserve({uid:p.uid,requestId:randomUUID()})).status,200);
+ const usage=await db.collection(USAGE_COLLECTION).doc(p.uid).get();assert.equal(usage.data().month.count,1);
+ assert.equal((await db.collection(USAGE_COLLECTION).doc(p.uid).collection('attempts').get()).size,5);
 });

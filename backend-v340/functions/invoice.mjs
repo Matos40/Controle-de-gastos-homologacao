@@ -34,11 +34,18 @@ export function validateResult(items){
 }
 export async function extractInvoice(req,deps,{timeoutMs=TIMEOUT_MS}={}){
  // Project-specific guard is enforced by the actual HTTP function before any SDK use.
- const authorize=()=>authorizePremium({method:req.method,headers:req.headers,query:req.query,body:{feature:FEATURE}},deps);
+ let verifiedUid;
+ const authorize=()=>authorizePremium({method:req.method,headers:req.headers,query:req.query,body:{feature:FEATURE}},{...deps,verifyToken:async token=>{const claims=await deps.verifyToken(token);verifiedUid=claims?.uid;return claims;}});
  const first=await authorize();
  if(first.status!==200)return fail(first.status,'ACCESS_DENIED');
  let file;
  try{file=decodeInvoice(req.body);}catch(e){return fail(e.message==='FILE_TOO_LARGE'?413:400,e.message==='FILE_TOO_LARGE'?'FILE_TOO_LARGE':'INVALID_FILE');}
+ // The HTTP entrypoint always supplies reserveUsage; legacy pure unit fixtures do not.
+ if(deps.reserveUsage){
+  let reservation;
+  try{reservation=await deps.reserveUsage({uid:verifiedUid,requestId:req.headers?.['x-request-id']});}catch{reservation={status:503,error:'USAGE_UNAVAILABLE'};}
+  if(reservation?.status!==200){file.bytes.fill(0);const status=[400,403,409,429,503].includes(reservation?.status)?reservation.status:503;return fail(status,({400:'INVALID_REQUEST_ID',403:'ACCESS_DENIED',409:'DUPLICATE_REQUEST',429:'QUOTA_EXCEEDED',503:'USAGE_UNAVAILABLE'})[status]);}
+ }
  const controller=new AbortController();
  let timer;
  try{
