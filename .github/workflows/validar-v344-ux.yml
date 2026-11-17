@@ -58,7 +58,14 @@ jobs:
           GCLOUD_PROJECT: demo-raytech-v340
           FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:19099
           FIRESTORE_EMULATOR_HOST: 127.0.0.1:18080
-        run: timeout 480s npx --yes firebase-tools@15.35.0 emulators:exec --project demo-raytech-v340 --only auth,firestore,functions "node --test --test-concurrency=1 functions/emulator.test.mjs functions/admin-panel.test.mjs functions/rc-browser.test.mjs functions/practical.test.mjs functions/app-ux.test.mjs"
+        run: timeout 480s npx --yes firebase-tools@15.35.0 emulators:exec --project demo-raytech-v340 --only auth,firestore,functions "node --test --test-concurrency=1 functions/emulator.test.mjs functions/admin-panel.test.mjs functions/rc-browser.test.mjs functions/practical.test.mjs"
+      - name: V34.4 Chromium in fresh emulators
+        working-directory: backend-v340
+        env:
+          GCLOUD_PROJECT: demo-raytech-v340
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:19099
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:18080
+        run: timeout 480s npx --yes firebase-tools@15.35.0 emulators:exec --project demo-raytech-v340 --only auth,firestore,functions "node --test functions/app-ux.test.mjs"
       - name: Existing synthetic regression tests
         if: always()
         run: node --test tests/cloud-test*.test.mjs
