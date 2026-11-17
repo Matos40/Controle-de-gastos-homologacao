@@ -1,0 +1,7 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {scopedAccountStorage} from '../js/productionV2/smartLoginStorage.mjs';
+import {registerFree} from '../js/productionV2/smartLoginProfiles.mjs';
+import {openSmartLoginAuth} from '../js/productionV2/smartLoginAuth.mjs';
+test('production origin rejected',async()=>assert.rejects(openSmartLoginAuth({location:{origin:'https://matos40.github.io',pathname:'/Controle-de-gastos-2.0/'}}),/SMART_LOGIN_TEST_CONFIG_REQUIRED/));
+test('UID separation and revocation, old bank untouched',()=>{const m=new Map([['controle_gastos_multimonth_v3','old']]);const s={getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,v),removeItem:k=>m.delete(k)};let uid='a';const a=scopedAccountStorage(s,'a',x=>x===uid);a.setItem('finance','A');uid='b';const b=scopedAccountStorage(s,'b',x=>x===uid);assert.equal(b.getItem('finance'),null);b.setItem('finance','B');assert.throws(()=>a.getItem('finance'));uid='a';assert.equal(a.getItem('finance'),'A');assert.equal(m.get('controle_gastos_multimonth_v3'),'old');});
+test('automatic free and preservation of existing premium',async()=>{let p=null;const transaction=fn=>fn({read:async()=>p,create:async(_,v)=>{p=v;},touch:async(_,v)=>Object.assign(p,v)});const args={uid:'a',transaction,now:()=>1};assert.equal(await registerFree(args),'free');p.plan='premium';assert.equal(await registerFree(args),'premium');assert.equal(p.createdAt,1);});

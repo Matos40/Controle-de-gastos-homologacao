@@ -1,0 +1,16 @@
+// Insert only inside homologation /databases/{database}/documents.
+// Never deploy to production. No changes to existing collections.
+match /raytechSmartCloudV332/{uid} {
+  function owner() { return request.auth != null && request.auth.uid == uid; }
+  function valid(d) {
+    return d.keys().hasAll(['revision','payload'])
+      && d.keys().hasOnly(['revision','payload'])
+      && d.revision is int && d.revision >= 1 && d.revision <= 9007199254740991
+      && d.payload is string && d.payload.size() <= 180000;
+  }
+  allow get: if owner();
+  allow list, delete: if false;
+  allow create: if owner() && valid(request.resource.data) && request.resource.data.revision == 1;
+  allow update: if owner() && valid(request.resource.data)
+    && request.resource.data.revision == resource.data.revision + 1;
+}
