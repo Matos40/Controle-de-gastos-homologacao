@@ -25,10 +25,11 @@ export function startSmartCloud({storage,remote,current,status}){
  }
  // Fresh device must read before the application creates its blank database.
  async function prepare(){
-  if(!alive()||!navigator.onLine||storage.getItem(MAIN_KEY)!==null||storage.getItem(MAIN_INITIALIZED_KEY)!==null)return;
+  if(!alive()||storage.getItem(MAIN_KEY)!==null||storage.getItem(MAIN_INITIALIZED_KEY)!==null)return;
+  if(!navigator.onLine)throw Error('FIRST_CLOUD_LOGIN_REQUIRES_NETWORK');
   const head=await remote.read();
   if(!alive()||storage.getItem(MAIN_KEY)!==null||storage.getItem(MAIN_INITIALIZED_KEY)!==null)return;
-  if(head){const {validatePayload}=await import('./model.mjs');validatePayload(head.payload);if(!Number.isSafeInteger(head.revision)||head.revision<1)throw Error('CLOUD_REVISION');if(!alive())return;storage.setItem(MAIN_KEY,head.payload);storage.setItem(MAIN_INITIALIZED_KEY,'1');ack(head);}
+  if(head){const {validatePayload}=await import('./model.mjs');validatePayload(head.payload);if(!Number.isSafeInteger(head.revision)||head.revision<1)throw Error('CLOUD_REVISION');if(!alive()||storage.getItem(MAIN_KEY)!==null||storage.getItem(MAIN_INITIALIZED_KEY)!==null)return;storage.setItem(MAIN_KEY,head.payload);storage.setItem(MAIN_INITIALIZED_KEY,'1');ack(head);}
  }
  const trigger=()=>schedule();
  const offline=()=>{if(alive())status('☁ Offline');};

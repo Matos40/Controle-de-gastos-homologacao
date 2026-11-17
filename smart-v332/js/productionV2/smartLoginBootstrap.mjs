@@ -15,7 +15,7 @@ async function observe(user){
  if(started){location.reload();return;}
  view.paint({phase:'checking-workspace'});
  try{
- const uid=user.uid;let plan;try{plan=await auth.profile(uid);}catch(e){if(navigator.onLine||localStorage.getItem('raytech-smart-v332:'+uid+':profile-ok')!=='free')throw e;plan='free';}
+ const uid=user.uid;let plan;if(!navigator.onLine&&localStorage.getItem('raytech-smart-v332:'+uid+':profile-ok')==='free')plan='free';else plan=await auth.profile(uid);
  if(token!==generation||auth.currentUid()!==uid)return;
  active=uid;window.smartAccountStorage=scopedAccountStorage(window.localStorage,uid,who=>auth.currentUid()===who&&active===who);
  if(plan==='free')window.smartAccountStorage.setItem('profile-ok','free');
@@ -30,7 +30,7 @@ async function observe(user){
  document.getElementById('productionCloudB2').hidden=true;
  document.getElementById('productionCloudHeader').hidden=true;
  document.getElementById('productionCloudState').hidden=true;
- if(new URLSearchParams(location.search).get('workspace')===null||new URLSearchParams(location.search).get('workspace')==='v2-main')stopCloud=startSmartCloud({storage:window.smartAccountStorage,remote:auth.cloud(uid),current:()=>auth.currentUid()===uid&&active===uid,status:s=>{state.textContent='Plano '+(plan==='free'?'Free':plan)+' · '+s;}});
+ if(new URLSearchParams(location.search).get('workspace')===null||new URLSearchParams(location.search).get('workspace')==='v2-main')stopCloud=startSmartCloud({storage:window.smartAccountStorage,remote:auth.cloud(uid),current:()=>auth.currentUid()===uid&&active===uid,status:s=>{state.textContent='Plano '+(plan==='free'?'Free':plan)+' · '+s;state.style.color=s.includes('Sincronizado')?'#4ade80':s.includes('Offline')?'#94a3b8':s.includes('⚠')?'#fbbf24':'#38bdf8';}});
  await stopCloud.prepare?.();if(token!==generation||auth.currentUid()!==uid)return;
  window.dispatchEvent(new Event('raytech-account-start'));document.dispatchEvent(new Event('raytech-account-start'));
  ready=true;panel.hidden=false;panel.inert=false;view.paint({phase:'ready'});
