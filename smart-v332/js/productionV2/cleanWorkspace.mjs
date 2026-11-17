@@ -55,7 +55,7 @@ export function openCleanStore(storage,month,search='?workspace=v2-clean'){
 // Never silently fall back to a different bank or an unlocked writer.
 export function acquireCleanLease(locks=globalThis.navigator?.locks,search='?workspace=v2-clean'){
  if(!isV2Workspace(search))return Promise.reject(Error('CLEAN_WORKSPACE_INVALID'));
- const lockName=isMainWorkspace(search)?'raytech-cg-v2-main-workspace':'raytech-cg-v2-clean-workspace';
+ const lockName=isMainWorkspace(search)?'raytech-smart-v332-main-workspace':'raytech-smart-v332-clean-workspace';
  if(!locks?.request)return Promise.reject(Error('CLEAN_LOCK_UNAVAILABLE'));
  return new Promise((resolve,reject)=>{
   let release;const hold=new Promise(r=>{release=r;});
