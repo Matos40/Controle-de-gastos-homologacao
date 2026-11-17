@@ -1,0 +1,20 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {decide,syncOnce} from '../js/productionV2/smartCloud.mjs';
+import {blank} from '../js/productionV2/model.mjs';
+const value=n=>{const d=blank('2026-11');d.months['2026-11'].salary=n;return JSON.stringify(d)};
+const a=value(10),b=value(20),c=value(30),head=(payload,revision=1)=>({payload,revision});
+test('first push',()=>assert.equal(decide(a,null,null).kind,'push'));
+test('new device pull',()=>assert.equal(decide(null,null,head(a)).kind,'pull'));
+test('equal data acknowledge',()=>assert.equal(decide(a,null,head(a)).kind,'ack'));
+test('unrelated data conflict',()=>assert.equal(decide(a,null,head(b)).kind,'conflict'));
+test('local edit push',()=>assert.equal(decide(b,head(a),head(a)).kind,'push'));
+test('remote edit pull',()=>assert.equal(decide(a,head(a),head(b,2)).kind,'pull'));
+test('concurrent changes conflict',()=>assert.equal(decide(b,head(a),head(c,2)).kind,'conflict'));
+test('missing remote fail closed',()=>assert.equal(decide(a,head(a),null).kind,'conflict'));
+test('regressed revision conflict',()=>assert.equal(decide(b,head(a,2),head(a)).kind,'conflict'));
+test('session changed during read',async()=>{let active=true;assert.equal(await syncOnce({local:()=>a,base:()=>null,read:async()=>{active=false;return null},current:()=>active}),'retry')});
+
+test('equal local cannot acknowledge regressed cloud revision',()=>assert.equal(decide(a,head(a,2),head(a)).kind,'conflict'));
+test('successful push records checkpoint',async()=>{let saved;let sent;assert.equal(await syncOnce({local:()=>b,base:()=>head(a),read:async()=>head(a),write:async(old,next)=>{assert.deepEqual(old,head(a));sent=next},ack:x=>saved=x,current:()=>true}),'synced');assert.deepEqual(saved,head(b,2));assert.deepEqual(sent,saved)});
+test('remote pull never overwrites active editor',async()=>{let acked=false;assert.equal(await syncOnce({local:()=>a,base:()=>head(a),read:async()=>head(b,2),apply:()=>false,ack:()=>acked=true,current:()=>true}),'retry');assert.equal(acked,false)});
+test('offline local edit retained when remote read fails',async()=>{let wrote=false;await assert.rejects(syncOnce({local:()=>b,base:()=>head(a),read:async()=>{throw Error('offline')},write:()=>wrote=true,current:()=>true}),/offline/);assert.equal(wrote,false)});
