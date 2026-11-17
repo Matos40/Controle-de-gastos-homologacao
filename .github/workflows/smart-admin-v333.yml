@@ -1,0 +1,17 @@
+name: Smart Admin V33.3 tests
+on:
+  push:
+    branches: [feature/v33-3-smart-admin]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test smart-v333/tests/*.test.mjs
+      - run: find smart-v333/js -name '*.js' -print0 | xargs -0 -n1 node --check
+      - run: find smart-v333/js -name '*.mjs' -print0 | xargs -0 -n1 node --check
