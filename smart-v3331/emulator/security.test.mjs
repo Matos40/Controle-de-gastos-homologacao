@@ -1,0 +1,32 @@
+import {initializeTestEnvironment,assertSucceeds,assertFails} from '@firebase/rules-unit-testing';
+import {doc,collection,query,limit,getDocs,getDoc,setDoc,updateDoc,deleteDoc,writeBatch,serverTimestamp,Timestamp} from 'firebase/firestore';
+import {before,after,beforeEach,test} from 'node:test';
+import {readFileSync} from 'node:fs';
+const projectId='demo-raytech-v333';
+let env;
+const A='raytechAccountsV333',R='raytechAdminRolesV333',F='raytechSmartCloudV333',L='raytechAdminAuditV333';
+const db=u=>u?env.authenticatedContext(u).firestore():env.unauthenticatedContext().firestore();
+const ref=(d,c,u)=>doc(d,c,u);
+const list=(d,c)=>getDocs(query(collection(d,c),limit(100)));
+before(async()=>{env=await initializeTestEnvironment({projectId,firestore:{rules:readFileSync(new URL('./firestore.rules',import.meta.url),'utf8')}})});
+after(async()=>{await env?.cleanup()});
+beforeEach(async()=>{await env.clearFirestore();await env.withSecurityRulesDisabled(async c=>{const d=c.firestore(),t=Timestamp.fromMillis(1);for(const [uid,plan,blocked] of [['owner','free',false],['admin','free',false],['inactive','free',false],['free','free',false],['premium','premium',false],['blocked','free',true]])await setDoc(ref(d,A,uid),{uid,plan,blocked,createdAt:t,lastAccess:t});for(const [uid,role,active] of [['owner','owner',true],['admin','admin',true],['inactive','admin',false]])await setDoc(ref(d,R,uid),{role,active});for(const uid of ['free','blocked'])await setDoc(ref(d,F,uid),{revision:1,payload:'{}'});await setDoc(ref(d,L,'old'),{actor:'admin',target:'free',beforePlan:'free',afterPlan:'premium',beforeBlocked:false,afterBlocked:false,at:t});});});
+function change(actor,target,beforePlan,afterPlan,beforeBlocked,afterBlocked,id='event'){const d=db(actor),b=writeBatch(d);b.update(ref(d,A,target),{plan:afterPlan,blocked:afterBlocked,lastAudit:id});b.set(ref(d,L,id),{actor,target,beforePlan,afterPlan,beforeBlocked,afterBlocked,at:serverTimestamp()});return b.commit();}
+test('01 owner lists accounts and audit',async()=>{await assertSucceeds(list(db('owner'),A));await assertSucceeds(list(db('owner'),L));});
+test('02 admin lists accounts and audit',async()=>{await assertSucceeds(list(db('admin'),A));await assertSucceeds(list(db('admin'),L));});
+test('03 Free denied admin lists',async()=>{await assertFails(list(db('free'),A));await assertFails(list(db('free'),L));});
+test('04 Premium denied admin lists',async()=>{await assertFails(list(db('premium'),A));await assertFails(list(db('premium'),L));});
+test('05 self-promotion denied',async()=>{await assertFails(setDoc(ref(db('free'),R,'free'),{role:'admin',active:true}));await assertFails(updateDoc(ref(db('free'),A,'free'),{plan:'premium'}));});
+test('06 admin changes plan with audit',async()=>{await assertSucceeds(change('admin','free','free','premium',false,false));});
+test('07 admin blocks customer',async()=>{await assertSucceeds(change('admin','free','free','free',false,true));});
+test('08 admin reactivates customer',async()=>{await assertSucceeds(change('admin','blocked','free','free',true,false));});
+test('09 admin cannot access third-party finance',async()=>{await assertFails(getDoc(ref(db('admin'),F,'free')));await assertFails(updateDoc(ref(db('admin'),F,'free'),{revision:2,payload:'{}'}));await assertFails(list(db('admin'),F));await assertSucceeds(getDoc(ref(db('free'),F,'free')));});
+test('10 owner cannot access third-party finance',async()=>{await assertFails(getDoc(ref(db('owner'),F,'free')));await assertFails(updateDoc(ref(db('owner'),F,'free'),{revision:2,payload:'{}'}));});
+test('11 blocked account cannot sync',async()=>{await assertFails(getDoc(ref(db('blocked'),F,'blocked')));await assertFails(updateDoc(ref(db('blocked'),F,'blocked'),{revision:2,payload:'{}'}));});
+test('12 administrative changes require correct audit',async()=>{await assertFails(updateDoc(ref(db('admin'),A,'free'),{plan:'premium',lastAudit:'missing'}));await assertFails(change('admin','free','premium','premium',false,false));await assertFails(change('admin','owner','free','premium',false,false));await assertFails(setDoc(ref(db('admin'),L,'forged'),{actor:'admin',target:'free',beforePlan:'free',afterPlan:'premium',beforeBlocked:false,afterBlocked:false,at:serverTimestamp()}));});
+test('13 audit is immutable',async()=>{await assertFails(deleteDoc(ref(db('admin'),L,'old')));await assertFails(updateDoc(ref(db('owner'),L,'old'),{target:'other'}));});
+test('14 inactive operator denied',async()=>{await assertFails(list(db('inactive'),A));await assertFails(change('inactive','free','free','premium',false,false));});
+test('15 unauthenticated denied',async()=>{await assertFails(getDoc(ref(db(null),A,'free')));await assertFails(getDoc(ref(db(null),F,'free')));await assertFails(list(db(null),L));await assertFails(getDoc(ref(db(null),R,'owner')));});
+
+test('16 verified identity update and spoof rejection',async()=>{const d=env.authenticatedContext('free',{email:'demo@example.com',email_verified:true,name:'Demo',picture:'https://lh3.googleusercontent.com/demo',firebase:{sign_in_provider:'google.com'}}).firestore();const data={email:'demo@example.com',name:'Demo',photo:'https://lh3.googleusercontent.com/demo',lastAccess:serverTimestamp()};await assertSucceeds(updateDoc(ref(d,A,'free'),data));await assertFails(updateDoc(ref(d,A,'free'),{...data,email:'fake@example.com'}));await assertFails(updateDoc(ref(d,A,'free'),{...data,name:'Fake'}));await assertFails(updateDoc(ref(d,A,'free'),{...data,photo:'https://example.com/fake'}));await assertFails(updateDoc(ref(db('free'),A,'free'),{...data,email:'other@example.com'}));});
+test('17 role metadata read restricted',async()=>{await assertSucceeds(getDoc(ref(db('admin'),R,'owner')));await assertFails(getDoc(ref(db('free'),R,'owner')));await assertFails(setDoc(ref(db('admin'),R,'free'),{role:'admin',active:true}));});

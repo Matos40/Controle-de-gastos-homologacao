@@ -1,0 +1,33 @@
+name: Smart Admin V33.3.1 tests
+on:
+  push:
+    branches: [feature/v33-3-1-admin-ux]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test smart-v3331/tests/*.test.mjs
+      - run: find smart-v3331/js -name '*.js' -print0 | xargs -0 -n1 node --check
+      - run: find smart-v3331/js -name '*.mjs' -print0 | xargs -0 -n1 node --check
+  firestore-security:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: smart-v3331/emulator
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm install --no-audit --no-fund
+      - run: npx firebase emulators:exec --project demo-raytech-v333 --only firestore "node --test security.test.mjs"
