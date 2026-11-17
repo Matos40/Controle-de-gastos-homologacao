@@ -1,0 +1,74 @@
+name: V34 Practical Edition
+on:
+  push:
+    branches: [feature/v34-practical-edition]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    if: github.repository == 'Matos40/Controle-de-gastos-homologacao'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Resolve isolated dependencies
+        working-directory: backend-v340/functions
+        run: |
+          echo 'd46084ed8e33b2b6899ca0ad6b78dc9de3e53c26e4ba145c51f9fbd4c73f82b1  package-lock.json' | sha256sum -c -
+          npm ci --no-audit --no-fund
+          git diff --exit-code -- package-lock.json
+      - name: Dependency review (report only)
+        working-directory: backend-v340/functions
+        run: |
+          npm outdated --json > outdated.json || true
+          npm audit --omit=dev --json > audit.json || true
+          node -e 'const a=require("./audit.json"); if(!a.metadata?.vulnerabilities)process.exit(1); console.log(JSON.stringify(a.metadata.vulnerabilities))'
+          sha256sum package-lock.json
+          node -e 'const a=require("./audit.json"); if(a.metadata.vulnerabilities.total!==0)process.exit(1)'
+      - uses: actions/upload-artifact@v5
+        with:
+          name: v34-practical-dependency-evidence
+          path: |
+            backend-v340/functions/package-lock.json
+            backend-v340/functions/outdated.json
+            backend-v340/functions/audit.json
+      - name: Policy and invoice security tests
+        working-directory: backend-v340/functions
+        run: node --test policy.test.mjs invoice.test.mjs usage.test.mjs usage-admin.test.mjs
+      - name: Panel syntax
+        working-directory: backend-v340/functions
+        run: node --check admin-panel.js && node --check admin-panel-server.mjs && node --check rc.js
+      - name: Install pinned browser test tooling outside backend
+        run: |
+          npm install --prefix /tmp/raytech-rc-browser --no-audit --no-fund playwright@1.56.1
+          /tmp/raytech-rc-browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Real local emulators
+        working-directory: backend-v340
+        env:
+          GCLOUD_PROJECT: demo-raytech-v340
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:19099
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:18080
+        run: timeout 480s npx --yes firebase-tools@15.35.0 emulators:exec --project demo-raytech-v340 --only auth,firestore,functions "node --test --test-concurrency=1 functions/emulator.test.mjs functions/admin-panel.test.mjs functions/rc-browser.test.mjs functions/practical.test.mjs"
+      - name: Existing synthetic regression tests
+        if: always()
+        run: node --test tests/cloud-test*.test.mjs
+
+      - name: Package local test edition
+        if: success()
+        run: |
+          mkdir -p /tmp/practical
+          git archive HEAD backend-v340 | tar -x -C /tmp/practical
+      - uses: actions/upload-artifact@v5
+        with:
+          name: Raytech-CG-V34-Practical-Windows
+          path: /tmp/practical/backend-v340

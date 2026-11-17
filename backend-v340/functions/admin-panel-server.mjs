@@ -1,10 +1,22 @@
 import {createServer} from 'node:http';
+import {prepareProfiles} from './practical-profiles.mjs';
 import {readFile} from 'node:fs/promises';
 import {assertLocalEmulators,PROJECT} from './emulator-guard.mjs';
 assertLocalEmulators();
+const practical=process.env.RAYTECH_PRACTICAL==='1';
+const profiles=practical?await prepareProfiles():new Map();
 export const server=createServer(async(req,res)=>{
  res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Content-Security-Policy',"default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");
  try{
+  if(req.headers.host!=='127.0.0.1:15002'){res.writeHead(403).end();return;}
+  if(practical&&req.method==='POST'&&req.url==='/api/lab-profile'){
+   if(req.headers.origin!=='http://127.0.0.1:15002'){res.writeHead(403).end();return;}
+   let body='';for await(const chunk of req){body+=chunk;if(body.length>256){res.writeHead(413).end();return;}}
+   let role;try{role=JSON.parse(body).role;}catch{res.writeHead(400).end();return;}
+   if(!profiles.has(role)){res.writeHead(400).end();return;}
+   res.writeHead(200,{'Content-Type':'application/json'}).end(JSON.stringify(profiles.get(role)));return;
+  }
+  if(req.method==='GET'&&req.url==='/api/lab-enabled'){res.writeHead(200,{'Content-Type':'application/json'}).end(JSON.stringify({enabled:practical}));return;}
   if(req.method==='GET'&&['/','/admin-panel.js','/rc','/rc.js'].includes(req.url)){const script=req.url.endsWith('.js');const file=({'/':'admin-panel.html','/admin-panel.js':'admin-panel.js','/rc':'rc.html','/rc.js':'rc.js'})[req.url];res.setHeader('Content-Type',script?'text/javascript; charset=utf-8':'text/html; charset=utf-8');res.end(await readFile(new URL('./'+file,import.meta.url)));return;}
   if(req.method==='POST'&&['/api/usageAdmin','/api/authorizePremiumFeature','/api/extractPremiumInvoice'].includes(req.url)){
    if(req.headers.origin&&req.headers.origin!=='http://127.0.0.1:15002'){res.writeHead(403).end();return;}

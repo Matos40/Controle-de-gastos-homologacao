@@ -1,0 +1,11 @@
+RAYTECH CG V34 PRACTICAL EDITION
+Somente laboratório local, sem dados reais.
+1. Extraia todo o ZIP em uma pasta nova.
+2. Pré-requisitos: Windows, Node.js 22 LTS, Java JDK 21, conexão à internet na primeira instalação. Não use credenciais reais.
+3. Dê duplo clique em INICIAR-RAYTECH-V34.cmd. Aguarde a abertura do navegador. Se não abrir, visite http://127.0.0.1:15002/rc.
+4. Escolha Free, Premium, Admin ou Owner e clique Entrar com perfil fictício. No painel administrativo, selecione Admin ou Owner novamente.
+5. Teste extração fictícia, repetição do identificador, cotas e alteração administrativa. Nenhum lançamento financeiro será salvo.
+6. Volte à janela do terminal e pressione ENTER para sair. Não feche à força; emulators:exec encerra os seus próprios processos. Não há exportação/importação de dados persistentes.
+A primeira execução baixa dependências. Nenhuma instalação global, publicação, login Google, chave Gemini ou ativação Blaze.
+Não desative políticas de segurança do Windows. Se PowerShell bloquear o script, solicite ajuda. Não encerre outros emuladores automaticamente.
+Perfis fictícios são criados a cada sessão; tokens expiram após cerca de uma hora. Reinicie o laboratório se necessário. O servidor oferece perfis privilegiados somente quando explicitamente iniciado em modo prático e em loopback; não use em máquinas compartilhadas.

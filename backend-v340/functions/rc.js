@@ -13,3 +13,13 @@ $('extract').onclick=()=>extract(false);$('retry').onclick=()=>extract(true);
 $('confirm').onclick=()=>{clearReview();status('Revisão confirmada somente nesta sessão. Nenhum lançamento salvo.');};
 $('discard').onclick=()=>{clearReview();status('Revisão descartada.');};
 sync();
+
+let selecting=false;
+fetch('/api/lab-enabled',{cache:'no-store'}).then(r=>r.json()).then(x=>{$('lab-profiles').hidden=!x.enabled;}).catch(()=>{});
+$('lab-select').onclick=async()=>{if(selecting||busy)return;selecting=true;const generation=epoch;$('lab-select').disabled=true;try{
+ const role=$('lab-role').value;
+ const r=await fetch('/api/lab-profile',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({role}),cache:'no-store',signal:AbortSignal.timeout(10000)});
+ if(!r.ok)throw Error('Perfil indisponível');const u=await r.json();if(generation!==epoch)return;
+ $('lab-identity').textContent=role.toUpperCase()+' · '+u.uid;$('token').value=u.token;$('login').click();
+ }catch{if(generation===epoch)$('lab-identity').textContent='Não foi possível selecionar o perfil.';}finally{selecting=false;$('lab-select').disabled=false;}};
+$('logout').addEventListener('click',()=>{$('lab-identity').textContent='';});

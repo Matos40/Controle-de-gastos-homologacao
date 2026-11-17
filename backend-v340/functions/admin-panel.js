@@ -25,3 +25,13 @@ $('search').oninput=render;
 $('next').onclick=()=>perform(active=>page(cursor,active));
 $('lookup').onclick=()=>perform(async active=>{const d=await api({action:'get',uid:$('search').value.trim()});if(active())edit(d.row);});
 $('form').onsubmit=e=>{e.preventDefault();if(!selected)return;perform(async active=>{const limits=Object.fromEntries(['minute','day','month'].map(k=>[k,Number($(k).value)]));await api({action:'set',uid:selected.uid,limits,expectedVersion:selected.version});if(!active())return;$('editor').hidden=true;selected=null;await page(null,active);if(active())status('Limites atualizados.');});};
+
+let selecting=false;
+fetch('/api/lab-enabled',{cache:'no-store'}).then(r=>r.json()).then(x=>{$('lab-profiles').hidden=!x.enabled;}).catch(()=>{});
+$('lab-select').onclick=async()=>{if(selecting||busy)return;selecting=true;const generation=epoch;$('lab-select').disabled=true;try{
+ const role=$('lab-role').value;
+ const r=await fetch('/api/lab-profile',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({role}),cache:'no-store',signal:AbortSignal.timeout(10000)});
+ if(!r.ok)throw Error('Perfil indisponível');const u=await r.json();if(generation!==epoch)return;
+ $('lab-identity').textContent=role.toUpperCase()+' · '+u.uid;$('token').value=u.token;$('load').click();
+ }catch{if(generation===epoch)$('lab-identity').textContent='Não foi possível selecionar o perfil.';}finally{selecting=false;$('lab-select').disabled=false;}};
+$('logout').addEventListener('click',()=>{$('lab-identity').textContent='';});
