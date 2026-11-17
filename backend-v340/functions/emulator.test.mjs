@@ -75,6 +75,9 @@ test('V34.2 real Firestore atomic reserve, fixed clock, concurrent duplicate, do
  await p.profile.update({plan:'premium'});assert.equal((await reserve({uid:p.uid,requestId:randomUUID()})).status,200);
  const usage=await db.collection(USAGE_COLLECTION).doc(p.uid).get();assert.equal(usage.data().month.count,1);
  assert.equal((await db.collection(USAGE_COLLECTION).doc(p.uid).collection('attempts').get()).size,5);
+ // Isolate the synthetic future-clock fixture from subsequent wall-clock admin queries.
+ await db.recursiveDelete(db.collection(USAGE_COLLECTION).doc(p.uid));
+ await p.profile.delete();
 });
 
 test('V34.3 administrative authorization, transactional quota update, audit and real enforcement',async()=>{

@@ -55,7 +55,8 @@ export async function handleUsageAdmin(req,{db,verifyToken,clock=Date.now}){
     let query=accounts.orderBy(FieldPath.documentId()).limit(26);
     if(body.after!==null)query=query.startAfter(body.after);
     const page=await tx.get(query),docs=page.docs.slice(0,25);
-    const rows=await Promise.all(docs.map(readRow));
+    const rows=[];
+    for(const doc of docs)rows.push(await readRow(doc));
     const totals={minute:0,day:0,month:0,atLimit:0};
     for(const row of rows){for(const k of ['minute','day','month'])totals[k]+=row.used[k];if(row.reached.length)totals.atLimit++;}
     return result(200,{rows,totals,next:page.size>25?docs.at(-1).id:null,periods:windows(now)});
@@ -72,6 +73,6 @@ export async function handleUsageAdmin(req,{db,verifyToken,clock=Date.now}){
    tx.set(limits.doc(body.uid),{limits:body.limits,version,updatedAt:now});
    tx.create(db.collection(AUDIT_COLLECTION).doc(randomUUID()),{actorUid:uid,targetUid:body.uid,before:row.limits,after:body.limits,version,at:now});
    return result(200,{version,limits:body.limits});
-  },{...body.action==='set'?{}:{readOnly:true}});
+  },body.action==='set'?{maxAttempts:5}:{readOnly:true});
  }catch{return error(503,'ADMIN_UNAVAILABLE');}
 }

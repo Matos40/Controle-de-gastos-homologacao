@@ -54,6 +54,7 @@ jobs:
           GCLOUD_PROJECT: demo-raytech-v340
           FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:19099
           FIRESTORE_EMULATOR_HOST: 127.0.0.1:18080
-        run: timeout 480s npx --yes firebase-tools@15.35.0 emulators:exec --project demo-raytech-v340 --only auth,firestore,functions "node --test functions/emulator.test.mjs"
+        run: timeout 480s npx --yes firebase-tools@15.35.0 emulators:exec --project demo-raytech-v340 --only auth,firestore,functions "node --test --test-concurrency=1 functions/emulator.test.mjs functions/admin-panel.test.mjs"
       - name: Existing synthetic regression tests
+        if: always()
         run: node --test tests/cloud-test*.test.mjs
