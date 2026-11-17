@@ -1,0 +1,6 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {requireProductionConfig,PRODUCTION_CONFIG} from './official/js/productionV2/config.mjs';
+import {scopedStorage} from './official/js/productionV2/smartLoginOfficialIdentity.mjs';
+test('configuration rejects every non-laboratory origin',()=>{for(const origin of ['https://matos40.github.io','http://localhost:15003','http://127.0.0.1:15002'])assert.throws(()=>requireProductionConfig(PRODUCTION_CONFIG,{origin}));assert.equal(requireProductionConfig(PRODUCTION_CONFIG,{origin:'http://127.0.0.1:15003'}).projectId,'demo-raytech-v340');});
+test('synthetic users and three banks isolated; revoked session cannot read',()=>{const m=new Map();const raw={getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,v),removeItem:k=>m.delete(k)};let active='a';const scope=uid=>scopedStorage(raw,{uid,original:false,prefix:'raytech_v334_uid:'+uid+':'},u=>u===active);const a=scope('a'),b=scope('b');for(const k of ['raytech_cg_v2_main_finance_v1','raytech_cg_v2_clean_finance_v1','controle_gastos_multimonth_v3'])a.setItem(k,k);active='b';assert.throws(()=>a.getItem('controle_gastos_multimonth_v3'));assert.equal(b.getItem('controle_gastos_multimonth_v3'),null);assert.equal(m.size,3);});
