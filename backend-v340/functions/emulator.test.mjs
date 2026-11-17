@@ -28,3 +28,16 @@ test('HTTP Firebase Auth and Firestore emulators: permission matrix and immediat
  await p.profile.delete();assert.equal((await call(p.token)).status,403);
  assert.deepEqual((await f.profile.get()).data(),{uid:f.uid,plan:'free',blocked:false});
 });
+
+test('V34.1 HTTP extraction authorizes within request and never writes financial data',async()=>{
+ const f=await fixture('v341-free');const p=await fixture('v341-premium','premium');const a=await fixture('v341-admin','free',false,{role:'admin',active:true});
+ const body={feature:'invoice-ai',mimeType:'application/pdf',data:Buffer.from('%PDF-1.4\n% synthetic\n%%EOF\n').toString('base64')};
+ const extract=async(u,b=body)=>{const res=await fetch(endpoint.replace('authorizePremiumFeature','extractPremiumInvoice'),{method:'POST',headers:{'content-type':'application/json',...(u?{authorization:'Bearer '+u.token}:{})},body:JSON.stringify(b)});assert.equal(res.headers.get('cache-control'),'no-store');return {status:res.status,body:await res.json()};};
+ assert.equal((await extract(null)).status,401);assert.equal((await extract(f)).status,403);assert.equal((await extract(f,{...body,uid:p.uid})).status,403);
+ const success=await extract(p);assert.equal(success.status,200);assert.equal(success.body.simulated,true);assert.equal(success.body.requiresReview,true);assert.equal(success.body.items.length,1);
+ assert.equal((await extract(a)).status,200);assert.equal((await extract(p,{...body,data:'bad'})).status,400);
+ await f.profile.update({plan:'premium'});assert.equal((await extract(f)).status,200);await f.profile.update({plan:'free'});assert.equal((await extract(f)).status,403);
+ await a.operator.update({active:false});assert.equal((await extract(a)).status,403);
+ assert.deepEqual((await p.profile.get()).data(),{uid:p.uid,plan:'premium',blocked:false});
+ const collections=await db.listCollections();assert.ok(collections.every(c=>[ACCOUNT_COLLECTION,ROLE_COLLECTION].includes(c.id)));
+});

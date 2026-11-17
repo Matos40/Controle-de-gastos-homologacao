@@ -21,3 +21,24 @@ export const authorizePremiumFeature=onRequest({region:'us-central1',cors:false}
   res.status(result.status).json(result.body);
  }catch{res.status(503).json({allowed:false});}
 });
+
+import {extractInvoice} from './invoice.mjs';
+import {simulatedGemini} from './gemini-provider.mjs';
+export const extractPremiumInvoice=onRequest({region:'us-central1',cors:false,timeoutSeconds:30},async(req,res)=>{
+ res.set('Cache-Control','no-store');
+ try{
+  assertLocalEmulators();
+  const app=getApps()[0]??initializeApp({projectId:PROJECT});
+  if(app.options.projectId!==PROJECT)throw Error('PROJECT_MISMATCH');
+  const db=getFirestore(app);
+  const result=await extractInvoice(req,{
+   verifyToken:token=>getAuth(app).verifyIdToken(token,true),
+   readPermissions:uid=>db.runTransaction(async tx=>{
+    const [account,role]=await tx.getAll(db.collection(ACCOUNT_COLLECTION).doc(uid),db.collection(ROLE_COLLECTION).doc(uid));
+    return {account:account.data(),role:role.data()};
+   },{readOnly:true}),
+   provider:simulatedGemini
+  });
+  res.status(result.status).json(result.body);
+ }catch{res.status(503).json({error:'UNAVAILABLE'});}
+});
