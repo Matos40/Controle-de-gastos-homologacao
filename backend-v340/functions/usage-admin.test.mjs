@@ -1,0 +1,15 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {isOperator,summarizeUsage,parseAdminBody,handleUsageAdmin} from './usage-admin.mjs';
+import {nextUsage,DEFAULT_LIMITS} from './usage.mjs';
+const uid='fixture',account={uid,plan:'free',blocked:false},role={active:true,role:'admin'},now=Date.parse('2026-11-17T12:00:00Z');
+test('active admin and owner authorized',()=>{assert.equal(isOperator(uid,account,role),true);assert.equal(isOperator(uid,account,{...role,role:'owner'}),true);});
+for(const [name,a,r] of [['premium ordinary',{...account,plan:'premium'},null],['blocked',{...account,blocked:true},role],['missing',null,role],['inactive',account,{...role,active:false}],['wrong UID',{...account,uid:'other'},role]])test(name,()=>assert.equal(isOperator(uid,a,r),false));
+test('empty usage and period reset',()=>{assert.deepEqual(summarizeUsage(undefined,DEFAULT_LIMITS,now).used,{minute:0,day:0,month:0});const u=nextUsage(undefined,now).next;assert.deepEqual(summarizeUsage(u,DEFAULT_LIMITS,now+86400000).used,{minute:0,day:0,month:1});});
+test('limit reached after quota reduction',()=>{const u=nextUsage(undefined,now).next;assert.deepEqual(summarizeUsage(u,{minute:1,day:1,month:1},now).reached,['minute','day','month']);});
+test('corrupt usage denied',()=>assert.throws(()=>summarizeUsage({},DEFAULT_LIMITS,now)));
+for(const body of [{action:'list',after:null},{action:'get',uid},{action:'set',uid,limits:DEFAULT_LIMITS,expectedVersion:0}])test('valid '+body.action,()=>assert.deepEqual(parseAdminBody(body),body));
+for(const body of [{action:'get',uid:'../x'},{action:'list',after:null,role:'owner'},{action:'set',uid,limits:{minute:0,day:1,month:2},expectedVersion:0},{action:'set',uid,limits:DEFAULT_LIMITS,expectedVersion:-1},{action:'get',uid,actorUid:'fake'},null])test('reject '+JSON.stringify(body),()=>assert.equal(parseAdminBody(body),null));
+test('missing auth never touches database',async()=>assert.equal((await handleUsageAdmin({method:'POST',body:{action:'list',after:null}},{verifyToken:()=>assert.fail()})).status,401));
+test('malformed token denied',async()=>assert.equal((await handleUsageAdmin({method:'POST',headers:{authorization:'Bearer fake'},body:{action:'list',after:null}},{verifyToken:async()=>{throw Error('private');}})).status,401));
+test('database unavailable fails closed',async()=>assert.deepEqual(await handleUsageAdmin({method:'POST',headers:{authorization:'Bearer fake'},body:{action:'list',after:null}},{verifyToken:async()=>({uid}),db:{collection:()=>({doc:()=>({})}),runTransaction:async()=>{throw Error('private');}}}),{status:503,body:{error:'ADMIN_UNAVAILABLE'}}));

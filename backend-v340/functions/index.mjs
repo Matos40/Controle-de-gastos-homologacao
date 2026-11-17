@@ -44,3 +44,15 @@ export const extractPremiumInvoice=onRequest({region:'us-central1',cors:false,ti
   res.status(result.status).json(result.body);
  }catch{res.status(503).json({error:'UNAVAILABLE'});}
 });
+
+import {handleUsageAdmin} from './usage-admin.mjs';
+export const usageAdmin=onRequest({region:'us-central1',cors:false,timeoutSeconds:30},async(req,res)=>{
+ res.set('Cache-Control','no-store');
+ try{
+  assertLocalEmulators();
+  const app=getApps()[0]??initializeApp({projectId:PROJECT});
+  if(app.options.projectId!==PROJECT)throw Error('PROJECT_MISMATCH');
+  const out=await handleUsageAdmin(req,{db:getFirestore(app),verifyToken:token=>getAuth(app).verifyIdToken(token,true)});
+  res.status(out.status).json(out.body);
+ }catch{res.status(503).json({error:'ADMIN_UNAVAILABLE'});}
+});

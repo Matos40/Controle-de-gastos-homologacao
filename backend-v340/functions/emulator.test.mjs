@@ -76,3 +76,26 @@ test('V34.2 real Firestore atomic reserve, fixed clock, concurrent duplicate, do
  const usage=await db.collection(USAGE_COLLECTION).doc(p.uid).get();assert.equal(usage.data().month.count,1);
  assert.equal((await db.collection(USAGE_COLLECTION).doc(p.uid).collection('attempts').get()).size,5);
 });
+
+test('V34.3 administrative authorization, transactional quota update, audit and real enforcement',async()=>{
+ const {LIMITS_COLLECTION}=await import('./usage.mjs');const {AUDIT_COLLECTION}=await import('./usage-admin.mjs');
+ const o=await fixture('v343-owner','free',false,{role:'owner',active:true}),a=await fixture('v343-admin','free',false,{role:'admin',active:true}),p=await fixture('v343-premium','premium'),b=await fixture('v343-blocked','free',true,{role:'admin',active:true});
+ const admin=async(u,body)=>{const res=await fetch(endpoint.replace('authorizePremiumFeature','usageAdmin'),{method:'POST',headers:{'content-type':'application/json',...(u?{authorization:'Bearer '+u.token}:{})},body:JSON.stringify(body),signal:AbortSignal.timeout(45000)});assert.equal(res.headers.get('cache-control'),'no-store');return {status:res.status,body:await res.json()};};
+ const list={action:'list',after:null},get={action:'get',uid:p.uid},set={action:'set',uid:p.uid,limits:{minute:1,day:1,month:1},expectedVersion:0};
+ for(const [u,status] of [[null,401],[p,403],[b,403],[a,200],[o,200]])assert.equal((await admin(u,list)).status,status);
+ assert.equal((await admin(a,get)).body.row.version,0);
+ assert.equal((await admin(a,{...set,uid:a.uid})).status,403);
+ assert.equal((await admin(a,{...set,uid:o.uid})).status,403);
+ const race=await Promise.all([admin(a,set),admin(a,set)]);assert.deepEqual(race.map(x=>x.status).sort(),[200,409]);
+ const doc=await db.collection(LIMITS_COLLECTION).doc(p.uid).get();assert.equal(doc.data().version,1);
+ const audits=await db.collection(AUDIT_COLLECTION).where('targetUid','==',p.uid).get();assert.equal(audits.size,1);assert.equal(audits.docs[0].data().actorUid,a.uid);assert.deepEqual(audits.docs[0].data().after,set.limits);
+ const reserve=createUsageStore(db);
+ assert.equal((await reserve({uid:p.uid,requestId:randomUUID()})).status,200);
+ assert.equal((await reserve({uid:p.uid,requestId:randomUUID()})).status,429);
+ const row=(await admin(o,get)).body.row;assert.equal(row.used.month,1);assert.ok(row.reached.includes('month'));
+ assert.equal((await admin(o,{...set,expectedVersion:1,limits:{minute:2,day:2,month:2}})).status,200);
+ assert.equal((await reserve({uid:p.uid,requestId:randomUUID()})).status,200);
+ await a.operator.update({active:false});assert.equal((await admin(a,get)).status,403);
+ const page=await admin(o,list);assert.equal(page.status,200);assert.ok(page.body.rows.length<=25);assert.equal(page.body.totals.month,page.body.rows.reduce((sum,x)=>sum+x.used.month,0));
+ if(page.body.next){const next=await admin(o,{action:'list',after:page.body.next});assert.equal(next.status,200);assert.ok(next.body.rows.every(x=>!page.body.rows.some(y=>y.uid===x.uid)));}
+});

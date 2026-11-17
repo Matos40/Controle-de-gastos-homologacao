@@ -1,5 +1,6 @@
 import {decidePremium,ACCOUNT_COLLECTION,ROLE_COLLECTION} from './policy.mjs';
 export const USAGE_COLLECTION='raytechLabUsageV342';
+export const LIMITS_COLLECTION='raytechLabLimitsV343';
 export const DEFAULT_LIMITS=Object.freeze({minute:3,day:20,month:100});
 const validUid=uid=>typeof uid==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(uid);
 export const validRequestId=id=>typeof id==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id);
@@ -33,10 +34,10 @@ export function createUsageStore(db,{limits=DEFAULT_LIMITS,clock=Date.now}={}){
   const user=db.collection(USAGE_COLLECTION).doc(uid),request=user.collection('attempts').doc(requestId);
   try{
    return await db.runTransaction(async tx=>{
-    const [profile,role,usage,attempt]=await tx.getAll(db.collection(ACCOUNT_COLLECTION).doc(uid),db.collection(ROLE_COLLECTION).doc(uid),user,request);
+    const [profile,role,usage,attempt,override]=await tx.getAll(db.collection(ACCOUNT_COLLECTION).doc(uid),db.collection(ROLE_COLLECTION).doc(uid),user,request,db.collection(LIMITS_COLLECTION).doc(uid));
     if(!decidePremium(uid,profile.data(),role.data()))return {status:403,error:'ACCESS_DENIED'};
     if(attempt.exists)return {status:409,error:'DUPLICATE_REQUEST'};
-    const now=clock(),decision=nextUsage(usage.data(),now,cap);
+    const now=clock(),decision=nextUsage(usage.data(),now,override.exists?validateLimits(override.data().limits):cap);
     if(decision.status!==200)return decision;
     tx.set(user,decision.next);
     tx.create(request,{reservedAt:now});
