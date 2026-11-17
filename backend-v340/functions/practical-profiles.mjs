@@ -13,9 +13,9 @@ export async function prepareProfiles(){
   const res=await fetch('http://127.0.0.1:19099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-key',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:role+'-'+session+'@example.invalid',password:randomUUID(),returnSecureToken:true}),signal:AbortSignal.timeout(10000)});
   if(!res.ok)throw Error('FIXTURE_FAILED');
   const u=await res.json(),batch=db.batch();
-  batch.create(db.collection(ACCOUNT_COLLECTION).doc(u.localId),{uid:u.localId,plan:role==='premium'?'premium':'free',blocked:false});
+  batch.create(db.collection(ACCOUNT_COLLECTION).doc(u.localId),{uid:u.localId,plan:role==='premium'?'premium':'free',blocked:false,name:({free:'Conta Free',premium:'Conta Premium',admin:'Administrador',owner:'Proprietário'})[role],email:role+'@example.invalid'});
   if(['admin','owner'].includes(role))batch.create(db.collection(ROLE_COLLECTION).doc(u.localId),{role,active:true});
-  await batch.commit();profiles.set(role,{uid:u.localId,token:u.idToken});
+  await batch.commit();profiles.set(role,{uid:u.localId,token:u.idToken,name:({free:'Conta Free',premium:'Conta Premium',admin:'Administrador',owner:'Proprietário'})[role],role});
  }
  return profiles;
 }

@@ -1,0 +1,3 @@
+export function identityFromClaims(c){if(c.email_verified!==true||c.firebase?.sign_in_provider!=='google.com'||typeof c.email!=='string'||!c.email||c.email.length>320)throw Error('VERIFIED_GOOGLE_REQUIRED');return {email:c.email,name:typeof c.name==='string'?c.name:'',photo:typeof c.picture==='string'?c.picture:''};}
+export function accountLabel(a){return a?.name||a?.email||'Identificação pendente';}
+export function filterAccounts(accounts,search,plan,state){const q=search.trim().toLocaleLowerCase('pt-BR');return accounts.filter(a=>(!q||[a.name,a.email,a.uid].some(v=>String(v||'').toLocaleLowerCase('pt-BR').includes(q)))&&(!plan||a.plan===plan)&&(!state||a.blocked===(state==='blocked')));}

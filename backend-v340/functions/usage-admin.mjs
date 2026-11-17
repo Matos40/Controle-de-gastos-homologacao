@@ -46,10 +46,11 @@ export async function handleUsageAdmin(req,{db,verifyToken,clock=Date.now}){
    const readRow=async doc=>{
     const target=doc.id,account=doc.data();
     if(account?.uid!==target||!['free','premium'].includes(account.plan)||typeof account.blocked!=='boolean')throw Error('INVALID_ACCOUNT');
-    const [u,l]=await tx.getAll(usage.doc(target),limits.doc(target));
+    const [u,l,operator]=await tx.getAll(usage.doc(target),limits.doc(target),roles.doc(target));
     const settings=l.data();
     if(l.exists&&(!Number.isSafeInteger(settings.version)||settings.version<1))throw Error('INVALID_VERSION');
-    return {uid:target,plan:account.plan,blocked:account.blocked,version:settings?.version??0,...summarizeUsage(u.data(),l.exists?settings.limits:DEFAULT_LIMITS,now)};
+    const targetRole=operator.data()?.active===true&&['owner','admin'].includes(operator.data()?.role)?operator.data().role:null;
+    return {uid:target,name:typeof account.name==='string'?account.name.slice(0,120):'',email:typeof account.email==='string'?account.email.slice(0,320):'',role:targetRole,editable:role.data().role==='owner'||(target!==uid&&!targetRole),plan:account.plan,blocked:account.blocked,version:settings?.version??0,...summarizeUsage(u.data(),l.exists?settings.limits:DEFAULT_LIMITS,now)};
    };
    if(body.action==='list'){
     let query=accounts.orderBy(FieldPath.documentId()).limit(26);

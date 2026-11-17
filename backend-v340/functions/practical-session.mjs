@@ -17,8 +17,8 @@ try{
   await new Promise(r=>setTimeout(r,500));
  }
  if(!ready)throw Error('LAB_START_FAILED');
- if(process.platform==='win32')execFile('rundll32.exe',['url.dll,FileProtocolHandler','http://127.0.0.1:15002/rc'],()=>{});
- console.log('Raytech CG: http://127.0.0.1:15002/rc');
+ if(process.platform==='win32')execFile('rundll32.exe',['url.dll,FileProtocolHandler','http://127.0.0.1:15002/app'],()=>{});
+ console.log('Raytech CG: http://127.0.0.1:15002/app');
  console.log('Pressione ENTER para encerrar os emuladores com seguranca.');
  rl=createInterface({input:process.stdin,output:process.stdout});
  await Promise.race([once(rl,'line'),closed]);
