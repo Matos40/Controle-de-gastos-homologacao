@@ -1,0 +1,2 @@
+# V34.5 online candidate (partial)
+Firebase Spark: client-only synthetic invoice; no cloud functions, payments or Gemini. Collections raytechV345Accounts, raytechV345Roles, raytechV345Finance reserved exclusively for synthetic data. Rules are additive candidates, not verified against current deployed rules. Do not publish rules until reviewed with existing live rules and emulator tests. The online model is a small isolated candidate, not the full official dashboard. No deployment is authorized by this file.

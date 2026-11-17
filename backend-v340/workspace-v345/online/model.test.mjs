@@ -1,0 +1,4 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {scope,blank,append,balance,simulatedInvoice,validate} from './model.mjs';
+test('UID and bank isolation',()=>{assert.equal(new Set(['a','b'].flatMap(u=>['v2-main','v2-clean','legacy'].map(k=>scope(u,k)))).size,6);assert.throws(()=>scope('a','production'));});
+test('synthetic invoice review is nonmutating and confirmation idempotent',()=>{const d=blank(),items=simulatedInvoice('fixture');assert.equal(d.entries.length,0);const next=append(d,items);assert.equal(balance(next),-16090);assert.deepEqual(append(next,items),next);assert.equal(d.entries.length,0);});
+test('invalid amounts and duplicate identifiers denied',()=>{assert.throws(()=>validate({salary:-1,entries:[]}));const items=simulatedInvoice('fixture');assert.throws(()=>append(append(blank(),items),[{...items[0],cents:1}]));});

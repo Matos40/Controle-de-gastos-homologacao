@@ -1,0 +1,7 @@
+export const banks=Object.freeze(['v2-main','v2-clean','legacy']);
+export function scope(uid,bank){if(typeof uid!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(uid)||!banks.includes(bank))throw Error('INVALID_SCOPE');return 'raytech-v345-online:'+uid+':'+bank;}
+export function validate(d){if(!d||!Number.isSafeInteger(d.salary)||d.salary<0||!Array.isArray(d.entries)||d.entries.length>500)throw Error('INVALID_DATA');const ids=new Set();for(const e of d.entries){if(!e||typeof e.id!=='string'||ids.has(e.id)||typeof e.title!=='string'||!e.title.trim()||e.title.length>100||!Number.isSafeInteger(e.cents)||e.cents<=0||!['expense','card','income'].includes(e.kind))throw Error('INVALID_ENTRY');ids.add(e.id);}return d;}
+export function append(d,entries){validate(d);const next=structuredClone(d);for(const e of entries){const old=next.entries.find(x=>x.id===e.id);if(old){if(JSON.stringify(old)!==JSON.stringify(e))throw Error('ID_REUSE');continue;}next.entries.push(e);}return validate(next);}
+export const blank=()=>({salary:0,entries:[]});
+export function balance(d){validate(d);return d.salary+d.entries.reduce((n,e)=>n+(e.kind==='income'?e.cents:-e.cents),0);}
+export function simulatedInvoice(requestId){if(typeof requestId!=='string'||!/^[A-Za-z0-9_-]{1,100}$/.test(requestId))throw Error('INVALID_ID');return [{id:requestId+':1',title:'Mercado fictício',cents:12590,kind:'card'},{id:requestId+':2',title:'Transporte fictício',cents:3500,kind:'card'}];}

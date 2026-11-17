@@ -1,0 +1,49 @@
+// Insert inside the existing match /databases/{database}/documents.
+// Never replace the existing live rules. Homologation only.
+match /raytechV345Accounts/{uid} {
+  function self() { return request.auth != null && request.auth.uid == uid; }
+  function operator() {
+    return request.auth != null
+      && exists(/databases/$(database)/documents/raytechV345Roles/$(request.auth.uid))
+      && get(/databases/$(database)/documents/raytechV345Roles/$(request.auth.uid)).data.active == true
+      && get(/databases/$(database)/documents/raytechV345Roles/$(request.auth.uid)).data.role in ['owner','admin']
+      && get(/databases/$(database)/documents/raytechV345Accounts/$(request.auth.uid)).data.blocked == false;
+  }
+  allow get: if self() || operator();
+  allow list: if operator() && request.query.limit <= 100;
+  allow create: if self() && request.resource.data.keys().hasOnly(['uid','name','plan','blocked'])
+    && request.resource.data.uid == uid && request.resource.data.name is string
+    && request.resource.data.name.size() <= 80 && request.resource.data.plan == 'free'
+    && request.resource.data.blocked == false;
+  allow update: if operator() && !self()
+    && !exists(/databases/$(database)/documents/raytechV345Roles/$(uid))
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plan','blocked'])
+    && request.resource.data.plan in ['free','premium'] && request.resource.data.blocked is bool;
+  allow delete: if false;
+}
+match /raytechV345Roles/{uid} {
+  allow get: if request.auth != null && (request.auth.uid == uid ||
+    (exists(/databases/$(database)/documents/raytechV345Roles/$(request.auth.uid))
+      && get(/databases/$(database)/documents/raytechV345Roles/$(request.auth.uid)).data.active == true
+      && get(/databases/$(database)/documents/raytechV345Roles/$(request.auth.uid)).data.role in ['owner','admin']
+      && get(/databases/$(database)/documents/raytechV345Accounts/$(request.auth.uid)).data.blocked == false));
+  allow list, write: if false;
+}
+match /raytechV345Finance/{uid}/banks/{bank} {
+  function allowed() {
+    return request.auth != null && request.auth.uid == uid
+      && bank in ['v2-main','v2-clean','legacy']
+      && exists(/databases/$(database)/documents/raytechV345Accounts/$(uid))
+      && get(/databases/$(database)/documents/raytechV345Accounts/$(uid)).data.blocked == false;
+  }
+  function valid() {
+    let d = request.resource.data;
+    return d.keys().hasOnly(['revision','payload']) && d.revision is int
+      && d.revision >= 1 && d.revision <= 9007199254740991
+      && d.payload is string && d.payload.size() <= 180000;
+  }
+  allow get: if allowed();
+  allow create: if allowed() && valid() && request.resource.data.revision == 1;
+  allow update: if allowed() && valid() && request.resource.data.revision == resource.data.revision + 1;
+  allow list, delete: if false;
+}
