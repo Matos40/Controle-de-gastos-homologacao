@@ -30,6 +30,9 @@ jobs:
         run: |
           npm outdated --json > outdated.json || true
           npm audit --omit=dev --json > audit.json || true
+          node -e 'const a=require("./audit.json"); if(!a.metadata?.vulnerabilities)process.exit(1); console.log(JSON.stringify(a.metadata.vulnerabilities))'
+          sha256sum package-lock.json
+          printf 'LOCKFILE_B64_BEGIN\n'; base64 -w 0 package-lock.json; printf '\nLOCKFILE_B64_END\n'
       - uses: actions/upload-artifact@v4
         with:
           name: v341-dependency-evidence
