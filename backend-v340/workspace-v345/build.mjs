@@ -4,11 +4,13 @@ import path from 'node:path';
 import {build} from 'esbuild';
 import postcss from 'postcss';
 import tailwind from 'tailwindcss';
+import {transparentOfficialIcon} from './app-identity.mjs';
 
 const out = 'dist';
 await rm(out, {force: true, recursive: true});
 await mkdir(out);
 await cp('official', out, {recursive: true});
+for (const size of [192,512]) await writeFile(out+'/raytech-app-'+size+'.png',transparentOfficialIcon(await readFile('official/raytech-icon-'+size+'.png')));
 await mkdir(out + '/vendor');
 
 let html = await readFile('official/index.html', 'utf8');
@@ -59,7 +61,7 @@ replace(/<p hidden id="productionCloudStatus"/, inspection.replace('Verificar co
 replace(/<button id="smartAdminOpen"[\s\S]*?<\/button>/, '');
 replace(/(<header class="raytech-header-shell[^>]*>)/, '$1' + `
 <div class="v345-account">
-  <span class="v345-environment">V34.6.2 · Homologação · Dados sintéticos</span>
+  <span class="v345-environment">V34.6.3 · Homologação · Dados sintéticos</span>
   <details class="v345-profile">
     <summary aria-label="Perfil e opções da conta"><span id="v345Avatar" aria-hidden="true"></span><strong id="v345Identity"></strong><span class="v345-chevron" aria-hidden="true">⌄</span></summary>
     <div class="v345-profile-menu">
