@@ -22,7 +22,7 @@ O build empacota as fontes Orbitron e Plus Jakarta Sans com licenças OFL, estil
 O único destino do build online é `raytech-cg-homologacao`, com Hosting estático no plano Spark. O cliente exige HTTPS no domínio oficial de homologação e confere o ID do app Web na configuração fornecida pelo Hosting. O provedor Google está habilitado nesse projeto.
 
 1. Revise o artefato e a [Issue #8](https://github.com/Matos40/Controle-de-gastos-homologacao/issues/8).
-2. Compare `online/firestore-additive.rules.txt` com as regras atuais. Insira o bloco dentro do match do banco e valide o arquivo combinado no emulador, incluindo as coleções preexistentes. Faça a revisão e aplicação das regras como operação separada do Hosting.
+2. Compare `online/firestore-additive.rules.txt` com as regras atuais. Insira o bloco dentro do match do banco e valide o arquivo combinado no emulador, incluindo as coleções preexistentes. Para gerar a cópia local combinada, use `npm run prepare:emulators -- /caminho/para/regras-ativas.txt`. Faça a revisão e aplicação das regras como operação separada do Hosting.
 3. Prepare as contas de teste e as atribuições Owner/Admin pelos controles IAM já autorizados. O próprio cliente só cria perfis Free.
 4. Na publicação autorizada, use `firebase deploy --config hosting.json --project raytech-cg-homologacao --only hosting`. A configuração contém somente Hosting.
 5. Verifique com contas de teste login Google, bloqueio, revisão, sincronização explícita, isolamento e saída. Para reverter o Hosting, selecione a versão anterior no histórico de releases do site de homologação.

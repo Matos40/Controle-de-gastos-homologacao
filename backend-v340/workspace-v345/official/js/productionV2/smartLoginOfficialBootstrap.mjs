@@ -72,12 +72,27 @@ async function observe(user) {
     if (generation !== epoch || auth.currentUid() !== uid) return;
     if (account?.blocked) { blocked(uid); return; }
     if (!offline) cacheOfflineGrant(raw, identity);
+    const avatar = document.getElementById('v345Avatar');
+    const label = user.displayName || account?.name || 'Conta de teste';
+    avatar.textContent = label.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
+    if (location.protocol === 'https:' && user.photoURL) {
+      try {
+        const photo = new URL(user.photoURL);
+        if (photo.origin === 'https://lh3.googleusercontent.com' && !photo.username && !photo.password) {
+          const image = document.createElement('img');
+          image.alt = '';
+          image.referrerPolicy = 'no-referrer';
+          image.onload = () => { if (activeSession(uid)) avatar.replaceChildren(image); };
+          image.src = photo.href;
+        }
+      } catch {}
+    }
     const paintPlan = plan => {
       const cloudPlan = role ? 'premium' : plan;
       window.raytechCloudEntitlement = cloudEntitlement({plan: cloudPlan, role, verified: !offline});
       invoiceAllowed = !offline && (plan === 'premium' || !!role);
       document.getElementById('v345Identity').textContent =
-        (user.displayName || account?.name || 'Conta de teste') + ' · ' +
+        label + ' · ' +
         (role === 'owner' ? 'Owner' : role === 'admin' ? 'Admin' : plan === 'premium' ? 'Premium' : 'Free');
       notify();
     };

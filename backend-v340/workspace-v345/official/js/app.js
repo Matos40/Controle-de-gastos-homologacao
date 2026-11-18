@@ -297,8 +297,6 @@ async function triggerNativePwaInstall() {
       updateMonthHeader();
       renderAll();
       bindSummaryNavigation();
-      setupPasteAndDropEvents();
-      updateApiKeyStatusBadge();
       checkPinLockOnStartup();
 
       salaryInput.addEventListener('input', (e) => {
@@ -318,7 +316,6 @@ async function triggerNativePwaInstall() {
       });
     });
 
-    // Configuração de Drag & Drop e Colar Imagem
     function openIncomeModal(editId = null) {
       const modal = document.getElementById('incomeModal');
       const titleEl = document.getElementById('incomeModalTitle');

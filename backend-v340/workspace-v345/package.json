@@ -18,13 +18,13 @@
     "tailwindcss": "3.4.19",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
-  "private": "true",
+  "private": true,
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.0",
-    "playwright": "1.56.1"
+    "playwright": "1.56.1",
+    "postcss": "8.5.33"
   },
   "overrides": {
-    "@grpc/grpc-js": "1.14.7",
-    "picomatch": "2.3.2"
+    "@grpc/grpc-js": "1.14.7"
   }
 }

@@ -103,13 +103,13 @@
                 </div>
                 <div class="flex items-center gap-1 shrink-0">
                   <button 
-                    onclick="openEditExpenseModal(${escapeHtml(JSON.stringify(String(item.id)))})" 
+                    onclick="openEditExpenseModal(${escapeHtml(JSON.stringify(String(item.id)))})"
                     class="w-7 h-7 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 flex items-center justify-center text-xs"
                   >
                     <i class="fa-solid fa-pen text-[10px]"></i>
                   </button>
                   <button 
-                    onclick="promptDeleteExpense(${escapeHtml(JSON.stringify(String(item.id)))})" 
+                    onclick="promptDeleteExpense(${escapeHtml(JSON.stringify(String(item.id)))})"
                     class="w-7 h-7 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-rose-400 flex items-center justify-center text-xs"
                   >
                     <i class="fa-regular fa-trash-can text-[10px]"></i>
@@ -146,14 +146,14 @@
                 
                 <div class="flex items-center gap-1">
                   <button 
-                    onclick="openEditExpenseModal(${escapeHtml(JSON.stringify(String(item.id)))})" 
+                    onclick="openEditExpenseModal(${escapeHtml(JSON.stringify(String(item.id)))})"
                     title="Editar despesa"
                     class="w-7 h-7 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition flex items-center justify-center text-xs"
                   >
                     <i class="fa-solid fa-pen"></i>
                   </button>
                   <button 
-                    onclick="promptDeleteExpense(${escapeHtml(JSON.stringify(String(item.id)))})" 
+                    onclick="promptDeleteExpense(${escapeHtml(JSON.stringify(String(item.id)))})"
                     title="Excluir despesa"
                     class="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition flex items-center justify-center text-xs"
                   >

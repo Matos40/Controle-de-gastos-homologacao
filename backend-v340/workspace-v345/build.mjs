@@ -58,7 +58,7 @@ replace(/<button id="smartAdminOpen"[\s\S]*?<\/button>/, '');
 replace(/(<header class="raytech-header-shell[^>]*>)/, '$1' + `
 <div class="v345-account">
   <span>V34.5 · Homologação · Dados sintéticos</span>
-  <strong id="v345Identity"></strong>
+  <span id="v345Avatar" aria-hidden="true"></span><strong id="v345Identity"></strong>
   <button id="smartAdminOpen" hidden type="button" class="admin-action">Smart Admin</button>
   <button id="v345Logout" type="button" class="admin-action">Sair</button>
 </div>`);

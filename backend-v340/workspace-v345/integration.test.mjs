@@ -30,7 +30,7 @@ async function seedAccount(name, plan, operator) {
   accounts[name] = {uid, email};
   await env.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
-    await setDoc(account(db, uid), {uid, name, plan, blocked: false});
+    await setDoc(account(db, uid), {uid, name, plan, blocked: false, ...(name === 'premium' ? {limits: {minute: 2, day: 2, month: 100}} : {})});
     if (operator) await setDoc(role(db, uid), {role: operator, active: true});
   });
 }
@@ -52,6 +52,11 @@ const dbAs = name => env.authenticatedContext(accounts[name].uid).firestore();
 test('Firestore isolates accounts, protects privileged profiles and requires atomic finance receipts', async () => {
   const premium = accounts.premium.uid;
   const db = dbAs('premium');
+
+  if (process.env.V345_COMBINED_RULES === '1') {
+    await assertSucceeds(setDoc(doc(db, 'users', premium, 'test', 'synthetic'), {ok: true}));
+    await assertFails(getDoc(doc(dbAs('free'), 'users', premium, 'test', 'synthetic')));
+  }
   await assertFails(getDoc(account(db, accounts.free.uid)));
   await assertFails(updateDoc(account(db, premium), {plan: 'free'}));
   await assertFails(setDoc(role(db, premium), {active: true, role: 'owner'}));
@@ -104,6 +109,7 @@ test('Chromium integrates synthetic finance, review, quota, role changes and ses
     await page.evaluate(() => localStorage.setItem('controle_gastos_multimonth_v3', 'banco-original'));
     await login(page, 'premium');
     await page.locator('#salaryInput').fill('2000');
+    assert.equal(await page.evaluate(() => appDb.months[appDb.selectedMonth].salary), 2000);
     await page.locator('#headerToolsToggleBtn').click();
     await page.locator('#premiumInvoiceButton').click();
     await page.locator('#simulatedExtract').click();
@@ -118,6 +124,12 @@ test('Chromium integrates synthetic finance, review, quota, role changes and ses
     assert.equal(await readCards(), 2);
     await page.locator('#simulatedClose').click();
 
+    await page.locator('#headerToolsToggleBtn').click();
+    await page.locator('#premiumInvoiceButton').click();
+    await page.locator('#simulatedExtract').click();
+    await page.getByText(/Cota atingida/).waitFor();
+    assert.equal(await page.locator('#simulatedConfirm').isDisabled(), true);
+    await page.locator('#simulatedClose').click();
     const head = doc(dbAs('premium'), 'raytechV345Finance', accounts.premium.uid, 'banks', 'v2-main');
     assert.equal((await getDoc(head)).exists(), false);
     const backups = await Promise.all([
@@ -137,12 +149,20 @@ test('Chromium integrates synthetic finance, review, quota, role changes and ses
       await new Promise(resolve => setTimeout(resolve, 250));
     }
     const synced = (await getDoc(head)).data();
-    assert.ok(synced);
+    assert.ok(synced, (await page.locator('#productionCloudStatus').textContent()) + ' ' + JSON.stringify(errors));
     assert.match(synced.payload, /Mercado fictício/);
     await context.setOffline(true);
     await page.locator('#salaryInput').fill('2500');
     assert.equal(await page.evaluate(() => appDb.months[appDb.selectedMonth].salary), 2500);
     await context.setOffline(false);
+    let remoteSalary = null;
+    for (let retry = 0; retry < 30 && remoteSalary !== 2500; retry++) {
+      const remote = (await getDoc(head)).data();
+      const state = JSON.parse(remote.payload);
+      remoteSalary = state.months[state.selectedMonth].salary;
+      if (remoteSalary !== 2500) await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    assert.equal(remoteSalary, 2500);
     await page.goto(origin + '?workspace=v2-clean');
     await page.locator('#smartAccountApp').waitFor({state: 'visible'});
     await page.waitForFunction(() => window.productionCleanWorkspaceReady === true);
@@ -150,6 +170,7 @@ test('Chromium integrates synthetic finance, review, quota, role changes and ses
     await page.goto(origin + '?workspace=legacy');
     await page.locator('#smartAccountApp').waitFor({state: 'visible'});
     assert.equal(await page.evaluate(() => localStorage.getItem('controle_gastos_multimonth_v3')), 'banco-original');
+    if (await page.locator('#onboardingSkip').isVisible()) await page.locator('#onboardingSkip').click();
     await page.locator('#v345Logout').click();
     await page.locator('[data-login-enter]').waitFor({state: 'visible'});
     await page.goto(origin);
@@ -159,7 +180,7 @@ test('Chromium integrates synthetic finance, review, quota, role changes and ses
     await page.locator('#smartAdminOpen').click();
     const premium = page.locator('.admin-row').filter({hasText: 'premium'});
     await premium.getByRole('button', {name: 'Editar cotas e acesso'}).click();
-    await page.getByLabel('Minuto UTC').fill('1');
+    await page.getByRole('spinbutton', {name: 'Minuto UTC', exact: true}).fill('1');
     await page.getByRole('button', {name: 'Salvar alterações'}).click();
     await page.getByText(/Alterações salvas/).waitFor();
     assert.equal(await page.locator('.admin-row[data-plan=admin]').getByRole('button').count(), 0);

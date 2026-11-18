@@ -20,3 +20,5 @@
 .v345-edit { display: grid; gap: .55rem; margin-top: .8rem; }
 .v345-edit label { display: flex; justify-content: space-between; gap: .5rem; }
 .v345-edit :is(input, select) { padding: .35rem; color: #e2e8f0; background: #06182e; border: 1px solid #3a607d; border-radius: .35rem; }
+#v345Avatar { display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; overflow: hidden; color: #bae6fd; background: #0c4a6e; font-size: .62rem; font-weight: 700; }
+#v345Avatar img { width: 100%; height: 100%; object-fit: cover; }
