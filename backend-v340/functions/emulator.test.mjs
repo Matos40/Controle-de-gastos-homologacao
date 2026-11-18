@@ -41,7 +41,7 @@ test('V34.1 HTTP extraction authorizes within request and never writes financial
  await f.profile.update({plan:'premium'});assert.equal((await extract(f)).status,200);await f.profile.update({plan:'free'});assert.equal((await extract(f)).status,403);
  await a.operator.update({active:false});assert.equal((await extract(a)).status,403);
  assert.deepEqual((await p.profile.get()).data(),{uid:p.uid,plan:'premium',blocked:false});
- const collections=await db.listCollections();assert.ok(collections.every(c=>[ACCOUNT_COLLECTION,ROLE_COLLECTION,USAGE_COLLECTION].includes(c.id)));
+ const collections=await db.listCollections();assert.ok(collections.every(c=>[ACCOUNT_COLLECTION,ROLE_COLLECTION,USAGE_COLLECTION,'raytechLabGlobalBudgetV3471'].includes(c.id)));
 });
 
 test('V34.2 real HTTP concurrent requests never exceed per-UID minute quota and duplicates do not count',async()=>{
@@ -101,4 +101,22 @@ test('V34.3 administrative authorization, transactional quota update, audit and 
  await a.operator.update({active:false});assert.equal((await admin(a,get)).status,403);
  const page=await admin(o,list);assert.equal(page.status,200);assert.ok(page.body.rows.length<=25);assert.equal(page.body.totals.month,page.body.rows.reduce((sum,x)=>sum+x.used.month,0));
  if(page.body.next){const next=await admin(o,{action:'list',after:page.body.next});assert.equal(next.status,200);assert.ok(next.body.rows.every(x=>!page.body.rows.some(y=>y.uid===x.uid)));}
+});
+
+
+test('V34.7.1 global budget atomic across accounts, duplicate, authorized admin totals and direct HTTP',async()=>{
+ const {BUDGET_COLLECTION,LAB_BUDGET}=await import('./global-budget.mjs');
+ const p=await fixture('v3471-premium','premium'),q=await fixture('v3471-other','premium'),o=await fixture('v3471-owner','free',false,{role:'owner',active:true}),f=await fixture('v3471-free');
+ const ref=db.collection(BUDGET_COLLECTION).doc('global'),now=Date.now(),iso=new Date(now).toISOString();
+ await ref.set({lastAt:now,day:{period:iso.slice(0,10),reserved:LAB_BUDGET.day-LAB_BUDGET.perAttempt,attempts:24},month:{period:iso.slice(0,7),reserved:LAB_BUDGET.day-LAB_BUDGET.perAttempt,attempts:24}});
+ const body={feature:'invoice-ai',mimeType:'application/pdf',data:Buffer.from('%PDF-1.4\n% synthetic\n%%EOF\n').toString('base64')};
+ const run=async(u,id=randomUUID())=>{const res=await fetch(endpoint.replace('authorizePremiumFeature','extractPremiumInvoice'),{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+u.token,'x-request-id':id},body:JSON.stringify(body),signal:AbortSignal.timeout(45000)});return {status:res.status,body:await res.json()};};
+ const ids=[randomUUID(),randomUUID()];const results=await Promise.all([run(p,ids[0]),run(q,ids[1])]);assert.deepEqual(results.map(x=>x.status).sort(),[200,429]);
+ const winner=results[0].status===200?p:q,loser=winner===p?q:p;
+ assert.equal(results.find(x=>x.status===429).body.error,'GLOBAL_BUDGET_EXCEEDED');
+ assert.equal((await run(winner,ids[winner===p?0:1])).status,409);assert.equal((await run(f)).status,403);
+ assert.equal((await db.collection(USAGE_COLLECTION).doc(winner.uid).get()).data().day.count,1);
+ assert.equal((await db.collection(USAGE_COLLECTION).doc(loser.uid).get()).exists,false);
+ const admin=async u=>{const res=await fetch(endpoint.replace('authorizePremiumFeature','usageAdmin'),{method:'POST',headers:{authorization:'Bearer '+u.token,'content-type':'application/json'},body:JSON.stringify({action:'list',after:null})});return {status:res.status,body:await res.json()};};
+ assert.equal((await admin(f)).status,403);const output=await admin(o);assert.equal(output.status,200);assert.equal(output.body.global.used.day,LAB_BUDGET.day);assert.equal(output.body.global.attempts.day,25);assert.equal(output.body.global.simulated,true);
 });

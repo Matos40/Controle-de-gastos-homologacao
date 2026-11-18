@@ -1,3 +1,4 @@
+import {BUDGET_COLLECTION,validateBudget,reserveBudget} from './global-budget.mjs';
 import {decidePremium,ACCOUNT_COLLECTION,ROLE_COLLECTION} from './policy.mjs';
 export const USAGE_COLLECTION='raytechLabUsageV342';
 export const LIMITS_COLLECTION='raytechLabLimitsV343';
@@ -27,8 +28,8 @@ export function nextUsage(previous,now,limits=DEFAULT_LIMITS){
 }
 // Transactions reserve an attempt, not a successful response. No automatic refund:
 // provider failure or uncertain client disconnect may already have incurred cost.
-export function createUsageStore(db,{limits=DEFAULT_LIMITS,clock=Date.now}={}){
- const cap=validateLimits(limits);
+export function createUsageStore(db,{limits=DEFAULT_LIMITS,clock=Date.now,budget=null}={}){
+ const cap=validateLimits(limits),globalCap=budget===null?null:validateBudget(budget);
  return async ({uid,requestId})=>{
   if(!validUid(uid)||!validRequestId(requestId))return {status:400,error:'INVALID_REQUEST_ID'};
   const user=db.collection(USAGE_COLLECTION).doc(uid),request=user.collection('attempts').doc(requestId);
@@ -39,6 +40,7 @@ export function createUsageStore(db,{limits=DEFAULT_LIMITS,clock=Date.now}={}){
     if(attempt.exists)return {status:409,error:'DUPLICATE_REQUEST'};
     const now=clock(),decision=nextUsage(usage.data(),now,override.exists?validateLimits(override.data().limits):cap);
     if(decision.status!==200)return decision;
+    if(globalCap){const ref=db.collection(BUDGET_COLLECTION).doc('global'),snapshot=await tx.get(ref),global=reserveBudget(snapshot.data(),now,globalCap);if(global.status!==200)return global;tx.set(ref,global.next);}
     tx.set(user,decision.next);
     tx.create(request,{reservedAt:now});
     return {status:200};

@@ -23,6 +23,7 @@ export const authorizePremiumFeature=onRequest({region:'us-central1',cors:false}
 });
 
 import {extractInvoice} from './invoice.mjs';
+import {LAB_BUDGET} from './global-budget.mjs';
 import {createUsageStore} from './usage.mjs';
 import {simulatedGemini} from './gemini-provider.mjs';
 export const extractPremiumInvoice=onRequest({region:'us-central1',cors:false,timeoutSeconds:30},async(req,res)=>{
@@ -38,7 +39,7 @@ export const extractPremiumInvoice=onRequest({region:'us-central1',cors:false,ti
     const [account,role]=await tx.getAll(db.collection(ACCOUNT_COLLECTION).doc(uid),db.collection(ROLE_COLLECTION).doc(uid));
     return {account:account.data(),role:role.data()};
    },{readOnly:true}),
-   reserveUsage:createUsageStore(db),
+   reserveUsage:createUsageStore(db,{budget:LAB_BUDGET}),
    provider:simulatedGemini
   });
   res.status(result.status).json(result.body);

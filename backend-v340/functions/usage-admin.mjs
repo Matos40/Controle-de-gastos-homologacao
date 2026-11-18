@@ -1,3 +1,4 @@
+import {BUDGET_COLLECTION,budgetView} from './global-budget.mjs';
 import {randomUUID} from 'node:crypto';
 import {FieldPath} from 'firebase-admin/firestore';
 import {ACCOUNT_COLLECTION,ROLE_COLLECTION} from './policy.mjs';
@@ -60,7 +61,8 @@ export async function handleUsageAdmin(req,{db,verifyToken,clock=Date.now}){
     for(const doc of docs)rows.push(await readRow(doc));
     const totals={minute:0,day:0,month:0,atLimit:0};
     for(const row of rows){for(const k of ['minute','day','month'])totals[k]+=row.used[k];if(row.reached.length)totals.atLimit++;}
-    return result(200,{rows,totals,next:page.size>25?docs.at(-1).id:null,periods:windows(now)});
+    const global=budgetView((await tx.get(db.collection(BUDGET_COLLECTION).doc('global'))).data(),now);
+    return result(200,{global,rows,totals,next:page.size>25?docs.at(-1).id:null,periods:windows(now)});
    }
    const target=await tx.get(accounts.doc(body.uid));
    if(!target.exists)return error(404,'NOT_FOUND');
