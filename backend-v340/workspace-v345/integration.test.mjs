@@ -197,7 +197,13 @@ test('Chromium integrates synthetic finance, review, quota, role changes and ses
     await page.locator('#smartAdminOpen').click();
     await page.locator('.v345-admin-rows .admin-row').first().waitFor();
     assert.equal(await page.locator('.admin-stat').count(), 10);
-    assert.equal(await page.locator('button.admin-stat').count(),6);assert.equal(await page.locator('.v3467-monitor').getAttribute('open'),null);assert.equal(await page.locator('.v3467-columns span').count(),6);await page.locator('button.admin-stat[data-filter=Administradores]').click();assert.equal(await page.locator('.admin-row').count(),2);await page.locator('button.admin-stat[data-filter=Usuários]').click();
+    assert.equal(await page.locator('button.admin-stat').count(), 6);
+    assert.equal(await page.locator('.v3467-monitor').getAttribute('open'), null);
+    assert.deepEqual(await page.locator('.v3467-columns span').allTextContents(),
+      ['Usuário', 'E-mail', 'Função', 'Plano', 'Situação', 'Uso IA', 'Ação']);
+    await page.locator('button.admin-stat[data-filter=Administradores]').click();
+    assert.equal(await page.locator('.admin-row').count(), 2);
+    await page.locator('button.admin-stat[data-filter=Usuários]').click();
     assert.equal(await page.locator('#v3473Monitor .admin-stat').count(),4);
     assert.deepEqual(await page.locator('#v3473Monitor strong').allTextContents(),['2','2','0','0']);
     await page.locator('.admin-row[data-plan=owner] button').click();assert.equal(await page.locator('dialog[open]').getByText('Conta protegida').count(),1);assert.equal(await page.locator('dialog[open]').getByRole('button',{name:'Salvar alterações'}).count(),0);await page.locator('dialog[open]').getByRole('button',{name:'Fechar',exact:true}).click();
