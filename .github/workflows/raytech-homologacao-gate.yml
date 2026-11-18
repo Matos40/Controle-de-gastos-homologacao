@@ -41,9 +41,10 @@ jobs:
         working-directory: backend-v340
         run: npx --yes firebase-tools@15.35.0 emulators:exec --project demo-raytech-v340 --only auth,firestore,functions "node --test --test-concurrency=1 functions/emulator.test.mjs"
       - name: Install Chromium for isolated dashboard
+        timeout-minutes: 4
         run: |
           npm install --prefix /tmp/raytech-rc-browser --no-audit --no-fund playwright@1.56.1
-          /tmp/raytech-rc-browser/node_modules/.bin/playwright install --with-deps chromium
+          /tmp/raytech-rc-browser/node_modules/.bin/playwright install chromium
       - name: Smart Admin desktop mobile and extraction in fresh emulators
         working-directory: backend-v340
         run: npx --yes firebase-tools@15.35.0 emulators:exec --project demo-raytech-v340 --only auth,firestore,functions "node --test functions/app-ux.test.mjs"
@@ -53,7 +54,6 @@ jobs:
           npm run build
           node prepare-v3473.mjs
           node --test scope.test.mjs online/model.test.mjs visual-refinement.test.mjs online/google-profile.test.mjs
-          npx playwright install chromium
           node --test smart-admin-modal.test.mjs production-parity.test.mjs
       - name: Full financial workspace regressions in fresh emulators
         working-directory: backend-v340
