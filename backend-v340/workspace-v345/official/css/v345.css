@@ -99,9 +99,13 @@
 @media(max-width:767px){#smartAdminHost .admin-stats{grid-template-columns:repeat(3,minmax(0,1fr))}#smartAdminHost .admin-tools{grid-template-columns:repeat(2,minmax(0,1fr))}#smartAdminHost .admin-tools input{grid-column:1/-1}#smartAdminHost .v3467-columns{display:none}#smartAdminHost .admin-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:5px 8px}#smartAdminHost .v345-admin-identity{grid-column:1/3}#smartAdminHost .v3467-email{grid-column:1/-1;grid-row:2}#smartAdminHost .admin-row .admin-action{grid-column:3;grid-row:1;min-height:40px}#smartAdminHost .v3467-plan,#smartAdminHost .v3467-state,#smartAdminHost .v3467-usage{grid-row:3}}
 
 /* V34.6.8: compact public header; no privileged bar when hidden. */
-.v345-account[hidden],#v3468Logout[hidden]{display:none!important}
+.v345-account[hidden]{display:none!important}
 .v3468-version{font-size:9px;line-height:1.2;color:#94a3b8;font-weight:400;white-space:nowrap;flex-shrink:0}
-.v3468-question{margin-left:.12em}
+.raytech-income-heading{display:flex;align-items:center;gap:.55rem}
+.raytech-income-help-toggle{display:grid;place-items:center;width:2rem;height:2rem;flex:none;border:1px solid #475569;border-radius:50%;color:#cbd5e1}
+.raytech-income-help-toggle:hover,.raytech-income-help-toggle:focus-visible{color:#a5f3fc;border-color:#22d3ee}
+.raytech-premium-dialog{margin:auto;width:min(24rem,calc(100% - 2rem));max-height:calc(100dvh - 2rem);background:transparent}
+.raytech-premium-dialog::backdrop{background:#020617e6}
 .v3468-install-version{font-size:.8rem;color:#94a3b8;margin:.35rem 0}
 @media(max-width:639px){.v3468-version{font-size:8px}.raytech-header-brand>.truncate{display:block!important}.raytech-header-row{flex-wrap:wrap}.raytech-header-brand{flex:1 1 auto;min-width:0}.raytech-header-controls{flex:1 1 auto;justify-content:flex-end}.raytech-header-brand h1{font-size:.8rem}.raytech-header-brand>.truncate>div{gap:3px}.raytech-header-controls{min-width:0}}
 

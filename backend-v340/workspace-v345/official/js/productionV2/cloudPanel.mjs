@@ -26,7 +26,7 @@ export function bindCloudPanel(doc,storage,{config=PRODUCTION_CONFIG,open=async(
  const reviewDetails=el('productionCloudReviewDetails'),reviewHome=reviewDetails?.parentElement,reviewOpen=el('productionCloudReviewOpen'),retry=el('productionCloudRetry'),manualSync=el('productionCloudSyncNow');
  const connection=()=>{const stored=syncStorage.getItem(CONNECTION_KEY);if(stored!==null)return stored==='signed-out'?null:stored;try{const p=JSON.parse(syncStorage.getItem('experimental-sync-policy-v1')),c=JSON.parse(syncStorage.getItem(DEVICE_KEY));return p?.uid&&p.uid===c?.uid&&['active','paused'].includes(p.state)?p.uid:null;}catch{return null;}};
  const online=()=>win?.navigator?.onLine!==false&&!win?.raytechOnlineAuthorizationPending;
- let unsubscribe=null,watchGeneration=0,watchStarting=false,watchFailed=false,watchTerminal=false,watchFailures=0,watchRetryTimer=null,watchRevision=null,unifiedLogin=false,reviewExpanded=false,profile=null,syncing=false,attention=false,recovering=false,verifiedSync=false,restoring=false,cloud=null,uid=null,busy=false,generation=0,session=null,runtime=null,plan=null,bound=false,review=null,invalid=false,writeAllowed=false,storageChanged=false;
+ let unsubscribe=null,watchGeneration=0,watchStarting=false,watchFailed=false,watchTerminal=false,watchFailures=0,watchRetryTimer=null,watchRevision=null,unifiedLogin=false,reviewExpanded=false,syncing=false,attention=false,recovering=false,verifiedSync=false,restoring=false,cloud=null,uid=null,busy=false,generation=0,session=null,runtime=null,plan=null,bound=false,review=null,invalid=false,writeAllowed=false,storageChanged=false;
  const unlocked=()=>!el('pinLockOverlay')||el('pinLockOverlay').classList.contains('hidden');
  const entitlement=()=>win?.raytechCloudEntitlement??{eligible:true,writeEnabled:true};
  const premium=()=>entitlement().eligible===true&&entitlement().writeEnabled===true;
@@ -90,7 +90,8 @@ export function bindCloudPanel(doc,storage,{config=PRODUCTION_CONFIG,open=async(
   if(applyOpen){applyOpen.hidden=!canSync||!uid||!applyFingerprint||!!review||invalid;applyOpen.disabled=busy||!online()||!ready()||!!session?.state().active;}
   if(applyBox)applyBox.hidden=!applyReview||!uid||!ready();
   if(applyResolve)applyResolve.disabled=busy||!online()||!ready()||!applyReview||!!applyReview?.blocked?.length;
-  connect.disabled=busy||!!cloud||!config.enabled;login.disabled=busy||!cloud||!!uid;inspect.hidden=!canSync||!premium()||!uid||(bound&&writeAllowed);inspect.disabled=busy||!premium()||!uid||!ready()||!online();logout.disabled=busy||!uid;
+  connect.disabled=busy||!!cloud||!config.enabled;login.disabled=busy||!cloud||!!uid;inspect.hidden=!canSync||!premium()||!uid||(bound&&writeAllowed);inspect.disabled=busy||!premium()||!uid||!ready()||!online();
+  logout.disabled=busy||el('productionCloudProfile').hidden;
   let st={active:false,busy:false};try{if(session)st=session.state();}catch{invalid=true;}
   const indicator=el('productionCloudConnection'),last=el('productionCloudLastSync');const waiting=!!st.budgetWaiting;const renewal=waiting?new Date(Date.parse(st.budgetDay+'T00:00:00Z')+86400000).toLocaleString('pt-BR'):'';
   if(indicator)indicator.textContent=!premium()?'Google conectado · '+(entitlement().plan==='free'?'Free · dados locais':'dados locais'):!online()?'Sem internet — dados locais preservados':!unlocked()?'Bloqueado pelo PIN':!uid?'Desconectado':invalid||review?'Revisão necessária':st.active?'Conectado · automático':bound?'Conectado · pausado':'Conectado · aguardando vínculo';
@@ -110,15 +111,11 @@ export function bindCloudPanel(doc,storage,{config=PRODUCTION_CONFIG,open=async(
    header.classList.remove('text-emerald-400','text-amber-400','text-slate-400','text-blue-400','text-red-400');
    header.classList.add(kind==='synced'?'text-emerald-400':kind==='syncing'?'text-blue-400':kind==='attention'?'text-red-400':kind==='offline'||kind==='paused'?'text-amber-400':'text-slate-400');
    const glyph=header.querySelector('svg');if(glyph){for(const g of glyph.querySelectorAll('[data-cloud-glyph]'))g.style.display=g.dataset.cloudGlyph===kind?'':'none';glyph.classList.toggle('raytech-sync-spin',kind==='syncing');}
-   const panelIcon=el('productionCloudPanelIcon'),panelCheck=el('productionCloudPanelCheck'),greeting=el('productionCloudPremiumGreeting');
+   const panelIcon=el('productionCloudPanelIcon'),panelCheck=el('productionCloudPanelCheck');
    if(panelIcon){panelIcon.classList.remove('text-emerald-400','text-amber-400','text-slate-400','text-blue-400','text-red-400');panelIcon.classList.add(kind==='synced'?'text-emerald-400':kind==='syncing'?'text-blue-400':kind==='attention'?'text-red-400':kind==='offline'||kind==='paused'?'text-amber-400':'text-slate-400');}
    if(panelCheck)panelCheck.style.display=kind==='synced'?'':'none';
-   if(greeting)greeting.hidden=!(uid&&entitlement().plan==='premium');
-   const guest=el('productionCloudGuest'),person=el('productionCloudProfile'),google=el('productionCloudGoogle'),name=el('productionCloudName'),photo=el('productionCloudPhoto'),initial=el('productionCloudInitial'),notice=el('productionCloudNotice');
-   if(guest)guest.hidden=!!uid;if(person){person.hidden=!uid;person.classList.toggle('flex',!!uid);}if(google)google.disabled=busy||!online()||!ready();
-   if(name)name.textContent=profile?.displayName||profile?.email||'Conta Google';
-   if(initial)initial.textContent=(profile?.displayName||profile?.email||'G').trim().slice(0,1).toUpperCase();
-   if(photo){let url=null;try{const u=new URL(profile?.photoURL);if(PRODUCTION_CONFIG.firebase.projectId==='raytech-cg-homologacao'&&u.protocol==='https:'&&/(^|\.)googleusercontent\.com$/.test(u.hostname))url=u.href;}catch{}if(url&&photo.getAttribute('src')!==url){photo.hidden=false;if(initial){initial.hidden=true;initial.classList.remove('flex');}photo.src=url;}else if(!url){photo.removeAttribute('src');photo.hidden=true;if(initial){initial.hidden=false;initial.classList.add('flex');}}}
+   const google=el('productionCloudGoogle'),notice=el('productionCloudNotice');
+   if(google)google.disabled=busy||!online()||!ready();
    if(notice){notice.hidden=!review&&!attention&&!invalid&&!waiting;notice.textContent=waiting&&!review&&!invalid?'Reserva diária esgotada. Retomada automática a partir de '+renewal+'. Dados locais preservados.':review?'Existem alterações que precisam ser revisadas. Seus dados estão preservados.':invalid?'Sincronização protegida. Entre em contato com o suporte.':'Não foi possível sincronizar. Seus dados locais estão preservados.';}
    const view=el('productionCloudState');if(view)view.hidden=!uid;
    if(indicator&&!premium())indicator.textContent=kind==='free'?'Google conectado · Plano Free\nSincronização exclusiva Premium':'Google conectado · dados locais';
@@ -134,7 +131,7 @@ export function bindCloudPanel(doc,storage,{config=PRODUCTION_CONFIG,open=async(
   const blocked=busy||!premium()||!canSync||!session||invalid||!ready()||st.busy;
   seed.disabled=blocked||bound||plan?.mode!=='seed'||!writeAllowed;disable(adopt,blocked||bound||!['adopt','merge'].includes(plan?.mode)||plan?.conflict||!writeAllowed);
   disable(refresh,blocked||!bound||!st.active||!!review||!writeAllowed);
-  if(canSync){connect.hidden=!!cloud;login.hidden=!!uid||!cloud;seed.hidden=bound||plan?.mode!=='seed';if(adopt){adopt.hidden=bound||!['adopt','merge'].includes(plan?.mode)||plan?.conflict;adopt.textContent=plan?.mode==='merge'?'Conciliar e sincronizar':'Receber da nuvem';}if(refresh)refresh.hidden=!bound;logout.hidden=!uid;}else {const p=el('productionCloudProfile');if(p)p.hidden=!uid;const state=el('productionCloudState');if(state)state.hidden=true;}
+  if(canSync){connect.hidden=!!cloud;login.hidden=!!uid||!cloud;seed.hidden=bound||plan?.mode!=='seed';if(adopt){adopt.hidden=bound||!['adopt','merge'].includes(plan?.mode)||plan?.conflict;adopt.textContent=plan?.mode==='merge'?'Conciliar e sincronizar':'Receber da nuvem';}if(refresh)refresh.hidden=!bound;}else {const state=el('productionCloudState');if(state)state.hidden=true;}
 disable(pauseBtn,!canSync||!session||(!st.active&&!waiting));disable(resumeBtn,blocked||!bound||st.active||waiting||!!review||!writeAllowed);
   disable(backupBtn,blocked);disable(stageBtn,blocked||!bound||st.active||!!review||!writeAllowed);disable(reviewBtn,blocked||st.active||!review||!writeAllowed||!!displayedConflict?.blocked.length);disable(updateBtn,blocked||st.active||!review||!writeAllowed);
   for(const e of [historyBtn,historyExport,diagnosticBtn])disable(e,blocked);
@@ -178,7 +175,7 @@ disable(pauseBtn,!canSync||!session||(!st.active&&!waiting));disable(resumeBtn,b
   }catch(e){if(g===generation)error(e);}finally{restoring=false;busy=false;await details();paint();runtime?.changed();}
  }
  async function connectCloud(){if(cloud||!config.enabled)return;cloud=await open();cloud.onSession(user=>{
-  const previous=uid;generation++;stop(!previous||previous===user?.uid);uid=user?.uid??null;profile=user??null;reviewExpanded=false;attention=false;verifiedSync=false;storageChanged=false;
+  const previous=uid;generation++;stop(!previous||previous===user?.uid);uid=user?.uid??null;reviewExpanded=false;attention=false;verifiedSync=false;storageChanged=false;
   displayedReview=null;displayedConflict=null;if(historyBox)historyBox.textContent='';if(reviewBox)reviewBox.textContent='';if(planBox)planBox.textContent='';
   reset('productionCloudConsent','productionCloudBackupSaved','productionCloudReviewConsent','productionCloudReviewBackup');
   if(uid){if(canSync&&premium())try{session=makeSession(uid,generation);}catch(e){error(e);paint();return;}
@@ -187,7 +184,6 @@ disable(pauseBtn,!canSync||!session||(!st.active&&!waiting));disable(resumeBtn,b
   void details().then(()=>{paint();win.setTimeout(()=>{if(!canSync||!uid||!ready()||!online()||busy)return;if(!premium())return;if(bound&&connection()===uid)void restore();},0);});
  });}
  connect.addEventListener('click',()=>action(connectCloud));
- const photo=el('productionCloudPhoto');photo?.addEventListener('error',()=>{photo.hidden=true;const initial=el('productionCloudInitial');if(initial){initial.hidden=false;initial.classList.add('flex');}});
  el('productionCloudGoogle')?.addEventListener('click',()=>{if(!premium()||!canSync||!ready()||!online())return;unifiedLogin=true;void action(async()=>{try{await connectCloud();if(!cloud.currentUid())throw Error('SESSION_REQUIRED');}catch(e){unifiedLogin=false;throw e;}});});
 
  applyOpen?.addEventListener('click',()=>action(async()=>{const s=requireSession();clearApply();await authorizeWrite();const p=await s.inspectApply();applyReview=p;applyFields.textContent='';for(const f of p.fields){const row=doc.createElement('label');row.className='block text-xs space-y-1';const title=doc.createElement('p');const record=f.local??f.target??f.before;const isRecord=record&&typeof record==='object';const month=f.path.split(' · ')[0];title.textContent=month+' · '+(isRecord?(record.title??record.description??'Lançamento'):(f.path.includes('budgetLimit')?'Limite do orçamento':'Salário'));title.className='font-semibold text-sm';row.appendChild(title);

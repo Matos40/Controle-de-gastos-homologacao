@@ -45,6 +45,15 @@ test('published shell has one version, preserved backup controls and isolated Ho
   assert.equal(hosting.hosting.site, 'raytech-cg-homologacao');
 });
 
+test('protected UX hooks retain the original Premium presentation and cloud logout', async () => {
+  const html = await readFile(new URL('index.html', dist), 'utf8');
+  assert.match(html, /<dialog id="premiumAiNotice"[^>]*>[\s\S]*?Recurso exclusivo Premium[\s\S]*?premiumAiNoticeClose/);
+  assert.match(html, /<div class="v345-account" hidden>/);
+  assert.ok(!html.includes('id="v3468Logout"'));
+  assert.match(html, /id="incomeBaseHelpToggle"[^>]*aria-controls="incomeBaseHelp"/);
+  assert.match(html, /id="productionCloudProfile"[\s\S]*?id="productionCloudLogout"/);
+});
+
 test('online homologation renders all four profiles without enabling IA or bypassing cloud consent', {timeout:45000}, async t => {
   const browser = await chromium.launch();
   t.after(() => browser.close());
@@ -74,21 +83,45 @@ test('online homologation renders all four profiles without enabling IA or bypas
     assert.match(await page.locator('#v345Identity').textContent(), /Pessoa Google fictícia/);
     for (const width of [1280,390]) {
       await page.setViewportSize({width,height:844});
+      const privileged = ['owner','admin'].includes(profile);
+      assert.equal(await page.locator('.v345-profile').isVisible(), privileged);
+      assert.equal(await page.locator('.v345-environment').isVisible(), privileged);
+      if (!privileged) assert.equal(await page.locator('.v345-account').evaluate(node=>node.getBoundingClientRect().height), 0);
       assert.ok(await page.locator('#pwaInstalledBadge').isVisible());
       assert.equal(await page.locator('#raytechHeaderVersion').textContent(), 'v' + version);
       assert.ok(await page.locator('#raytechHeaderVersion').isVisible());
+      const help = page.getByRole('button',{name:'Ajuda sobre renda base'});
+      assert.ok(await help.evaluate(btn=>btn.getBoundingClientRect().left-btn.previousElementSibling.getBoundingClientRect().right>=6));
+      await help.click();
+      assert.equal(await help.getAttribute('aria-expanded'),'true');
+      assert.ok(await page.locator('#incomeBaseHelp').isVisible());
+      await help.click();
+      assert.equal(await page.locator('#incomeBaseHelp').isVisible(),false);
       await page.locator('#headerToolsToggleBtn').click();
+      const securityButtons = await page.locator('#smartPwaOpen').evaluate(button =>
+        [...button.parentElement.querySelectorAll(':scope > button')].map(item=>item.textContent.trim()));
+      assert.deepEqual(securityButtons,['Chave API','Senha PIN','Instalar App']);
+      assert.equal(await page.locator('#productionCloudName').textContent(),'Pessoa Google fictícia');
+      assert.equal(await page.locator('#productionCloudPlanLabel').textContent(),profile==='premium'?'Premium':'Free');
+      assert.ok(await page.locator('#productionCloudLogout').isEnabled());
+      assert.ok(await page.locator('#premiumInvoiceIndicator').evaluate((icon,premium)=>icon.classList.contains(premium?'fa-crown':'fa-lock')&&icon.classList.contains('text-amber-400'),profile==='premium'));
       await page.locator('#premiumInvoiceButton').click();
       const invoice = page.getByRole('dialog',{name:'Leitor de fatura com IA'});
-      assert.match(await invoice.locator('#simulatedStatus').textContent(),
-        profile === 'premium' ? /desativado/ : /restrito ao plano Premium/);
-      assert.ok(await invoice.locator('#simulatedExtract').isDisabled());
-      assert.ok(await invoice.locator('#simulatedConfirm').isDisabled());
-      for (const id of ['ocrDropZone','ocrProcessBtn']) {
-        assert.ok(await invoice.locator('#'+id).isVisible());
-        assert.ok(await invoice.locator('#'+id).isDisabled());
+      if (profile === 'premium') {
+        assert.match(await invoice.locator('#simulatedStatus').textContent(), /desativado/);
+        assert.ok(await invoice.locator('#simulatedExtract').isDisabled());
+        assert.ok(await invoice.locator('#simulatedConfirm').isDisabled());
+        for (const id of ['ocrDropZone','ocrProcessBtn']) {
+          assert.ok(await invoice.locator('#'+id).isVisible());
+          assert.ok(await invoice.locator('#'+id).isDisabled());
+        }
+        await invoice.getByRole('button',{name:'Fechar'}).click();
+      } else {
+        assert.equal(await invoice.isVisible(),false);
+        const offer = page.getByRole('dialog',{name:'Recurso exclusivo Premium'});
+        assert.ok(await offer.isVisible());
+        await offer.getByRole('button',{name:'Entendi'}).click();
       }
-      await invoice.getByRole('button',{name:'Fechar'}).click();
       await page.locator('#headerToolsToggleBtn').click();
       await page.locator('#premiumApiKeyButton').click();
       const key = page.getByRole('dialog',{name:'Chave Gemini API'});
@@ -96,7 +129,6 @@ test('online homologation renders all four profiles without enabling IA or bypas
       await key.getByRole('button',{name:'Fechar'}).click();
     }
     await page.locator('#headerToolsToggleBtn').click();
-    assert.equal(await page.locator('#v3468Logout').isVisible(), ['premium','free'].includes(profile));
     const review = page.locator('#productionCloudInspect');
     if (profile === 'free') {
       assert.equal(await review.isVisible(),false);

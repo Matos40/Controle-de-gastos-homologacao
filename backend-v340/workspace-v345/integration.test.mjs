@@ -183,11 +183,10 @@ test('Chromium integrates synthetic finance, review, quota, role changes and ses
     await page.locator('#smartAccountApp').waitFor({state: 'visible'});
     assert.equal(await page.evaluate(() => localStorage.getItem('controle_gastos_multimonth_v3')), 'banco-original');
     if (await page.locator('#onboardingSkip').isVisible()) await page.locator('#onboardingSkip').click();
-    const profile = page.locator('.v345-profile');
-    assert.equal(await page.locator('#v345Logout').isVisible(), false);
-    await profile.locator('summary').click();
+    assert.equal(await page.locator('.v345-profile').isVisible(), false);
     assert.equal(await page.locator('#smartAdminOpen').isVisible(), false);
-    await page.locator('#v345Logout').click();
+    await page.locator('#headerToolsToggleBtn').click();
+    await page.locator('#productionCloudLogout').click();
     await page.locator('[data-login-enter]').waitFor({state: 'visible'});
     await page.goto(origin);
     await login(page, 'owner');
@@ -317,8 +316,8 @@ test('PWA manifest, scoped installation, offline dashboard, UID isolation and of
     await page.waitForFunction(()=>window.productionCleanWorkspaceReady===true);
     assert.equal(await page.evaluate(()=>appDb.months[appDb.selectedMonth].salary),3406);
     assert.equal(await page.locator('#smartAdminOpen').isVisible(),false);
-    await page.locator('.v345-profile summary').click();
-    await page.locator('#v345Logout').click();
+    await page.locator('#headerToolsToggleBtn').click();
+    await page.locator('#productionCloudLogout').click();
     await page.locator('[data-login-enter]').waitFor({state:'visible'});
     await page.reload();
     await page.locator('[data-login-enter]').waitFor({state:'visible'});

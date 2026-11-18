@@ -1,5 +1,14 @@
 # Raytech CG — Plano de ação consolidado
 
+## Decisões aprovadas da V34.7.4.5
+
+- Cabeçalho com marca, logo, selo APP e versão. Perfil, menu suspenso e faixa técnica exclusivamente para Owner/Admin verificados. Free/Premium sem lacuna no cabeçalho e com identidade, plano e logout em Opções → Sincronização na nuvem. O login de teste mantém a identificação da homologação.
+- Ajuda da Renda Base por botão de interrogação alinhado, com espaçamento e expansão acessível em desktop e mobile.
+- Free vê cadeado dourado e o modal Premium do histórico. Premium vê coroa dourada e leitor. Owner/Admin seguem o plano e as permissões atribuídas. Sem preços ou links de pagamento. Processamento online de homologação permanece desativado.
+- Segurança & App contém Chave API, Senha PIN e Instalar App, nessa ordem. Remover Chave API somente após a IA centralizada estar operacional, segura, validada e expressamente aprovada. Preservar Spark.
+- Proteger os sete campos por linha e o modal compacto do Smart Admin, perfis Google, indicadores, filtros, auditoria, regras de plano, sincronização, PWA, backups, importação, exportação e isolamento dos bancos. Alterações ou remoções de itens aprovados exigem autorização expressa do proprietário, inclusive a separação do perfil por função.
+- Publicar o candidato verificado somente no Hosting de homologação. Para a atualização oficial, preparar a mesma revisão comum com os adaptadores de produção, backup, rollback e testes de autenticação, bancos, sincronização, Smart Admin e IA. Solicitar uma única autorização final depois da aprovação prática da homologação, antes da publicação oficial.
+
 Versão de trabalho: V34.7.4.1 Online Spark. Branch exclusiva: feature/v34-7-4-1-online-spark.
 Referência visual oficial, somente leitura: Matos40/Controle-de-gastos-2.0@b880872fc48e5832eb7f9d299d342ef5bf5c376d. Preservar componentes e funcionalidades aprovados; novas funcionalidades não justificam regressão visual.
 

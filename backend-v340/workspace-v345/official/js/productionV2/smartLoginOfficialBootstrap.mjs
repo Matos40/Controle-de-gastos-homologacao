@@ -8,6 +8,15 @@ import {scopedStorage, revokeOfflineGrant} from './smartLoginOfficialIdentity.mj
 
 const root = document.getElementById('smartLogin');
 const panel = document.getElementById('smartAccountApp');
+const headerProfile = panel.querySelector('.v345-account');
+const cloudProfile = document.getElementById('productionCloudProfile');
+const cloudLogout = document.getElementById('productionCloudLogout');
+const incomeHelpToggle = document.getElementById('incomeBaseHelpToggle');
+incomeHelpToggle.addEventListener('click', () => {
+  const help = document.getElementById('incomeBaseHelp');
+  help.hidden = !help.hidden;
+  incomeHelpToggle.setAttribute('aria-expanded', String(!help.hidden));
+});
 const storagePrefix=location.origin===ORIGIN?'raytech:v34.5:':'raytech:hml34741:';
 const raw = {
   getItem: key => localStorage.getItem(storagePrefix + key),
@@ -20,11 +29,11 @@ let unsubscribe = [];
 const activeSession = uid => active === uid && auth.currentUid() === uid;
 window.raytechCanUseInvoiceAI = () => !!active && activeSession(active) && invoiceAllowed && navigator.onLine;
 window.raytechInvoiceState = () => {
-  if (!active || !activeSession(active)) return {visible: false, reason: ''};
-  if (window.raytechCanUseInvoiceAI()) return {visible: true, reason: ''};
-  if (!invoiceVerified || !navigator.onLine) return {visible: true, reason: 'Leitor indisponível offline.'};
-  return {visible: !auth.invoiceBackendAvailable,
-    reason: invoicePlan === 'premium' ? 'O processamento de IA está desativado na homologação online.' : 'Recurso restrito ao plano Premium. O processamento de IA está desativado na homologação.'};
+  if (!active || !activeSession(active)) return {visible: false, premium: false, reason: ''};
+  const executable = window.raytechCanUseInvoiceAI();
+  return {visible: true, premium: invoicePlan === 'premium' || executable,
+    reason: executable ? '' : !invoiceVerified || !navigator.onLine ? 'Leitor indisponível offline.' :
+      'O processamento de IA está desativado na homologação online.'};
 };
 window.raytechExtractInvoice = () => {
   if (!window.raytechCanUseInvoiceAI()) throw Error('INVOICE_DENIED');
@@ -40,6 +49,8 @@ const lock = () => {
   invoiceAllowed = false;
   invoiceVerified = false;
   window.raytechSessionRevoked = true;
+  headerProfile.hidden = cloudProfile.hidden = true;
+  cloudLogout.disabled = true;
   panel.hidden = true;
   panel.inert = true;
   for (const stop of unsubscribe) stop();
@@ -98,6 +109,13 @@ async function observe(user) {
     const avatar = document.getElementById('v345Avatar');
     const label = user.displayName || account?.name || 'Conta de teste';
     avatar.textContent = label.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
+    const cloudPhoto = document.getElementById('productionCloudPhoto');
+    const cloudInitial = document.getElementById('productionCloudInitial');
+    cloudInitial.textContent = avatar.textContent;
+    document.getElementById('productionCloudName').textContent = user.displayName || user.email || 'Conta Google';
+    document.getElementById('productionCloudGuest').hidden = true;
+    cloudProfile.hidden = cloudLogout.disabled = false;
+    cloudProfile.classList.add('flex');
     if (!offline && location.protocol === 'https:' && user.photoURL) {
       try {
         const photo = new URL(user.photoURL);
@@ -107,6 +125,9 @@ async function observe(user) {
           image.referrerPolicy = 'no-referrer';
           image.onload = () => { if (activeSession(uid)) avatar.replaceChildren(image); };
           image.src = photo.href;
+          cloudPhoto.onload = () => { if (activeSession(uid)) { cloudPhoto.hidden = false; cloudInitial.hidden = true; } };
+          cloudPhoto.onerror = () => { cloudPhoto.hidden = true; cloudInitial.hidden = false; };
+          cloudPhoto.src = photo.href;
         }
       } catch {}
     }
@@ -116,7 +137,10 @@ async function observe(user) {
       invoiceAllowed = auth.invoiceBackendAvailable && accessVerified && (plan === 'premium' || !!role);
       invoicePlan = plan;
       invoiceVerified = accessVerified;
-      document.getElementById('v3468Logout').hidden = !!role;
+      headerProfile.hidden = !accessVerified || !['owner','admin'].includes(role);
+      if (headerProfile.hidden) headerProfile.querySelector('details').open = false;
+      document.getElementById('productionCloudPlanLabel').textContent = plan === 'premium' ? 'Premium' : plan === 'free' ? 'Free' : 'Plano não verificado offline';
+      document.getElementById('productionCloudPremiumGreeting').hidden = plan !== 'premium';
       document.getElementById('v345Identity').textContent =
         label + ' · ' +
         (role === 'owner' ? 'Owner' : role === 'admin' ? 'Admin' : plan === 'premium' ? 'Premium' : 'Free');
@@ -142,8 +166,7 @@ async function observe(user) {
       catch { view.paint({phase: 'workspace-blocked', message: 'Não foi possível sair. Tente novamente.'}); }
     };
     document.getElementById('v345Logout').addEventListener('click', logout);
-    document.getElementById('v3468Logout').addEventListener('click', logout);
-    document.getElementById('productionCloudLogout')?.addEventListener('click', logout, {capture: true});
+    cloudLogout.addEventListener('click', logout, {capture: true});
     const cancelDeadline = () => { if (deadline !== null) clearTimeout(deadline); deadline = null; };
     const expireIfNecessary = () => {
       if (activeSession(uid) && offlineSession() && Date.now() >= expires) blocked(uid);
@@ -179,6 +202,7 @@ async function observe(user) {
     const goOffline = () => {
       if (!activeSession(uid)) return;
       offline = true; accessVerified = false; invoiceAllowed = false; invoiceVerified = false;
+      headerProfile.hidden = true;
       window.raytechOnlineAuthorizationPending = true;
       detach();
       notify();

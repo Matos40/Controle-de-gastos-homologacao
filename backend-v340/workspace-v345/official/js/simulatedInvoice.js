@@ -6,6 +6,8 @@
   const open = document.getElementById('premiumInvoiceButton');
   const key = document.getElementById('premiumApiKeyButton');
   const keyDialog = document.getElementById('apiKeyModal');
+  const premium = document.getElementById('premiumAiNotice');
+  const indicator = document.getElementById('premiumInvoiceIndicator');
   const extract = document.getElementById('simulatedExtract');
   const preview = document.getElementById('invoiceOfflinePreview');
   let review = null, turn = 0, busy = false;
@@ -14,6 +16,11 @@
   window.openOcrModal = () => {
     const state = window.raytechInvoiceState();
     if (!state.visible) return;
+    if (!state.premium) {
+      document.getElementById('premiumAiOfflineNote').classList.toggle('hidden', navigator.onLine);
+      if (!premium.open) premium.showModal();
+      return;
+    }
     review = null;
     stage.replaceChildren();
     confirm.disabled = true;
@@ -23,6 +30,7 @@
     status.textContent = state.reason || 'Gere uma amostra para revisar antes de lançar.';
     if (!dialog.open) dialog.showModal();
   };
+  window.closePremiumAiNotice = () => premium.close();
   window.openApiKeyModal = () => {
     if (!window.raytechInvoiceState().visible) return;
     document.getElementById('invoiceKeyStatus').textContent =
@@ -102,6 +110,8 @@
   };
   function paint() {
     const state = window.raytechInvoiceState();
+    indicator.classList.toggle('fa-lock', !state.premium);
+    indicator.classList.toggle('fa-crown', state.premium);
     open?.classList.toggle('hidden', !state.visible);
     key?.classList.toggle('hidden', !state.visible);
     if (!entitled() && dialog.open) {
@@ -112,9 +122,10 @@
       preview.hidden = false;
       extract.hidden = confirm.hidden = true;
       status.textContent = state.reason;
-      if (!state.visible) close();
+      if (!state.visible || !state.premium) close();
     }
     if (!state.visible && keyDialog.open) keyDialog.close();
+    if ((!state.visible || state.premium) && premium.open) premium.close();
   }
   window.addEventListener('raytech-ai-entitlement-changed', paint);
   window.addEventListener('offline', paint);

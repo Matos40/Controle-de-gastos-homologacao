@@ -10,6 +10,13 @@ Referência de produção para a V34.7.4.4: V34.6.8, commit `b880872fc48e5832eb7
 | Entradas do leitor e da chave de IA, restrições por plano, serviço online desativado e laboratório sintético | `production-parity.test.mjs`, `integration.test.mjs`, suítes de cotas e autorização do backend |
 | Consentimento de vínculo, Free local, Premium isolado, recuperação, sincronização bidirecional e offline | `production-parity.test.mjs`, `scope.test.mjs`, `integration.test.mjs` |
 | Menus, backup JSON, importação, exportação Excel, PWA, atualização e desktop/mobile | `production-parity.test.mjs`, `visual-refinement.test.mjs`, `integration.test.mjs`, `stage-hosting.mjs` |
+| Perfil no cabeçalho, faixa técnica e área sem espaço residual | `production-parity.test.mjs`: somente Owner/Admin verificados. Free/Premium têm nome, foto ou iniciais, plano e logout em Opções → Sincronização na nuvem |
+| Ajuda da Renda Base e Segurança & App | `production-parity.test.mjs`: interrogação alinhada e acessível e exatamente Chave API, Senha PIN, Instalar App, nessa ordem |
+| Oferta Premium e leitor | `production-parity.test.mjs`: Free com cadeado dourado e modal histórico sem preços ou pagamentos. Premium com coroa dourada e leitor. Owner/Admin seguem plano e permissão. Homologação online mantém processamento desligado |
+
+As decisões da V34.7.4.5 são protegidas. Alterações ou remoções em funcionalidades, componentes visuais, fluxos e configurações aprovados exigem autorização expressa do proprietário. Em especial, a visibilidade do perfil no cabeçalho e o logout na área de nuvem não devem ser alterados sem essa autorização.
+
+A entrada Chave API deve permanecer até que a IA centralizada esteja implementada, funcional, segura, testada e expressamente aprovada. Spark permanece vigente. Não incluir cobrança ou serviços pagos na promoção sem autorização.
 
 ## Diferenças de ambiente
 

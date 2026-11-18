@@ -573,7 +573,7 @@
             <div id="productionCloudProfile" hidden class="items-center gap-3">
                 <span id="productionCloudInitial" class="rounded-full bg-slate-800 w-10 h-10 flex items-center justify-center shrink-0">G</span>
                 <img id="productionCloudPhoto" alt="" referrerpolicy="no-referrer" hidden class="rounded-full w-10 h-10 object-cover shrink-0">
-                <div class="min-w-0 flex-1"><p id="productionCloudName" class="text-sm font-semibold truncate"></p><p class="text-xs text-slate-400">Conta Google</p><p id="productionCloudPremiumGreeting" hidden class="mt-1 text-xs font-bold text-amber-400">Parabéns, você é PREMIUM</p></div>
+                <div class="min-w-0 flex-1"><p id="productionCloudName" class="text-sm font-semibold truncate"></p><p class="text-xs text-slate-400">Conta Google · <span id="productionCloudPlanLabel"></span></p><p id="productionCloudPremiumGreeting" hidden class="mt-1 text-xs font-bold text-amber-400">Parabéns, você é PREMIUM</p></div>
                 <button type="button" disabled id="productionCloudLogout" class="p-2 rounded-lg bg-slate-900 border border-slate-800 text-xs disabled:opacity-40" title="Sair da conta" aria-label="Sair da conta"><i class="fa-solid fa-right-from-bracket"></i></button>
               </div>
             <section id="productionCloudState" class="space-y-1">
@@ -903,8 +903,11 @@
             <!-- Indicador do Saldo Anterior Herdado -->
             <span id="previousBalanceHeaderBadge" class="hidden items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg border shadow-sm"></span>
           </div>
-          <h2 class="text-lg sm:text-2xl font-bold text-white tracking-tight">Qual é a sua renda mensal?</h2>
-          <p id="incomeBaseHelp" class="raytech-income-base-help text-xs sm:text-sm text-slate-400 leading-relaxed">
+          <div class="raytech-income-heading">
+            <h2 class="text-lg sm:text-2xl font-bold text-white tracking-tight">Qual é a sua renda mensal</h2>
+            <button type="button" id="incomeBaseHelpToggle" class="raytech-income-help-toggle" aria-label="Ajuda sobre renda base" aria-controls="incomeBaseHelp" aria-expanded="false">?</button>
+          </div>
+          <p id="incomeBaseHelp" hidden class="text-xs sm:text-sm text-slate-400 leading-relaxed">
             Insira sua renda líquida mensal. Recebeu um Pix, bônus ou freela?<br>
             Use o botão ao lado para somar à renda.
           </p>
