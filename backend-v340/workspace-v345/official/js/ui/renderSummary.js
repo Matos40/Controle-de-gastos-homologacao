@@ -74,8 +74,8 @@
             <span class="text-emerald-400 font-bold whitespace-nowrap">${formatBRL(item.amount)}</span>
             ${dateFormatted ? `<span class="text-[10px] text-slate-500">(${escapeHtml(dateFormatted)})</span>` : ''}
             <div class="flex items-center gap-1 ml-auto">
-              <button onclick="openIncomeModal('${item.id}')" title="Editar entrada" aria-label="Editar entrada" class="text-slate-400 hover:text-emerald-300 p-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
-              <button onclick="promptDeleteIncome('${item.id}')" title="Excluir entrada" aria-label="Excluir entrada" class="text-slate-400 hover:text-rose-400 p-1"><i class="fa-regular fa-trash-can"></i></button>
+              <button onclick="openIncomeModal(${escapeHtml(JSON.stringify(String(item.id)))})" title="Editar entrada" aria-label="Editar entrada" class="text-slate-400 hover:text-emerald-300 p-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
+              <button onclick="promptDeleteIncome(${escapeHtml(JSON.stringify(String(item.id)))})" title="Excluir entrada" aria-label="Excluir entrada" class="text-slate-400 hover:text-rose-400 p-1"><i class="fa-regular fa-trash-can"></i></button>
             </div>
           </div>`;
       }).join('');

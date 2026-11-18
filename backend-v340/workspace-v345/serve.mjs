@@ -1,0 +1,39 @@
+import {createServer} from 'node:http';
+import {createReadStream} from 'node:fs';
+import {stat} from 'node:fs/promises';
+import {extname, resolve, sep} from 'node:path';
+import {pathToFileURL} from 'node:url';
+
+const origin = 'http://127.0.0.1:15003';
+const root = resolve('dist');
+const types = {html: 'text/html; charset=utf-8', css: 'text/css', js: 'text/javascript',
+  mjs: 'text/javascript', png: 'image/png', svg: 'image/svg+xml', woff2: 'font/woff2'};
+const csp = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+  "img-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:19099 http://127.0.0.1:18080; " +
+  "worker-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
+
+export async function serve() {
+  const server = createServer(async (req, res) => {
+    try {
+      if (req.headers.host !== '127.0.0.1:15003' || !['GET', 'HEAD'].includes(req.method)) throw Error();
+      const path = decodeURIComponent(new URL(req.url, origin).pathname);
+      const file = resolve(root, '.' + (path === '/' ? '/index.html' : path));
+      if (!file.startsWith(root + sep) || !(await stat(file)).isFile()) throw Error();
+      res.writeHead(200, {
+        'Content-Type': types[extname(file).slice(1)] ?? 'application/octet-stream',
+        'Content-Security-Policy': csp, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store',
+      });
+      if (req.method === 'HEAD') res.end();
+      else createReadStream(file).pipe(res);
+    } catch { res.writeHead(404).end(); }
+  });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject).listen(15003, '127.0.0.1', resolve);
+  });
+  return server;
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await serve();
+  console.log(origin);
+}

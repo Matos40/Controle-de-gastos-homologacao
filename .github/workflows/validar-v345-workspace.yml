@@ -72,3 +72,25 @@ jobs:
 
       - name: V34.5 isolated model and scope tests
         run: node --test backend-v340/workspace-v345/scope.test.mjs backend-v340/workspace-v345/online/model.test.mjs
+
+      - name: Build V34.5 isolated dashboard
+        working-directory: backend-v340/workspace-v345
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          npm run prepare:emulators
+          npx playwright install --with-deps chromium
+      - name: V34.5 Firestore rules and dashboard Chromium
+        working-directory: backend-v340/workspace-v345
+        env:
+          GCLOUD_PROJECT: demo-raytech-v340
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:19099
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:18080
+        run: timeout 240s npx --yes firebase-tools@15.35.0 emulators:exec --config emulators.json --project demo-raytech-v340 --only auth,firestore "node --test integration.test.mjs"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: raytech-v345-hosting-candidate
+          path: |
+            backend-v340/workspace-v345/dist
+            backend-v340/workspace-v345/hosting.json
+            backend-v340/workspace-v345/online/firestore-additive.rules.txt

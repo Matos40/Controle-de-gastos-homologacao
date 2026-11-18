@@ -363,5 +363,5 @@
       "sha": "b7857ee5e89dc707f3b21a1ff7067569db3ae060"
     }
   ],
-  "status": "snapshot provenance; not runnable until local adapters and safety checks are implemented"
+  "status": "proveniência do snapshot V33.4.7, anterior aos adaptadores V34.5"
 }

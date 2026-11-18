@@ -55,8 +55,8 @@
         const catBadge = `<span class="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium px-2 py-0.5 rounded-md border ${catInfo.badgeClass} whitespace-nowrap">${catInfo.icon} ${catInfo.label}</span>`;
 
         const paidBadge = isPaid
-          ? `<button onclick="toggleExpensePaid('${item.id}')" title="Clique para marcar como pendente" class="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-emerald-300 bg-emerald-950/70 px-2 py-0.5 rounded-md border border-emerald-500/40 hover:bg-emerald-900 transition whitespace-nowrap"><i class="fa-solid fa-circle-check text-emerald-400 text-[9px]"></i> Pago</button>`
-          : `<button onclick="toggleExpensePaid('${item.id}')" title="Clique para marcar como pago" class="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-slate-400 bg-slate-900 hover:text-slate-200 px-2 py-0.5 rounded-md border border-slate-700 transition whitespace-nowrap"><i class="fa-regular fa-clock text-[9px]"></i> A vencer</button>`;
+          ? `<button onclick="toggleExpensePaid(${escapeHtml(JSON.stringify(String(item.id)))})" title="Clique para marcar como pendente" class="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-emerald-300 bg-emerald-950/70 px-2 py-0.5 rounded-md border border-emerald-500/40 hover:bg-emerald-900 transition whitespace-nowrap"><i class="fa-solid fa-circle-check text-emerald-400 text-[9px]"></i> Pago</button>`
+          : `<button onclick="toggleExpensePaid(${escapeHtml(JSON.stringify(String(item.id)))})" title="Clique para marcar como pago" class="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-slate-400 bg-slate-900 hover:text-slate-200 px-2 py-0.5 rounded-md border border-slate-700 transition whitespace-nowrap"><i class="fa-regular fa-clock text-[9px]"></i> A vencer</button>`;
 
         let formattedDate = 'Sem data';
         if (item.date) {
@@ -78,7 +78,7 @@
               <div class="flex items-start justify-between gap-2.5">
                 <div class="flex items-center gap-2.5 min-w-0 flex-1">
                   <button 
-                    onclick="toggleExpensePaid('${item.id}')"
+                    onclick="toggleExpensePaid(${escapeHtml(JSON.stringify(String(item.id)))})"
                     class="w-9 h-9 rounded-xl ${isPaid ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : (isFixed ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20')} flex items-center justify-center shrink-0"
                   >
                     <i class="fa-solid ${isPaid ? 'fa-check' : (isFixed ? 'fa-repeat' : 'fa-bolt')} text-xs"></i>
@@ -103,13 +103,13 @@
                 </div>
                 <div class="flex items-center gap-1 shrink-0">
                   <button 
-                    onclick="openEditExpenseModal('${item.id}')" 
+                    onclick="openEditExpenseModal(${escapeHtml(JSON.stringify(String(item.id)))})" 
                     class="w-7 h-7 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 flex items-center justify-center text-xs"
                   >
                     <i class="fa-solid fa-pen text-[10px]"></i>
                   </button>
                   <button 
-                    onclick="promptDeleteExpense('${item.id}')" 
+                    onclick="promptDeleteExpense(${escapeHtml(JSON.stringify(String(item.id)))})" 
                     class="w-7 h-7 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-rose-400 flex items-center justify-center text-xs"
                   >
                     <i class="fa-regular fa-trash-can text-[10px]"></i>
@@ -122,7 +122,7 @@
             <div class="hidden sm:flex items-center justify-between">
               <div class="flex items-center gap-3 min-w-0">
                 <button 
-                  onclick="toggleExpensePaid('${item.id}')"
+                  onclick="toggleExpensePaid(${escapeHtml(JSON.stringify(String(item.id)))})"
                   title="${isPaid ? 'Desmarcar pagamento' : 'Marcar como pago'}"
                   class="w-9 h-9 rounded-xl ${isPaid ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : (isFixed ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20')} flex items-center justify-center shrink-0 transition hover:scale-105"
                 >
@@ -146,14 +146,14 @@
                 
                 <div class="flex items-center gap-1">
                   <button 
-                    onclick="openEditExpenseModal('${item.id}')" 
+                    onclick="openEditExpenseModal(${escapeHtml(JSON.stringify(String(item.id)))})" 
                     title="Editar despesa"
                     class="w-7 h-7 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition flex items-center justify-center text-xs"
                   >
                     <i class="fa-solid fa-pen"></i>
                   </button>
                   <button 
-                    onclick="promptDeleteExpense('${item.id}')" 
+                    onclick="promptDeleteExpense(${escapeHtml(JSON.stringify(String(item.id)))})" 
                     title="Excluir despesa"
                     class="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition flex items-center justify-center text-xs"
                   >

@@ -10,7 +10,7 @@ function decodeWorkspaceBackup(db) {
 // Never weaken validateRestoreCandidate or write directly to a linked bank.
 function requestFullBackupRestore(envelope, kind) {
   const decoded = decodeWorkspaceBackup(envelope);
-  if (MAIN_WORKSPACE && localStorage.getItem('raytech_cg_v2_main_sync_v1:raytech_production_v2_device') !== null) {
+  if (MAIN_WORKSPACE && window.raytechStorage.getItem('raytech_cg_v2_main_sync_v1:raytech_production_v2_device') !== null) {
     const candidate = validateBackupDatabase(decoded);
     if (typeof window.productionPrepareBackupRestore !== 'function') throw Error('Banco vinculado. Aguarde a conexão e tente novamente.');
     const restore = window.productionPrepareBackupRestore(encodeWorkspaceBackup(candidate));

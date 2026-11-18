@@ -83,8 +83,8 @@
         const catBadge = `<span class="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-medium px-2 py-0.5 rounded-md border ${catInfo.badgeClass} whitespace-nowrap">${catInfo.icon} ${catInfo.label}</span>`;
 
         const paidBadge = isPaid
-          ? `<button onclick="toggleCardPaid('${item.id}')" class="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-emerald-300 bg-emerald-950/70 px-2 py-0.5 rounded-md border border-emerald-500/40 whitespace-nowrap"><i class="fa-solid fa-circle-check text-emerald-400 text-[9px]"></i> Verificado</button>`
-          : `<button onclick="toggleCardPaid('${item.id}')" class="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-slate-400 bg-slate-900 hover:text-slate-200 px-2 py-0.5 rounded-md border border-slate-700 whitespace-nowrap"><i class="fa-regular fa-circle-check text-[9px]"></i> Conferir</button>`;
+          ? `<button onclick="toggleCardPaid(${escapeHtml(JSON.stringify(String(item.id)))})" class="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-emerald-300 bg-emerald-950/70 px-2 py-0.5 rounded-md border border-emerald-500/40 whitespace-nowrap"><i class="fa-solid fa-circle-check text-emerald-400 text-[9px]"></i> Verificado</button>`
+          : `<button onclick="toggleCardPaid(${escapeHtml(JSON.stringify(String(item.id)))})" class="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-slate-400 bg-slate-900 hover:text-slate-200 px-2 py-0.5 rounded-md border border-slate-700 whitespace-nowrap"><i class="fa-regular fa-circle-check text-[9px]"></i> Conferir</button>`;
 
         const iconBg = isParcelado
           ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
@@ -124,13 +124,13 @@
                 </div>
                 <div class="flex items-center gap-1 shrink-0">
                   <button 
-                    onclick="openEditCardModal('${item.id}')" 
+                    onclick="openEditCardModal(${escapeHtml(JSON.stringify(String(item.id)))})" 
                     class="w-7 h-7 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 ${editHoverColor} flex items-center justify-center text-xs"
                   >
                     <i class="fa-solid fa-pen text-[10px]"></i>
                   </button>
                   <button 
-                    onclick="promptDeleteCardExpense('${item.id}')" 
+                    onclick="promptDeleteCardExpense(${escapeHtml(JSON.stringify(String(item.id)))})" 
                     class="w-7 h-7 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-rose-400 flex items-center justify-center text-xs"
                   >
                     <i class="fa-regular fa-trash-can text-[10px]"></i>
@@ -166,14 +166,14 @@
 
                 <div class="flex items-center gap-1">
                   <button 
-                    onclick="openEditCardModal('${item.id}')" 
+                    onclick="openEditCardModal(${escapeHtml(JSON.stringify(String(item.id)))})" 
                     title="Editar compra"
                     class="w-7 h-7 rounded-lg text-slate-400 ${editHoverColor} hover:bg-slate-800 transition flex items-center justify-center text-xs"
                   >
                     <i class="fa-solid fa-pen"></i>
                   </button>
                   <button 
-                    onclick="promptDeleteCardExpense('${item.id}')" 
+                    onclick="promptDeleteCardExpense(${escapeHtml(JSON.stringify(String(item.id)))})" 
                     title="Excluir compra do cartão"
                     class="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition flex items-center justify-center text-xs"
                   >

@@ -21,7 +21,7 @@ export function bindCloudPanel(doc,storage,{config=PRODUCTION_CONFIG,open=async(
  const clearApply=()=>{applyReview=null;applyFingerprint=null;if(applyFields)applyFields.textContent='';if(applyConfirm)applyConfirm.checked=false;if(applyBackup)applyBackup.checked=false;};
  const CONNECTION_KEY='auto-connect-v1',LAST_KEY='last-sync-v1';
  const maintenance=new URLSearchParams(search).get('maintenance')==='1';
- if(advanced)advanced.hidden=!maintenance;status.hidden=!maintenance;
+ if(advanced)advanced.hidden=!maintenance;status.hidden=false;
  let displayedReview=null,displayedConflict=null;
  const reviewDetails=el('productionCloudReviewDetails'),reviewHome=reviewDetails?.parentElement,reviewOpen=el('productionCloudReviewOpen'),retry=el('productionCloudRetry'),manualSync=el('productionCloudSyncNow');
  const connection=()=>{const stored=syncStorage.getItem(CONNECTION_KEY);if(stored!==null)return stored==='signed-out'?null:stored;try{const p=JSON.parse(syncStorage.getItem('experimental-sync-policy-v1')),c=JSON.parse(syncStorage.getItem(DEVICE_KEY));return p?.uid&&p.uid===c?.uid&&['active','paused'].includes(p.state)?p.uid:null;}catch{return null;}};
@@ -41,7 +41,7 @@ export function bindCloudPanel(doc,storage,{config=PRODUCTION_CONFIG,open=async(
   if(applyOpen){applyOpen.hidden=!canSync||!uid||!applyFingerprint||!!review||invalid;applyOpen.disabled=busy||!online()||!ready()||!!session?.state().active;}
   if(applyBox)applyBox.hidden=!applyReview||!uid||!ready();
   if(applyResolve)applyResolve.disabled=busy||!online()||!ready()||!applyReview||!!applyReview?.blocked?.length;
-  connect.disabled=busy||!!cloud||!config.enabled;login.disabled=busy||!cloud||!!uid;inspect.disabled=busy||!uid;logout.disabled=busy||!uid;
+  connect.disabled=busy||!!cloud||!config.enabled;login.disabled=busy||!cloud||!!uid;inspect.hidden=!canSync||!premium()||bound;inspect.disabled=busy||!uid||!ready()||!online();logout.disabled=busy||!uid;
   let st={active:false,busy:false};try{if(session)st=session.state();}catch{invalid=true;}
   const indicator=el('productionCloudConnection'),last=el('productionCloudLastSync');const waiting=!!st.budgetWaiting;const renewal=waiting?new Date(Date.parse(st.budgetDay+'T00:00:00Z')+86400000).toLocaleString('pt-BR'):'';
   if(indicator)indicator.textContent=!premium()?'Google conectado · '+(entitlement().plan==='free'?'Free · dados locais':'dados locais'):!online()?'Sem internet — dados locais preservados':!unlocked()?'Bloqueado pelo PIN':!uid?'Desconectado':invalid||review?'Revisão necessária':st.active?'Conectado · automático':bound?'Conectado · pausado':'Conectado · aguardando vínculo';
@@ -69,7 +69,7 @@ export function bindCloudPanel(doc,storage,{config=PRODUCTION_CONFIG,open=async(
    if(guest)guest.hidden=!!uid;if(person){person.hidden=!uid;person.classList.toggle('flex',!!uid);}if(google)google.disabled=busy||!online()||!ready();
    if(name)name.textContent=profile?.displayName||profile?.email||'Conta Google';
    if(initial)initial.textContent=(profile?.displayName||profile?.email||'G').trim().slice(0,1).toUpperCase();
-   if(photo){let url=null;try{const u=new URL(profile?.photoURL);if(u.protocol==='https:'&&/(^|\.)googleusercontent\.com$/.test(u.hostname))url=u.href;}catch{}if(url&&photo.getAttribute('src')!==url){photo.hidden=false;if(initial){initial.hidden=true;initial.classList.remove('flex');}photo.src=url;}else if(!url){photo.removeAttribute('src');photo.hidden=true;if(initial){initial.hidden=false;initial.classList.add('flex');}}}
+   if(photo){let url=null;try{const u=new URL(profile?.photoURL);if(PRODUCTION_CONFIG.firebase.projectId==='raytech-cg-homologacao'&&u.protocol==='https:'&&/(^|\.)googleusercontent\.com$/.test(u.hostname))url=u.href;}catch{}if(url&&photo.getAttribute('src')!==url){photo.hidden=false;if(initial){initial.hidden=true;initial.classList.remove('flex');}photo.src=url;}else if(!url){photo.removeAttribute('src');photo.hidden=true;if(initial){initial.hidden=false;initial.classList.add('flex');}}}
    if(notice){notice.hidden=!review&&!attention&&!invalid&&!waiting;notice.textContent=waiting&&!review&&!invalid?'Reserva diária esgotada. Retomada automática a partir de '+renewal+'. Dados locais preservados.':review?'Existem alterações que precisam ser revisadas. Seus dados estão preservados.':invalid?'Sincronização protegida. Entre em contato com o suporte.':'Não foi possível sincronizar. Seus dados locais estão preservados.';}
    const view=el('productionCloudState');if(view)view.hidden=!uid;
    if(indicator&&!premium())indicator.textContent=kind==='free'?'Google conectado · Plano Free\nSincronização exclusiva Premium':'Google conectado · dados locais';
@@ -108,7 +108,7 @@ disable(pauseBtn,!canSync||!session||(!st.active&&!waiting));disable(resumeBtn,b
   if(!premium()||!unifiedLogin||busy||restoring||!uid||!session||!ready()||!online())return;
   unifiedLogin=false;
   return action(async()=>{const s=requireSession(),g=generation,who=uid;await details();if(g!==generation||who!==uid||invalid||review)return;
-   if(!bound){await authorizeWrite();if(g!==generation||who!==uid||!ready()||!premium())return;const p=await s.inspect();if(g!==generation||who!==uid||!ready()||!premium())return;await s.authorize({mode:p.mode,confirmed:true,backupSaved:true,preserveBoth:true});syncStorage.setItem(CONNECTION_KEY,who);plan=null;await details();}
+   if(!bound)return;
    await authorizeWrite();if(g!==generation||who!==uid||!ready())return;
    if(!s.state().active){if(s.state().persisted==='active')await s.restoreActive();else await s.resume(true);}
    if(g!==generation||who!==uid||!ready()||!s.state().active)return;
@@ -129,7 +129,7 @@ disable(pauseBtn,!canSync||!session||(!st.active&&!waiting));disable(resumeBtn,b
   displayedReview=null;displayedConflict=null;if(historyBox)historyBox.textContent='';if(reviewBox)reviewBox.textContent='';if(planBox)planBox.textContent='';
   reset('productionCloudConsent','productionCloudBackupSaved','productionCloudReviewConsent','productionCloudReviewBackup');
   if(uid){if(canSync&&premium())try{session=makeSession(uid,generation);}catch(e){error(e);paint();return;}say('Conta Google conectada. Verifique a autorização da conta.');}else say('Entre com a conta Google desejada.');
-  void details().then(()=>{paint();win.setTimeout(()=>{if(!canSync||!uid||!ready()||!online()||busy)return;if(!premium())return;if(unifiedLogin||!bound){unifiedLogin=true;void finishExplicitLogin();}else if(connection()===uid)void restore();},0);});
+  void details().then(()=>{paint();win.setTimeout(()=>{if(!canSync||!uid||!ready()||!online()||busy)return;if(!premium())return;if(bound&&connection()===uid)void restore();},0);});
  });}
  connect.addEventListener('click',()=>action(connectCloud));
  const photo=el('productionCloudPhoto');photo?.addEventListener('error',()=>{photo.hidden=true;const initial=el('productionCloudInitial');if(initial){initial.hidden=false;initial.classList.add('flex');}});
@@ -206,8 +206,8 @@ disable(pauseBtn,!canSync||!session||(!st.active&&!waiting));disable(resumeBtn,b
    };
   };
   win.addEventListener('raytech-finance-saved',()=>{try{if(session&&!session.hasLocalChanges())return;}catch{}verifiedSync=false;runtime?.signal({local:true});paint();});
-  const lifecycle=()=>{if(online()&&doc.visibilityState!=='hidden')watchFailed=false;runtime?.changed();paint();if(!online()||!ready()||doc.visibilityState==='hidden')return;if(!cloud&&(connection()||win.raytechStorage)&&!busy)void action(connectCloud);else if(!premium())return;else if(unifiedLogin||session&&!bound){unifiedLogin=true;void finishExplicitLogin();}else if(session?.state().active){runtime?.signal();}else if(!session?.state().budgetWaiting)void restore();};
-  win.addEventListener('raytech-plan-changed',()=>{generation++;stop(true);attention=false;verifiedSync=false;if(uid&&premium()&&canSync){session=makeSession(uid,generation);unifiedLogin=true;}paint();if(premium())void details().then(()=>{if(unifiedLogin)void finishExplicitLogin();});});
+  const lifecycle=()=>{if(online()&&doc.visibilityState!=='hidden')watchFailed=false;runtime?.changed();paint();if(!online()||!ready()||doc.visibilityState==='hidden')return;if(!cloud&&(connection()||win.raytechStorage)&&!busy)void action(connectCloud);else if(!premium())return;else if(unifiedLogin&&bound){void finishExplicitLogin();}else if(session?.state().active){runtime?.signal();}else if(!session?.state().budgetWaiting)void restore();};
+  win.addEventListener('raytech-plan-changed',()=>{generation++;stop(true);attention=false;verifiedSync=false;if(uid&&premium()&&canSync){session=makeSession(uid,generation);unifiedLogin=connection()===uid;}paint();if(premium())void details().then(()=>{if(unifiedLogin)void finishExplicitLogin();});});
   win.addEventListener('online',lifecycle);win.addEventListener('offline',lifecycle);doc.addEventListener?.('visibilitychange',lifecycle);
   win.addEventListener('storage',e=>{if(e.key===dbKey||e.key===syncPrefix(search)+DEVICE_KEY||e.key===syncPrefix(search)+REVIEW_KEY){storageChanged=true;stop();say('Alteração em outra aba. Feche as outras abas e reabra; sincronização bloqueada.');paint();}});
   win.addEventListener('pagehide',()=>{generation++;stop(true);},{once:true});

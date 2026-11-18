@@ -1,0 +1,30 @@
+{
+  "name": "raytech-v345",
+  "version": "34.5.0",
+  "scripts": {
+    "test": "node --test scope.test.mjs online/model.test.mjs",
+    "build": "node build.mjs",
+    "lab": "node serve.mjs",
+    "prepare:emulators": "node prepare-emulators.mjs"
+  },
+  "type": "commonjs",
+  "dependencies": {
+    "@fontsource/orbitron": "5.2.8",
+    "@fontsource/plus-jakarta-sans": "5.2.8",
+    "@fortawesome/fontawesome-free": "6.7.2",
+    "chart.js": "4.4.1",
+    "esbuild": "0.28.2",
+    "firebase": "12.12.1",
+    "tailwindcss": "3.4.19",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "private": "true",
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.0",
+    "playwright": "1.56.1"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "1.14.7",
+    "picomatch": "2.3.2"
+  }
+}

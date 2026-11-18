@@ -24,9 +24,6 @@ function initPwaEnvironment() {
     deferredPwaPrompt = null; document.getElementById('pwaInstalledBadge')?.classList.remove('hidden');
     closePwaModal(); showToast('Aplicativo instalado com sucesso na sua Tela Inicial!', 'success');
   });
-  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-    navigator.serviceWorker.register('./sw.js').catch(err => console.warn('Falha ao registrar Service Worker:', err));
-  }
   const updateOnlineStatus = () => {
     const banner = document.getElementById('offlineBanner'); if (!banner) return;
     banner.classList.toggle('hidden', navigator.onLine); banner.classList.toggle('flex', !navigator.onLine);
@@ -212,11 +209,7 @@ async function triggerNativePwaInstall() {
 
     // Inicialização
     window.addEventListener('raytech-account-start', async () => {
-      if (DEFAULT_API_KEY && !(globalThis.raytechStorage??globalThis.localStorage).getItem(STORAGE_GEMINI_KEY)) {
-        (globalThis.raytechStorage??globalThis.localStorage).setItem(STORAGE_GEMINI_KEY, DEFAULT_API_KEY);
-      }
 
-      initPwaEnvironment();
       const gate = document.getElementById('cleanWorkspaceGate');
       const badge = document.getElementById('cleanWorkspaceBanner');
       if(WORKSPACE_MODE==='invalid'){

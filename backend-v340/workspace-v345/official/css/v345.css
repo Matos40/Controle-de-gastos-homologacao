@@ -1,0 +1,22 @@
+[hidden] { display: none !important; }
+.v345-account { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .25rem .75rem; padding: .25rem .8rem; font-size: .75rem; }
+.v345-account span { color: #94a3b8; }
+.v345-dialog { width: min(32rem, calc(100% - 2rem)); padding: 1.25rem; color: #e2e8f0; background: #0f172a; border: 1px solid #6366f1; border-radius: 1rem; }
+.v345-dialog::backdrop { background: #020617db; }
+.v345-dialog h2 { font-size: 1.15rem; font-weight: 700; }
+.v345-dialog p, #simulatedReview { margin-block: .75rem; }
+#simulatedReview label { display: block; padding: .35rem; }
+.v345-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; }
+.v345-dialog button:disabled { opacity: .45; }
+#labCredentials { display: grid; gap: .5rem; margin-block: .75rem; text-align: left; }
+#labCredentials input { display: block; width: 100%; border: 1px solid #3a607d; border-radius: .5rem; padding: .4rem .6rem; background: #06182e; color: #e1f5ff; }
+.admin-row[data-plan="owner"] { border-color: #22c55e; }
+.admin-row[data-plan="admin"] { border-color: #22d3ee; }
+.admin-row[data-plan="premium"] { border-color: #fbbf24; }
+.admin-row[data-plan="free"] { border-color: #64748b; }
+.v345-usage { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
+.v345-usage label { display: grid; font-size: .75rem; }
+.v345-usage progress { width: 6.8rem; height: .55rem; accent-color: #38bdf8; }
+.v345-edit { display: grid; gap: .55rem; margin-top: .8rem; }
+.v345-edit label { display: flex; justify-content: space-between; gap: .5rem; }
+.v345-edit :is(input, select) { padding: .35rem; color: #e2e8f0; background: #06182e; border: 1px solid #3a607d; border-radius: .35rem; }

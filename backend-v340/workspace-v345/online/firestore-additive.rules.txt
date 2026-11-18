@@ -1,49 +1,143 @@
-// Insert inside the existing match /databases/{database}/documents.
-// Never replace the existing live rules. Homologation only.
+// Insert inside match /databases/{database}/documents after reviewing the
+// complete live rules for overlapping matches. Never replace the live rules.
+function v345Self(uid) {
+  return request.auth != null && request.auth.uid == uid;
+}
+function v345Account(uid) {
+  return /databases/$(database)/documents/raytechV345Accounts/$(uid);
+}
+function v345Role(uid) {
+  return /databases/$(database)/documents/raytechV345Roles/$(uid);
+}
+function v345Active(uid) {
+  return exists(v345Account(uid)) && get(v345Account(uid)).data.blocked == false;
+}
+function v345Operator(uid) {
+  return exists(v345Role(uid)) && get(v345Role(uid)).data.active == true
+    && get(v345Role(uid)).data.role in ['owner', 'admin'];
+}
+function v345IsOperator() {
+  return request.auth != null && v345Active(request.auth.uid) && v345Operator(request.auth.uid);
+}
+function v345Premium(uid) {
+  return v345Self(uid) && v345Active(uid)
+    && (get(v345Account(uid)).data.plan == 'premium' || v345Operator(uid));
+}
+function v345Id(id) {
+  return id is string && id.matches('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
+}
+function v345Limits(limits) {
+  return limits is map && limits.keys().hasOnly(['minute', 'day', 'month'])
+    && limits.minute is int && limits.day is int && limits.month is int
+    && limits.minute >= 1 && limits.minute <= limits.day
+    && limits.day <= limits.month && limits.month <= 10000;
+}
+function v345Audit(id) {
+  return /databases/$(database)/documents/raytechV345Audit/$(id);
+}
+
 match /raytechV345Accounts/{uid} {
-  function self() { return request.auth != null && request.auth.uid == uid; }
-  function operator() {
-    return request.auth != null
-      && exists(/databases/$(database)/documents/raytechV345Roles/$(request.auth.uid))
-      && get(/databases/$(database)/documents/raytechV345Roles/$(request.auth.uid)).data.active == true
-      && get(/databases/$(database)/documents/raytechV345Roles/$(request.auth.uid)).data.role in ['owner','admin']
-      && get(/databases/$(database)/documents/raytechV345Accounts/$(request.auth.uid)).data.blocked == false;
+  function valid(d) {
+    return d.keys().hasOnly(['uid', 'name', 'plan', 'blocked', 'limits', 'lastAudit'])
+      && d.uid == uid && d.name is string && d.name.size() > 0 && d.name.size() <= 80
+      && d.plan in ['free', 'premium'] && d.blocked is bool
+      && (!('limits' in d) || v345Limits(d.limits))
+      && (!('lastAudit' in d) || v345Id(d.lastAudit));
   }
-  allow get: if self() || operator();
-  allow list: if operator() && request.query.limit <= 100;
-  allow create: if self() && request.resource.data.keys().hasOnly(['uid','name','plan','blocked'])
-    && request.resource.data.uid == uid && request.resource.data.name is string
-    && request.resource.data.name.size() <= 80 && request.resource.data.plan == 'free'
-    && request.resource.data.blocked == false;
-  allow update: if operator() && !self()
-    && !exists(/databases/$(database)/documents/raytechV345Roles/$(uid))
-    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plan','blocked'])
-    && request.resource.data.plan in ['free','premium'] && request.resource.data.blocked is bool;
+  allow get: if v345Self(uid) || v345IsOperator();
+  allow list: if v345IsOperator() && request.query.limit <= 100;
+  allow create: if v345Self(uid) && valid(request.resource.data)
+    && request.resource.data.keys().hasOnly(['uid', 'name', 'plan', 'blocked'])
+    && request.resource.data.plan == 'free' && request.resource.data.blocked == false;
+  allow update: if v345IsOperator() && !v345Self(uid) && !exists(v345Role(uid))
+    && valid(request.resource.data)
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plan', 'blocked', 'limits', 'lastAudit'])
+    && !exists(v345Audit(request.resource.data.lastAudit))
+    && getAfter(v345Audit(request.resource.data.lastAudit)).data.target == uid;
   allow delete: if false;
 }
+
 match /raytechV345Roles/{uid} {
-  allow get: if request.auth != null && (request.auth.uid == uid ||
-    (exists(/databases/$(database)/documents/raytechV345Roles/$(request.auth.uid))
-      && get(/databases/$(database)/documents/raytechV345Roles/$(request.auth.uid)).data.active == true
-      && get(/databases/$(database)/documents/raytechV345Roles/$(request.auth.uid)).data.role in ['owner','admin']
-      && get(/databases/$(database)/documents/raytechV345Accounts/$(request.auth.uid)).data.blocked == false));
+  allow get: if v345Self(uid) || v345IsOperator();
   allow list, write: if false;
 }
-match /raytechV345Finance/{uid}/banks/{bank} {
-  function allowed() {
-    return request.auth != null && request.auth.uid == uid
-      && bank in ['v2-main','v2-clean','legacy']
-      && exists(/databases/$(database)/documents/raytechV345Accounts/$(uid))
-      && get(/databases/$(database)/documents/raytechV345Accounts/$(uid)).data.blocked == false;
+
+match /raytechV345Audit/{id} {
+  function valid(d) {
+    let before = get(v345Account(d.target)).data;
+    let after = getAfter(v345Account(d.target)).data;
+    return d.keys().hasOnly(['actor', 'target', 'beforePlan', 'afterPlan', 'beforeBlocked', 'afterBlocked', 'at'])
+      && d.actor == request.auth.uid && d.target != d.actor && !exists(v345Role(d.target))
+      && d.at == request.time && before.get('lastAudit', '') != id && after.lastAudit == id
+      && d.beforePlan == before.plan && d.afterPlan == after.plan
+      && d.beforeBlocked == before.blocked && d.afterBlocked == after.blocked;
   }
-  function valid() {
-    let d = request.resource.data;
-    return d.keys().hasOnly(['revision','payload']) && d.revision is int
-      && d.revision >= 1 && d.revision <= 9007199254740991
-      && d.payload is string && d.payload.size() <= 180000;
+  allow list: if v345IsOperator() && request.query.limit <= 100;
+  allow create: if v345IsOperator() && v345Id(id) && valid(request.resource.data);
+  allow get, update, delete: if false;
+}
+
+match /raytechV345Usage/{uid} {
+  function cap() {
+    return get(v345Account(uid)).data.get('limits', {'minute': 3, 'day': 20, 'month': 100});
   }
-  allow get: if allowed();
-  allow create: if allowed() && valid() && request.resource.data.revision == 1;
-  allow update: if allowed() && valid() && request.resource.data.revision == resource.data.revision + 1;
+  function valid(d) {
+    return d.keys().hasOnly(['at', 'minute', 'day', 'month']) && d.at == request.time
+      && d.minute is int && d.minute >= 1 && d.minute <= cap().minute
+      && d.day is int && d.day >= 1 && d.day <= cap().day
+      && d.month is int && d.month >= 1 && d.month <= cap().month;
+  }
+  function next(d, p) {
+    let ms = d.at.toMillis();
+    let prior = p.at.toMillis();
+    return d.minute == (ms - ms % 60000 == prior - prior % 60000 ? p.minute + 1 : 1)
+      && d.day == (ms - ms % 86400000 == prior - prior % 86400000 ? p.day + 1 : 1)
+      && d.month == (d.at.year() == p.at.year() && d.at.month() == p.at.month() ? p.month + 1 : 1);
+  }
+  allow get: if v345Premium(uid) || v345IsOperator();
+  allow create: if v345Premium(uid) && valid(request.resource.data)
+    && request.resource.data.minute == 1 && request.resource.data.day == 1 && request.resource.data.month == 1;
+  allow update: if v345Premium(uid) && valid(request.resource.data) && next(request.resource.data, resource.data);
   allow list, delete: if false;
+}
+
+match /raytechV345Finance/{uid}/banks/v2-main {
+  function headPath() {
+    return /databases/$(database)/documents/raytechV345Finance/$(uid)/banks/v2-main;
+  }
+  function receiptPath(id) {
+    return /databases/$(database)/documents/raytechV345Finance/$(uid)/banks/v2-main/receipts/$(id);
+  }
+  function valid(d, revision, parentId) {
+    let id = d.lastOperationId;
+    let receipt = getAfter(receiptPath(id)).data;
+    return d.keys().hasOnly(['marker', 'revision', 'lastOperationId', 'hash', 'payload'])
+      && d.marker == 'raytech-financial-production-v2'
+      && d.payload is string && d.payload.size() <= 180000
+      && d.revision is int && d.revision == revision && revision <= 9007199254740991
+      && d.hash is string && d.hash.matches('[0-9a-f]{64}')
+      && v345Id(id) && id != parentId && !exists(receiptPath(id))
+      && receipt.operationId == id && receipt.parentId == parentId
+      && receipt.revision == revision && receipt.hash == d.hash;
+  }
+  allow get: if v345Premium(uid);
+  allow create: if v345Premium(uid) && valid(request.resource.data, 1, '');
+  allow update: if v345Premium(uid)
+    && valid(request.resource.data, resource.data.revision + 1, resource.data.lastOperationId);
+  allow delete, list: if false;
+
+  match /receipts/{id} {
+    function validReceipt(d) {
+      let next = getAfter(headPath()).data;
+      return d.keys().hasOnly(['operationId', 'parentId', 'revision', 'hash'])
+        && d.operationId == id && v345Id(id) && next.lastOperationId == id
+        && d.revision == next.revision && d.hash == next.hash
+        && (exists(headPath())
+          ? d.parentId == get(headPath()).data.lastOperationId && d.revision == get(headPath()).data.revision + 1
+          : d.revision == 1 && d.parentId == '');
+    }
+    allow get: if v345Premium(uid);
+    allow create: if v345Premium(uid) && validReceipt(request.resource.data);
+    allow list, update, delete: if false;
+  }
 }
