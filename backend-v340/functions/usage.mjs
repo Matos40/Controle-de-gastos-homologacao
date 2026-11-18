@@ -1,3 +1,4 @@
+import {outcomeRefs,transition} from './outcome.mjs';
 import {BUDGET_COLLECTION,validateBudget,reserveBudget} from './global-budget.mjs';
 import {decidePremium,ACCOUNT_COLLECTION,ROLE_COLLECTION} from './policy.mjs';
 export const USAGE_COLLECTION='raytechLabUsageV342';
@@ -28,7 +29,7 @@ export function nextUsage(previous,now,limits=DEFAULT_LIMITS){
 }
 // Transactions reserve an attempt, not a successful response. No automatic refund:
 // provider failure or uncertain client disconnect may already have incurred cost.
-export function createUsageStore(db,{limits=DEFAULT_LIMITS,clock=Date.now,budget=null}={}){
+export function createUsageStore(db,{limits=DEFAULT_LIMITS,clock=Date.now,budget=null,trackOutcomes=false}={}){
  const cap=validateLimits(limits),globalCap=budget===null?null:validateBudget(budget);
  return async ({uid,requestId})=>{
   if(!validUid(uid)||!validRequestId(requestId))return {status:400,error:'INVALID_REQUEST_ID'};
@@ -40,9 +41,11 @@ export function createUsageStore(db,{limits=DEFAULT_LIMITS,clock=Date.now,budget
     if(attempt.exists)return {status:409,error:'DUPLICATE_REQUEST'};
     const now=clock(),decision=nextUsage(usage.data(),now,override.exists?validateLimits(override.data().limits):cap);
     if(decision.status!==200)return decision;
-    if(globalCap){const ref=db.collection(BUDGET_COLLECTION).doc('global'),snapshot=await tx.get(ref),global=reserveBudget(snapshot.data(),now,globalCap);if(global.status!==200)return global;tx.set(ref,global.next);}
+    let globalRef,globalNext;if(globalCap){globalRef=db.collection(BUDGET_COLLECTION).doc('global');const snapshot=await tx.get(globalRef),global=reserveBudget(snapshot.data(),now,globalCap);if(global.status!==200)return global;globalNext=global.next;}
+    const refs=trackOutcomes?outcomeRefs(db,uid,now):[],counts=refs.length?await tx.getAll(...refs):[];const updated=counts.map(x=>transition(x.data(),'reserve'));
+    if(globalRef)tx.set(globalRef,globalNext);refs.forEach((ref,i)=>tx.set(ref,updated[i]));
     tx.set(user,decision.next);
-    tx.create(request,{reservedAt:now});
+    tx.create(request,{reservedAt:now,...(trackOutcomes?{status:'pending'}:{})});
     return {status:200};
    });
   }catch{return {status:503,error:'USAGE_UNAVAILABLE'};}

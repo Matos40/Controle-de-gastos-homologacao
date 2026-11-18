@@ -41,7 +41,7 @@ test('V34.1 HTTP extraction authorizes within request and never writes financial
  await f.profile.update({plan:'premium'});assert.equal((await extract(f)).status,200);await f.profile.update({plan:'free'});assert.equal((await extract(f)).status,403);
  await a.operator.update({active:false});assert.equal((await extract(a)).status,403);
  assert.deepEqual((await p.profile.get()).data(),{uid:p.uid,plan:'premium',blocked:false});
- const collections=await db.listCollections();assert.ok(collections.every(c=>[ACCOUNT_COLLECTION,ROLE_COLLECTION,USAGE_COLLECTION,'raytechLabGlobalBudgetV3471'].includes(c.id)));
+ const collections=await db.listCollections();assert.ok(collections.every(c=>[ACCOUNT_COLLECTION,ROLE_COLLECTION,USAGE_COLLECTION,'raytechLabGlobalBudgetV3471','raytechLabOutcomeV3472'].includes(c.id)));
 });
 
 test('V34.2 real HTTP concurrent requests never exceed per-UID minute quota and duplicates do not count',async()=>{
@@ -120,3 +120,5 @@ test('V34.7.1 global budget atomic across accounts, duplicate, authorized admin 
  const admin=async u=>{const res=await fetch(endpoint.replace('authorizePremiumFeature','usageAdmin'),{method:'POST',headers:{authorization:'Bearer '+u.token,'content-type':'application/json'},body:JSON.stringify({action:'list',after:null})});return {status:res.status,body:await res.json()};};
  assert.equal((await admin(f)).status,403);const output=await admin(o);assert.equal(output.status,200);assert.equal(output.body.global.used.day,LAB_BUDGET.day);assert.equal(output.body.global.attempts.day,25);assert.equal(output.body.global.simulated,true);
 });
+
+test('V34.7.2 atomic outcome ledger, idempotent finalization and separate failure/pending',async()=>{const {createOutcomeStore,outcomeRefs}=await import('./outcome.mjs');const p=await fixture('v3472-outcome','premium');const now=Date.now();const store=createUsageStore(db,{clock:()=>now,trackOutcomes:true}),finish=createOutcomeStore(db);const ids=[randomUUID(),randomUUID(),randomUUID()];for(const id of ids)assert.equal((await store({uid:p.uid,requestId:id})).status,200);await Promise.all([finish({uid:p.uid,requestId:ids[0],status:'completed'}),finish({uid:p.uid,requestId:ids[0],status:'completed'})]);await finish({uid:p.uid,requestId:ids[1],status:'failed'});await assert.rejects(finish({uid:p.uid,requestId:ids[0],status:'failed'}));const row=(await outcomeRefs(db,p.uid,now)[3].get()).data();assert.deepEqual(row,{reserved:3,completed:1,failed:1,pending:1});});

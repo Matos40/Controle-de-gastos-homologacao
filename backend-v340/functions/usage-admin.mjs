@@ -1,3 +1,4 @@
+import {readOutcome} from './outcome.mjs';
 import {BUDGET_COLLECTION,budgetView} from './global-budget.mjs';
 import {randomUUID} from 'node:crypto';
 import {FieldPath} from 'firebase-admin/firestore';
@@ -51,7 +52,8 @@ export async function handleUsageAdmin(req,{db,verifyToken,clock=Date.now}){
     const settings=l.data();
     if(l.exists&&(!Number.isSafeInteger(settings.version)||settings.version<1))throw Error('INVALID_VERSION');
     const targetRole=operator.data()?.active===true&&['owner','admin'].includes(operator.data()?.role)?operator.data().role:null;
-    return {uid:target,name:typeof account.name==='string'?account.name.slice(0,120):'',email:typeof account.email==='string'?account.email.slice(0,320):'',role:targetRole,editable:role.data().role==='owner'||(target!==uid&&!targetRole),plan:account.plan,blocked:account.blocked,version:settings?.version??0,...summarizeUsage(u.data(),l.exists?settings.limits:DEFAULT_LIMITS,now)};
+    const outcome=(await readOutcome(tx,db,target,now)).user;
+    return {outcome,uid:target,name:typeof account.name==='string'?account.name.slice(0,120):'',email:typeof account.email==='string'?account.email.slice(0,320):'',role:targetRole,editable:role.data().role==='owner'||(target!==uid&&!targetRole),plan:account.plan,blocked:account.blocked,version:settings?.version??0,...summarizeUsage(u.data(),l.exists?settings.limits:DEFAULT_LIMITS,now)};
    };
    if(body.action==='list'){
     let query=accounts.orderBy(FieldPath.documentId()).limit(26);
@@ -62,7 +64,8 @@ export async function handleUsageAdmin(req,{db,verifyToken,clock=Date.now}){
     const totals={minute:0,day:0,month:0,atLimit:0};
     for(const row of rows){for(const k of ['minute','day','month'])totals[k]+=row.used[k];if(row.reached.length)totals.atLimit++;}
     const global=budgetView((await tx.get(db.collection(BUDGET_COLLECTION).doc('global'))).data(),now);
-    return result(200,{global,rows,totals,next:page.size>25?docs.at(-1).id:null,periods:windows(now)});
+    const outcomes=(await readOutcome(tx,db,uid,now)).global;
+    return result(200,{outcomes,global,rows,totals,next:page.size>25?docs.at(-1).id:null,periods:windows(now)});
    }
    const target=await tx.get(accounts.doc(body.uid));
    if(!target.exists)return error(404,'NOT_FOUND');

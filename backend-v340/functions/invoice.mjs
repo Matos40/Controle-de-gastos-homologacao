@@ -48,6 +48,8 @@ export async function extractInvoice(req,deps,{timeoutMs=TIMEOUT_MS}={}){
  }
  const controller=new AbortController();
  let timer;
+ let resultStatus='failed';
+ const finish=async status=>{if(!deps.finishOutcome)return;await deps.finishOutcome({uid:verifiedUid,requestId:req.headers?.['x-request-id'],status});};
  try{
   const result=await Promise.race([
    Promise.resolve().then(()=>deps.provider({...file,signal:controller.signal})),
@@ -57,7 +59,9 @@ export async function extractInvoice(req,deps,{timeoutMs=TIMEOUT_MS}={}){
   // Re-check account before delivering results; a downgrade during processing is denied.
   const final=await authorize();
   if(final.status!==200)return fail(final.status,'ACCESS_DENIED');
+  resultStatus='completed';
+  try{await finish('completed');}catch{return fail(503,'OUTCOME_UNAVAILABLE');}
   return {status:200,body:{items,requiresReview:true,simulated:true}};
  }catch(e){return fail(controller.signal.aborted?504:502,controller.signal.aborted?'TIMEOUT':'PROCESSING_FAILED');}
- finally{clearTimeout(timer);controller.abort();file.bytes.fill(0);}
+ finally{clearTimeout(timer);controller.abort();file.bytes.fill(0);if(resultStatus==='failed'&&deps.reserveUsage&&deps.finishOutcome){try{await finish('failed');}catch{/* durable pending remains visible; no refund or retry */}}}
 }
