@@ -25,7 +25,7 @@ export function bindCloudPanel(doc,storage,{config=PRODUCTION_CONFIG,open=async(
  let displayedReview=null,displayedConflict=null;
  const reviewDetails=el('productionCloudReviewDetails'),reviewHome=reviewDetails?.parentElement,reviewOpen=el('productionCloudReviewOpen'),retry=el('productionCloudRetry'),manualSync=el('productionCloudSyncNow');
  const connection=()=>{const stored=syncStorage.getItem(CONNECTION_KEY);if(stored!==null)return stored==='signed-out'?null:stored;try{const p=JSON.parse(syncStorage.getItem('experimental-sync-policy-v1')),c=JSON.parse(syncStorage.getItem(DEVICE_KEY));return p?.uid&&p.uid===c?.uid&&['active','paused'].includes(p.state)?p.uid:null;}catch{return null;}};
- const online=()=>win?.navigator?.onLine!==false;
+ const online=()=>win?.navigator?.onLine!==false&&!win?.raytechOnlineAuthorizationPending;
  let unsubscribe=null,watchGeneration=0,watchStarting=false,watchFailed=false,watchTerminal=false,watchFailures=0,watchRetryTimer=null,watchRevision=null,unifiedLogin=false,reviewExpanded=false,profile=null,syncing=false,attention=false,recovering=false,verifiedSync=false,restoring=false,cloud=null,uid=null,busy=false,generation=0,session=null,runtime=null,plan=null,bound=false,review=null,invalid=false,writeAllowed=false,storageChanged=false;
  const unlocked=()=>!el('pinLockOverlay')||el('pinLockOverlay').classList.contains('hidden');
  const entitlement=()=>win?.raytechCloudEntitlement??{eligible:true,writeEnabled:true};
@@ -146,7 +146,7 @@ disable(pauseBtn,!canSync||!session||(!st.active&&!waiting));disable(resumeBtn,b
  function stop(preserve=false){clearApply();stopWatch();clearWatchRetry();watchFailed=false;watchTerminal=false;watchFailures=0;recovering=false;runtime?.close();runtime=null;if(session)try{preserve?session.suspend():session.sessionChanged();}catch{}session=null;plan=null;bound=false;review=null;invalid=false;writeAllowed=false;}
  function makeSession(who,g){
   const current=()=>g===generation&&uid===who&&ready()&&premium();
-  const s=createProductionSyncSession({config,location:win.location,search,cloud,storage:syncStorage,uid:who,hash:payloadHash,id:()=>win.crypto.randomUUID(),local:{read:()=>storage.getItem(dbKey),apply:(raw,payload)=>current()&&win.productionV2ApplyLocal?.(raw,payload)===true},unlocked:current,online:()=>win?.navigator?.onLine!==false,visible:()=>doc.visibilityState!=='hidden',lock:(key,fn)=>withQueueLock('main_b2_'+key,fn,win.navigator?.locks)});
+  const s=createProductionSyncSession({config,location:win.location,search,cloud,storage:syncStorage,uid:who,hash:payloadHash,id:()=>win.crypto.randomUUID(),local:{read:()=>storage.getItem(dbKey),apply:(raw,payload)=>current()&&win.productionV2ApplyLocal?.(raw,payload)===true},unlocked:current,online,visible:()=>doc.visibilityState!=='hidden',lock:(key,fn)=>withQueueLock('main_b2_'+key,fn,win.navigator?.locks)});
   runtime=createEventRuntime({session:{state:()=>{const state=s.state();return {...state,active:state.active||bound&&state.persisted==='active'&&!state.budgetWaiting};},tick:async opts=>{try{syncing=true;paint();
   if(!s.state().active){await authorizeWrite();if(g!==generation||!await s.restoreActive())return {status:'paused'};}
   const r=await s.tick(opts);if(g===generation){result(r);if(r.status==='updated'||r.status==='synced'&&s.hasLocalChanges())runtime?.signal();}return r;}finally{syncing=false;await details();paint();}},pause:s.pause,sessionChanged:s.sessionChanged},environment:()=>({visible:doc.visibilityState!=='hidden',online:win.navigator?.onLine!==false,unlocked:current()&&!busy&&!review&&!invalid,bound}),delay:1000,eventOnly:true,onRenew:async()=>{if(g!==generation||!current()||!bound||review||invalid||!online()||!s.state().budgetWaiting||s.state().budgetDay>=new Date().toISOString().slice(0,10))return false;await authorizeWrite();if(g!==generation||!current())return false;const ok=await s.restoreActive();if(ok){attention=false;watchFailed=false;}await details();paint();return ok;},setTimer:(fn,ms)=>win.setTimeout(fn,ms),clearTimer:id=>win.clearTimeout(id),onError:failure=>{if(g===generation){reportFailure(failure);paint();}}});
@@ -273,6 +273,7 @@ disable(pauseBtn,!canSync||!session||(!st.active&&!waiting));disable(resumeBtn,b
     if(!watchTerminal){watchFailed=false;watchFailures=0;}
     runtime?.reconnect();lifecycle();
   });
+  win.addEventListener('raytech-online-verified',lifecycle);
   win.addEventListener('offline',()=>{
     verifiedSync=false;stopWatch();clearWatchRetry();reportFailure({kind:'offline'});lifecycle();
   });doc.addEventListener?.('visibilitychange',lifecycle);

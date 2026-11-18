@@ -264,3 +264,111 @@ test('a funded local bank advances an empty revision and synchronizes across des
     assert.equal((await getDoc(head)).data().revision,4);
   } finally {await mobile.close();await desktop.close();}
 });
+
+test('PWA manifest, scoped installation, offline dashboard, UID isolation and offline logout', async () => {
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    await page.goto(origin);
+    const client=await context.newCDPSession(page);
+    const install=await client.send('Page.getAppManifest');
+    assert.match(install.url,/manifest\.webmanifest$/);
+    assert.equal(install.errors.length,0);
+    const manifest=JSON.parse(install.data);
+    assert.equal(manifest.display,'standalone');
+    assert.equal(manifest.scope,'/');
+    assert.deepEqual(manifest.icons.map(icon=>icon.sizes),['192x192','512x512']);
+    await login(page,'owner');
+    await page.waitForFunction(()=>navigator.serviceWorker.controller&&window.raytechPwa?.state().phase==='ready');
+    const worker=await page.evaluate(async()=>{
+      const registration=await navigator.serviceWorker.ready;
+      return {scope:registration.scope,script:registration.active.scriptURL};
+    });
+    assert.equal(worker.scope,origin+'/');
+    assert.equal(worker.script,origin+'/raytech-pwa-sw.js');
+    await page.locator('#salaryInput').fill('3406');
+    await context.setOffline(true);
+    await page.reload();
+    await page.locator('#smartAccountApp').waitFor({state:'visible'});
+    await page.waitForFunction(()=>window.productionCleanWorkspaceReady===true);
+    assert.equal(await page.evaluate(()=>appDb.months[appDb.selectedMonth].salary),3406);
+    assert.equal(await page.locator('#smartAdminOpen').isVisible(),false);
+    await page.locator('.v345-profile summary').click();
+    await page.locator('#v345Logout').click();
+    await page.locator('[data-login-enter]').waitFor({state:'visible'});
+    await page.reload();
+    await page.locator('[data-login-enter]').waitFor({state:'visible'});
+    assert.equal(await page.locator('#smartAccountApp').isVisible(),false);
+    await context.setOffline(false);
+    await login(page,'free');
+    assert.equal(await page.evaluate(()=>appDb.months[appDb.selectedMonth].salary),0);
+  } finally { await context.close(); }
+});
+
+test('PWA discards incomplete updates and defers validated activation until windows close', async () => {
+  const {readFile,writeFile}=await import('node:fs/promises');
+  const {createHash}=await import('node:crypto');
+  const workerPath='dist/raytech-pwa-sw.js', htmlPath='dist/index.html';
+  const [worker,html]=await Promise.all([readFile(workerPath,'utf8'),readFile(htmlPath,'utf8')]);
+  const context=await browser.newContext();
+  const page=await context.newPage();
+  try {
+    await page.goto(origin);
+    await login(page,'premium');
+    await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
+    await page.locator('#salaryInput').fill('3460');
+    const publish=async(changedHtml,label)=>{
+      const digest=createHash('sha256').update(changedHtml).digest('hex');
+      const candidate=worker.replace(/"id":"[a-f0-9]+"/,'"id":"'+label+'"')
+        .replace(/\["\/index\.html","[a-f0-9]+"\]/,'["/index.html","'+digest+'"]');
+      await writeFile(workerPath,candidate);
+      await page.evaluate(()=>window.raytechPwa.checkUpdate());
+    };
+    const changedHtml=html+'\n<!-- engineering update fixture -->';
+    await publish(changedHtml,'interrupted-fixture');
+    await page.waitForFunction(()=>window.raytechPwa.state().phase==='update-failed');
+    assert.equal(await page.evaluate(async()=>!!(await navigator.serviceWorker.ready).waiting),false);
+    assert.equal(await page.evaluate(async()=>(await caches.keys()).some(key=>key.includes('interrupted-fixture'))),false);
+    await writeFile(htmlPath,changedHtml);
+    await publish(changedHtml,'verified-fixture');
+    await page.waitForFunction(()=>window.raytechPwa.state().phase==='update-waiting');
+    assert.equal(await page.evaluate(()=>appDb.months[appDb.selectedMonth].salary),3460);
+    assert.equal(await page.evaluate(async()=>(await fetch('/index.html').then(r=>r.text())).includes('engineering update fixture')),false);
+    await page.close();
+    const next=await context.newPage();
+    await next.goto(origin);
+    await next.waitForFunction(async()=>(await fetch('/index.html').then(r=>r.text())).includes('engineering update fixture'));
+    await context.setOffline(true);
+    await next.reload();
+    await next.waitForFunction(()=>window.productionCleanWorkspaceReady===true);
+    assert.equal(await next.evaluate(()=>appDb.months[appDb.selectedMonth].salary),3460);
+  } finally {
+    await context.close();
+    await Promise.all([writeFile(workerPath,worker),writeFile(htmlPath,html)]);
+  }
+});
+
+test('PWA revalidates a blocked account before resuming online access', async () => {
+  await seedAccount('pwablocked','premium');
+  const context=await browser.newContext();
+  try {
+    const page=await context.newPage();
+    await page.goto(origin);
+    await login(page,'pwablocked');
+    await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
+    await context.setOffline(true);
+    const uid=accounts.pwablocked.uid;
+    await env.withSecurityRulesDisabled(async admin=>{
+      await updateDoc(account(admin.firestore(),uid),{blocked:true});
+    });
+    await page.reload();
+    await page.locator('#smartAccountApp').waitFor({state:'visible'});
+    await context.setOffline(false);
+    await page.locator('[data-login-exit]').waitFor({state:'visible'});
+    assert.equal(await page.locator('#smartAccountApp').isVisible(),false);
+    await context.setOffline(true);
+    await page.reload();
+    await page.locator('[data-login-exit]').waitFor({state:'visible'});
+    assert.equal(await page.locator('#smartAccountApp').isVisible(),false);
+  } finally { await context.close(); }
+});

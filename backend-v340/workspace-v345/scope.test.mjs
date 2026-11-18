@@ -127,3 +127,17 @@ test('recovery confirms an existing receipt when Firestore committed before losi
   assert.equal(writes,1);
   assert.equal(JSON.parse(remote.head.payload).months['2026-06'].expenses.length,1);
 });
+
+test('PWA grant has a 24-hour validity window and is scoped to one UID', async () => {
+  const {verifyOfflineAccess,recordOfflineAccess,OFFLINE_VALIDITY_MS} = await import('./official/js/productionV2/pwaOfflineAccess.mjs');
+  const slots=new Map();
+  const storage={getItem:k=>slots.get(k)??null,setItem:(k,v)=>slots.set(k,v),removeItem:k=>slots.delete(k)};
+  recordOfflineAccess(storage,'fixtureA',1000);
+  assert.equal(verifyOfflineAccess(storage,'fixtureA',1000),1000+OFFLINE_VALIDITY_MS);
+  assert.throws(()=>verifyOfflineAccess(storage,'fixtureA',999));
+  assert.throws(()=>verifyOfflineAccess(storage,'fixtureA',1000+OFFLINE_VALIDITY_MS));
+  assert.throws(()=>verifyOfflineAccess(storage,'fixtureB',1000));
+  const {revokeOfflineGrant}=await import('./official/js/productionV2/smartLoginOfficialIdentity.mjs');
+  revokeOfflineGrant(storage,'fixtureA');
+  assert.throws(()=>verifyOfflineAccess(storage,'fixtureA',1000));
+});

@@ -1,3 +1,5 @@
+import publicConfig from '../../../firebase-public.json' with {type:'json'};
+
 export const ORIGIN = 'http://127.0.0.1:15003';
 const homologationOrigins = new Set([
   'https://raytech-cg-homologacao.web.app',
@@ -18,9 +20,7 @@ export function requireProductionConfig(config = PRODUCTION_CONFIG, location = g
 export async function environment() {
   const expected = requireProductionConfig();
   if (expected === localFirebase) return {local: true, firebase: localFirebase};
-  const response = await fetch('/__/firebase/init.json', {cache: 'no-store', redirect: 'error'});
-  if (!response.ok) throw Error('V345_HOSTING_CONFIG');
-  const firebase = await response.json();
+  const firebase = Object.freeze(publicConfig);
   if (firebase.projectId !== expected.projectId ||
       firebase.authDomain !== 'raytech-cg-homologacao.firebaseapp.com' ||
       firebase.appId !== '1:195471491370:web:b7e5a0a5a218d16f7a9e53' || !firebase.apiKey) {

@@ -3,7 +3,8 @@ import {mountSmartLoginView} from './smartLoginView.mjs';
 import {mountAdmin} from './smartAdminView.mjs';
 import {openSmartLoginAuth} from './smartLoginOfficialAuth.mjs';
 import {ORIGIN} from './config.mjs';
-import {scopedStorage, readOfflineGrant, cacheOfflineGrant, revokeOfflineGrant} from './smartLoginOfficialIdentity.mjs';
+import {verifyOfflineAccess,recordOfflineAccess} from './pwaOfflineAccess.mjs';
+import {scopedStorage, revokeOfflineGrant} from './smartLoginOfficialIdentity.mjs';
 
 const root = document.getElementById('smartLogin');
 const panel = document.getElementById('smartAccountApp');
@@ -63,19 +64,27 @@ async function observe(user) {
   if (!user) { view.paint({phase: 'signed-out'}); return; }
   view.paint({phase: 'checking-workspace'});
   const uid = user.uid;
-  const offline = !navigator.onLine;
+  let offline = !navigator.onLine;
   const identity = {uid, original: false, prefix: 'raytech_v334_uid:' + uid + ':'};
   try {
-    const [account, role] = offline
-      ? (readOfflineGrant(raw, uid), [null, null])
-      : await Promise.all([auth.profile(uid), auth.role(uid)]);
+    let account = null, role = null, expires, accessVerified = false;
+    if (!offline) {
+      try { [account,role] = await Promise.all([auth.profile(uid),auth.role(uid)]); }
+      catch (error) {
+        if (!['unavailable','deadline-exceeded','auth/network-request-failed'].includes(error.code)) throw error;
+        offline = true;
+      }
+    }
     if (generation !== epoch || auth.currentUid() !== uid) return;
-    if (account?.blocked) { blocked(uid); return; }
-    if (!offline) cacheOfflineGrant(raw, identity);
+    if (!offline && account?.blocked !== false) { blocked(uid); return; }
+    if (!offline) { recordOfflineAccess(raw,uid); accessVerified = true; }
+    expires = verifyOfflineAccess(raw,uid);
+    let stopAdmin = () => {}, deadline = null;
+    const offlineSession = () => offline || !navigator.onLine || !accessVerified;
     const avatar = document.getElementById('v345Avatar');
     const label = user.displayName || account?.name || 'Conta de teste';
     avatar.textContent = label.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
-    if (location.protocol === 'https:' && user.photoURL) {
+    if (!offline && location.protocol === 'https:' && user.photoURL) {
       try {
         const photo = new URL(user.photoURL);
         if (photo.origin === 'https://lh3.googleusercontent.com' && !photo.username && !photo.password) {
@@ -89,8 +98,8 @@ async function observe(user) {
     }
     const paintPlan = plan => {
       const cloudPlan = role ? 'premium' : plan;
-      window.raytechCloudEntitlement = cloudEntitlement({plan: cloudPlan, role, verified: !offline});
-      invoiceAllowed = !offline && (plan === 'premium' || !!role);
+      window.raytechCloudEntitlement = cloudEntitlement({plan: cloudPlan, role, verified: !!account});
+      invoiceAllowed = accessVerified && (plan === 'premium' || !!role);
       document.getElementById('v345Identity').textContent =
         label + ' · ' +
         (role === 'owner' ? 'Owner' : role === 'admin' ? 'Admin' : plan === 'premium' ? 'Premium' : 'Free');
@@ -98,7 +107,8 @@ async function observe(user) {
     };
     active = uid;
     window.raytechSessionRevoked = false;
-    window.raytechStorage = scopedStorage(raw, identity, activeSession);
+    window.raytechStorage = scopedStorage(raw, identity, who => activeSession(who) &&
+      (!offlineSession() || Date.now() < expires));
     paintPlan(account?.plan);
     started = true;
     await loadScripts();
@@ -116,22 +126,84 @@ async function observe(user) {
     };
     document.getElementById('v345Logout').addEventListener('click', logout);
     document.getElementById('productionCloudLogout')?.addEventListener('click', logout, {capture: true});
-    if (offline) window.addEventListener('online', () => { lock(); location.reload(); }, {once: true});
-    else {
-      let plan = account.plan;
-      unsubscribe.push(auth.watchAccount(uid, record => {
-        if (!record || record.blocked !== false) blocked(uid);
-        else if (record.plan !== plan) {
-          plan = record.plan;
-          paintPlan(plan);
-          window.dispatchEvent(new Event('raytech-plan-changed'));
-        }
-      }, () => blocked(uid)));
-      unsubscribe.push(auth.watchRole(uid, current => {
-        if (current !== role) { lock(); location.reload(); }
-      }, () => blocked(uid)));
-      if (role) unsubscribe.push(mountAdmin({api: auth.admin(uid), role, uid}));
-    }
+    const cancelDeadline = () => { if (deadline !== null) clearTimeout(deadline); deadline = null; };
+    const expireIfNecessary = () => {
+      if (activeSession(uid) && offlineSession() && Date.now() >= expires) blocked(uid);
+    };
+    const scheduleExpiry = () => {
+      cancelDeadline();
+      expireIfNecessary();
+      if (activeSession(uid) && offlineSession()) deadline = setTimeout(expireIfNecessary, Math.max(1,expires-Date.now()));
+    };
+    let stopWatch = [], revalidating = false;
+    const detach = () => { for (const stop of stopWatch) stop(); stopWatch = []; stopAdmin(); stopAdmin = () => {}; };
+    const watch = () => {
+      detach();
+      const refreshed = () => { recordOfflineAccess(raw,uid); expires = verifyOfflineAccess(raw,uid); };
+      stopWatch = [
+        auth.watchAccount(uid, record => {
+          if (!activeSession(uid) || !navigator.onLine) return;
+          if (!record || record.blocked !== false) { blocked(uid); return; }
+          refreshed();
+          if (record.plan !== account.plan) {
+            account = record;
+            paintPlan(account.plan);
+            window.dispatchEvent(new Event('raytech-plan-changed'));
+          }
+        }, () => blocked(uid),goOffline),
+        auth.watchRole(uid, current => {
+          if (!activeSession(uid) || !navigator.onLine) return;
+          if (current !== role) { lock(); location.reload(); }
+        }, () => blocked(uid),goOffline),
+      ];
+      if (role) stopAdmin = mountAdmin({api:auth.admin(uid),role,uid});
+    };
+    const goOffline = () => {
+      if (!activeSession(uid)) return;
+      offline = true; accessVerified = false; invoiceAllowed = false;
+      window.raytechOnlineAuthorizationPending = true;
+      detach();
+      notify();
+      scheduleExpiry();
+    };
+    const revalidate = async () => {
+      if (!activeSession(uid) || !navigator.onLine || revalidating || accessVerified) return;
+      revalidating = true;
+      try {
+        const [fresh, currentRole] = await Promise.all([auth.profile(uid),auth.role(uid)]);
+        if (!activeSession(uid) || !navigator.onLine) return;
+        if (fresh?.blocked !== false) { blocked(uid); return; }
+        const changed = fresh.plan !== account?.plan || currentRole !== role;
+        account = fresh; role = currentRole; offline = false; accessVerified = true;
+        recordOfflineAccess(raw,uid); expires = verifyOfflineAccess(raw,uid); cancelDeadline();
+        window.raytechOnlineAuthorizationPending = false;
+        paintPlan(account.plan);
+        watch();
+        if (changed) window.dispatchEvent(new Event('raytech-plan-changed'));
+        window.dispatchEvent(new Event('raytech-online-verified'));
+      } catch (error) {
+        if (!activeSession(uid)) return;
+        if (['unavailable','deadline-exceeded','auth/network-request-failed'].includes(error.code)) scheduleExpiry();
+        else blocked(uid);
+      } finally { revalidating = false; }
+    };
+    window.raytechOnlineAuthorizationPending = offline;
+    window.addEventListener('offline',goOffline);
+    window.addEventListener('online',revalidate);
+    const revalidateVisible = () => {
+      scheduleExpiry();
+      if (document.visibilityState === 'visible') void revalidate();
+    };
+    document.addEventListener('visibilitychange',revalidateVisible);
+    // A browser can report "online" with no route to Firestore.
+    const retryAccess = setInterval(()=>{if(!accessVerified)void revalidate();},30000);
+    unsubscribe.push(()=>{
+      clearInterval(retryAccess);cancelDeadline();detach();
+      window.removeEventListener('offline',goOffline);
+      window.removeEventListener('online',revalidate);
+      document.removeEventListener('visibilitychange',revalidateVisible);
+    });
+    if (offline) scheduleExpiry(); else watch();
     window.dispatchEvent(new Event('raytech-account-start'));
     document.dispatchEvent(new Event('raytech-account-start'));
     if (generation !== epoch || !activeSession(uid)) return;

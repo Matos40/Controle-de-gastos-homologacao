@@ -47,9 +47,17 @@ async function initialize() {
     return data;
   };
   const role = async uid => operatorRole(await read(roleRef(uid)));
-  const watch = (ref, fn, error) => onSnapshot(ref, {includeMetadataChanges: true}, snapshot => {
-    if (!snapshot.metadata.fromCache) fn(snapshot.data());
-  }, error);
+  const watch = (ref, fn, error, unavailable) => {
+    let sawServer = false;
+    return onSnapshot(ref, {includeMetadataChanges: true}, snapshot => {
+      if (snapshot.metadata.fromCache) {
+        if (sawServer) unavailable?.();
+        return;
+      }
+      sawServer = true;
+      fn(snapshot.data());
+    }, error);
+  };
   return {
     db, currentUid, profile, role, assertSession,
     onSession: (fn, error) => onAuthStateChanged(auth, fn, error),
@@ -60,8 +68,8 @@ async function initialize() {
       return signInWithEmailAndPassword(auth, form.elements.email.value, form.elements.password.value);
     },
     signOut: () => signOut(auth),
-    watchAccount: (uid, fn, error) => watch(account(uid), fn, error),
-    watchRole: (uid, fn, error) => watch(roleRef(uid), value => fn(operatorRole(value)), error),
+    watchAccount: (uid, fn, error, unavailable) => watch(account(uid), fn, error, unavailable),
+    watchRole: (uid, fn, error, unavailable) => watch(roleRef(uid), value => fn(operatorRole(value)), error, unavailable),
     async reserveInvoice(uid) {
       assertSession(uid);
       await runTransaction(db, async tx => {

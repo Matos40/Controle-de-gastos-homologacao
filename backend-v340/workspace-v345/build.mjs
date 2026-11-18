@@ -1,4 +1,6 @@
-import {cp, mkdir, readFile, writeFile, rm} from 'node:fs/promises';
+import {cp, mkdir, readFile, writeFile, rm, readdir} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import path from 'node:path';
 import {build} from 'esbuild';
 import postcss from 'postcss';
 import tailwind from 'tailwindcss';
@@ -30,7 +32,7 @@ replace(/<!-- Tailwind CSS -->[\s\S]*?<\/script>\s*<link rel="stylesheet" href="
 <link rel="stylesheet" href="./css/styles.css">
 <link rel="stylesheet" href="./css/v345.css">`);
 replace(/<link href="https:\/\/fonts.googleapis.com[^>]+>/, '');
-replace(/<link id="pwaManifestLink"[^>]+>/, '');
+replace(/<link id="pwaManifestLink"[^>]+>/, '<link rel="manifest" href="./manifest.webmanifest">\n<script type="module" src="./pwa/register.mjs"></script>');
 replace(/<button\s+type="button"\s+id="(?:premiumApiKeyButton|pwaHeaderBtn)"[\s\S]*?<\/button>/g, '');
 replace(/<!-- Modal Chave da API Gemini -->[\s\S]*?(?=  <main class="max-w-6xl)/, `
 <dialog id="ocrModal" aria-labelledby="invoiceTitle" class="v345-dialog">
@@ -91,3 +93,15 @@ for (const [source, target] of [
 const entry = 'js/productionV2/smartLoginOfficialBootstrap.mjs';
 await build({entryPoints: ['official/' + entry], bundle: true, minify: true,
   treeShaking: true, format: 'esm', target: 'es2022', outfile: out + '/' + entry});
+
+const digest = data => createHash('sha256').update(data).digest('hex');
+const paths = (await readdir(out,{recursive:true,withFileTypes:true}))
+  .filter(entry => entry.isFile())
+  .map(entry => path.relative(out,path.join(entry.parentPath,entry.name)).split(path.sep).join('/'))
+  .sort();
+const files = await Promise.all(paths.map(async name => [
+  '/' + name.split('/').map(encodeURIComponent).join('/'), digest(await readFile(out + '/' + name)),
+]));
+const worker = await readFile('pwa-worker.js','utf8');
+const id = digest(JSON.stringify(files) + worker);
+await writeFile(out + '/raytech-pwa-sw.js','const BUILD = ' + JSON.stringify({id,files}) + ';\n' + worker);

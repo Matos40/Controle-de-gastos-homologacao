@@ -7,10 +7,10 @@ import {pathToFileURL} from 'node:url';
 const origin = 'http://127.0.0.1:15003';
 const root = resolve('dist');
 const types = {html: 'text/html; charset=utf-8', css: 'text/css', js: 'text/javascript',
-  mjs: 'text/javascript', png: 'image/png', svg: 'image/svg+xml', woff2: 'font/woff2'};
+  mjs: 'text/javascript', webmanifest: 'application/manifest+json', png: 'image/png', svg: 'image/svg+xml', woff2: 'font/woff2'};
 const csp = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
   "img-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:19099 http://127.0.0.1:18080; " +
-  "worker-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
+  "worker-src http://127.0.0.1:15003/raytech-pwa-sw.js; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
 
 export async function serve() {
   const server = createServer(async (req, res) => {
