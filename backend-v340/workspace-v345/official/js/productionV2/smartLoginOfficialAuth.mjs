@@ -6,6 +6,7 @@ import {getFirestore, connectFirestoreEmulator, doc, collection, getDocFromServe
 import {environment,collectionName} from './config.mjs';
 import {DEFAULT_LIMITS} from './v345Usage.mjs';
 import {operatorRole} from './smartAdminPolicy.mjs';
+import {googleProfileFromToken, adminIdentity} from './googleAdminProfile.mjs';
 
 let ready;
 export function openSmartLoginAuth() {
@@ -22,12 +23,34 @@ async function initialize() {
     connectFirestoreEmulator(db, '127.0.0.1', 18080);
   }
   const currentUid = () => auth.currentUser?.uid ?? null;
+  const profileSyncs = new Map();
   const account = uid => doc(db, collectionName('Accounts'), uid);
   const roleRef = uid => doc(db, collectionName('Roles'), uid);
   const read = async ref => (await getDocFromServer(ref)).data();
   const assertSession = uid => {
     if (currentUid() !== uid) throw Error('SESSION_CHANGED');
   };
+  function syncGoogleProfile(uid, current) {
+    if (profileSyncs.has(uid)) return;
+    const user = auth.currentUser;
+    const sync = (async () => {
+      const {claims} = await user.getIdTokenResult();
+      assertSession(uid);
+      if (auth.currentUser !== user || !googleProfileFromToken(claims, current.googleProfile)) return;
+      await runTransaction(db, async tx => {
+        assertSession(uid);
+        const ref = account(uid);
+        const fresh = (await tx.get(ref)).data();
+        assertSession(uid);
+        if (auth.currentUser !== user || fresh?.uid !== uid || fresh.blocked !== false) return;
+        const googleProfile = googleProfileFromToken(claims, fresh.googleProfile);
+        if (googleProfile) tx.update(ref, {googleProfile});
+      });
+    })();
+    profileSyncs.set(uid, sync);
+    void sync.catch(error => console.warn('[Smart Admin] Perfil Google não sincronizado', error.code ?? 'unavailable'))
+      .finally(() => profileSyncs.delete(uid));
+  }
   const ai=async(uid,endpoint,body,id)=>{
     assertSession(uid);
     if(!local||location.origin!=='http://127.0.0.1:15003'||!navigator.onLine)throw Error('AI_UNAVAILABLE');
@@ -51,6 +74,7 @@ async function initialize() {
       });
     }
     assertSession(uid);
+    if (!local && data.uid === uid && data.blocked === false) syncGoogleProfile(uid, data);
     return data;
   };
   const role = async uid => operatorRole(await read(roleRef(uid)));
@@ -93,7 +117,7 @@ async function initialize() {
           const record = await read(roleRef(row.id));
           const role = operatorRole(record);
           const profile = row.data();
-          const base = {...profile, role, protected: !!record};
+          const base = {...adminIdentity(profile), role, protected: !!record};
           if(!local)return {...base,limits:profile.limits??(role||profile.plan==='premium'?DEFAULT_LIMITS:undefined),usageUnavailable:true,readerEnabled:false};
           // Free profiles can retain configured limits and historical consumption after downgrade.
           // Never pass limits without usage to the view. Ask the authorized backend for every account.

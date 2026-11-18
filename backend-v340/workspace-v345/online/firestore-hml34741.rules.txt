@@ -38,15 +38,35 @@ function hml34741Audit(id) {
 
 match /raytechHml34741Accounts/{uid} {
   function valid(d) {
-    return d.keys().hasOnly(['uid', 'name', 'plan', 'blocked', 'limits', 'lastAudit'])
+    return d.keys().hasOnly(['uid', 'name', 'plan', 'blocked', 'limits', 'lastAudit', 'googleProfile'])
       && d.uid == uid && d.name is string && d.name.size() > 0 && d.name.size() <= 80
       && d.plan in ['free', 'premium'] && d.blocked is bool
       && (!('limits' in d) || hml34741Limits(d.limits))
       && (!('lastAudit' in d) || hml34741Id(d.lastAudit));
   }
+  // createdAtMs comes from the administrative Auth lookup. A client cannot set or remove it.
+  function validGoogleProfile(p, previous, token) {
+    let name = token.get('name', '');
+    let picture = token.get('picture', '');
+    return p is map && p.keys().hasAll(['email', 'name', 'photo', 'lastLoginSeconds'])
+      && p.keys().hasOnly(['email', 'name', 'photo', 'lastLoginSeconds', 'createdAtMs'])
+      && ('createdAtMs' in p) == ('createdAtMs' in previous)
+      && p.get('createdAtMs', 0) == previous.get('createdAtMs', 0)
+      && token.firebase.sign_in_provider == 'google.com' && token.email_verified == true
+      && p.email is string && p.email.size() > 0 && p.email.size() <= 320 && p.email == token.email
+      && p.name == ((name is string && name.size() <= 160) ? name : '')
+      && p.photo == ((picture is string && picture.size() <= 2048
+        && picture.matches('https://lh3[.]googleusercontent[.]com/[^[:space:]]*')) ? picture : '')
+      && p.lastLoginSeconds is int && p.lastLoginSeconds > 0 && p.lastLoginSeconds == token.auth_time
+      && p.lastLoginSeconds > previous.get('lastLoginSeconds', 0);
+  }
   allow get: if hml34741Self(uid) || hml34741IsOperator();
   allow list: if hml34741IsOperator() && request.query.limit <= 100;
   allow create: if false; // Pre-provision synthetic accounts using authorized Firebase Console operator.
+  allow update: if hml34741Self(uid) && resource.data.blocked == false
+    && valid(request.resource.data)
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['googleProfile'])
+    && validGoogleProfile(request.resource.data.googleProfile, resource.data.get('googleProfile', {}), request.auth.token);
   allow update: if hml34741IsOperator() && !hml34741Self(uid) && !exists(hml34741Role(uid))
     && valid(request.resource.data)
     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plan', 'blocked', 'limits', 'lastAudit'])

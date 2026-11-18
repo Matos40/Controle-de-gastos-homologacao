@@ -50,7 +50,7 @@ function renderConsumption(account) {
   }
   return node;
 }
-function safeDate(v){try{const d=v?.toDate?.();return d instanceof Date&&Number.isFinite(d.getTime())?d.toLocaleString('pt-BR'):'—';}catch{return '—';}}
+function safeDate(v){try{const d=v instanceof Date?v:v?.toDate?.();return d instanceof Date&&Number.isFinite(d.getTime())?d.toLocaleString('pt-BR'):'—';}catch{return '—';}}
 function accountAvatar(account) {
   const initials = accountLabel(account).trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
   const avatar = el('span', initials, 'v345-admin-avatar');
@@ -62,7 +62,6 @@ function accountAvatar(account) {
         const img = el('img');
         img.alt = '';
         img.referrerPolicy = 'no-referrer';
-        img.loading = 'lazy';
         img.onload = () => avatar.replaceChildren(img);
         img.src = url.href;
       }
@@ -266,11 +265,13 @@ export function mountAdmin({api, role, uid}) {
           name.append(el('strong', accountLabel(account)));name.title=accountLabel(account);
           identity.append(avatar, name);
           const email=el('span',account.email||'—','v3467-email');email.title=account.email||'';
+          const roleTag=el('span',plans[account.role]||'Usuário','admin-row-role');
+          roleTag.dataset.role=account.role||'';
           const planTag=el('span',plans[account.plan]||'—','v3467-plan');planTag.dataset.value=account.plan;
           const stateTag=el('span',account.blocked?'Bloqueada':'Ativa','v3467-state');stateTag.dataset.blocked=String(account.blocked);
           const usage=el('span',account.usage&&account.limits?account.usage.month+'/'+account.limits.month:'—','v3467-usage');usage.title=account.usage&&account.limits?'Consumo mensal UTC':'Consumo de IA indisponível';
           const detailButton=button('Exibir detalhes',()=>edit(account,status,epoch));detailButton.setAttribute('aria-label','Exibir detalhes de '+accountLabel(account));
-          row.append(identity,email,planTag,stateTag,usage,detailButton);
+          row.append(identity,email,roleTag,planTag,stateTag,usage,detailButton);
           rows.append(row);
         }
         if (!rows.childElementCount) rows.append(el('p', 'Nenhuma conta encontrada.'));
@@ -281,7 +282,7 @@ export function mountAdmin({api, role, uid}) {
       rows.className = 'v345-admin-rows';
       const auditPanel = el('section', '', 'v345-audit');
       auditPanel.append(el('h3', 'Auditoria · últimos 100 registros'));
-      const columns=el('div','','v3467-columns');for(const label of ['Usuário','E-mail','Plano','Situação','Uso IA','Ação'])columns.append(el('span',label));
+      const columns=el('div','','v3467-columns');for(const label of ['Usuário','E-mail','Função','Plano','Situação','Uso IA','Ação'])columns.append(el('span',label));
       host.append(stats, tools, monitor, columns, rows, auditPanel);
       const labels = new Map(accounts.map(a => [a.uid, accountLabel(a)]));
       for (const event of audit) {
