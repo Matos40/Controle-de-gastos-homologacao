@@ -1,6 +1,8 @@
 import {seed,profiles,password} from './functions/rc3474-seed.mjs';
 import {assertLocalEmulators} from './functions/emulator-guard.mjs';
 import {spawn} from 'node:child_process';
+import {existsSync,unlinkSync} from 'node:fs';
+const stopFile=fileURLToPath(new URL('./.rc3474-stop',import.meta.url));
 import {fileURLToPath} from 'node:url';
 assertLocalEmulators();
 await seed();
@@ -15,6 +17,7 @@ if(process.platform==='win32'&&process.env.RAYTECH_RC_NO_BROWSER!=='1'){
  const browser=spawn('cmd.exe',['/d','/c','start','','http://127.0.0.1:15003'],{stdio:'ignore'});browser.on('error',()=>console.log('Abra o endereco manualmente.'));
 }
 let closing=false;
-async function stop(){if(closing)return;closing=true;process.stdin.pause();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
+const stopPoll=process.env.RAYTECH_RC_TEST==='1'?setInterval(()=>{if(existsSync(stopFile)){unlinkSync(stopFile);void stop();}},250):null;
+async function stop(){if(closing)return;closing=true;if(stopPoll)clearInterval(stopPoll);process.stdin.pause();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
 process.once('SIGINT',()=>void stop());process.once('SIGTERM',()=>void stop());
-process.stdin.resume();process.stdin.once('data',()=>void stop());process.stdin.once('end',()=>void stop());
+if(process.env.RAYTECH_RC_TEST!=='1'){process.stdin.resume();process.stdin.once('data',()=>void stop());process.stdin.once('end',()=>void stop());}

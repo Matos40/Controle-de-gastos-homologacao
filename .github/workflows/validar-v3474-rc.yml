@@ -75,3 +75,34 @@ jobs:
           name: raytech-v3474-windows
           path: backend-v340/release/
           if-no-files-found: error
+  windows-smoke:
+    needs: security
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22.18.0'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/download-artifact@v5
+        with:
+          name: raytech-v3474-windows
+          path: downloaded
+      - name: Verify and extract exact candidate
+        shell: pwsh
+        run: |
+          $zip = 'downloaded/raytech-v3474-windows.zip'
+          $expected = ((Get-Content "$zip.sha256" -Raw).Trim() -split '\s+')[0]
+          $actual = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($expected -notmatch '^[a-f0-9]{64}$' -or $expected -ne $actual) { throw 'SHA-256 mismatch' }
+          Write-Host "Verified inner ZIP SHA-256: $actual"
+          Expand-Archive -LiteralPath $zip -DestinationPath 'rc3474-extracted'
+      - name: Windows launcher startup, four profiles, HTTP, graceful shutdown
+        shell: pwsh
+        run: node backend-v340/rc3474-windows-smoke.mjs rc3474-extracted
