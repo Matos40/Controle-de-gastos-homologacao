@@ -1,4 +1,4 @@
-name: V34.7.4 Smart Release Candidate - emulators only
+name: V34.7.4.1 Smart Admin Fix - emulators only
 on:
   push:
     branches: [feature/v34-7-4-smart-release-candidate]
@@ -66,13 +66,13 @@ jobs:
           cp -r workspace-v345/dist /tmp/rc3474/workspace-v345/
           cp workspace-v345/dist-firestore.rules workspace-v345/serve.mjs /tmp/rc3474/workspace-v345/
           cp firebase-v3473.json rc3474-session.mjs iniciar-v3474.ps1 INICIAR-RAYTECH-V3474.cmd LEIA-ME-V3474.md /tmp/rc3474/
-          (cd /tmp/rc3474 && zip -qr "$GITHUB_WORKSPACE/backend-v340/release/raytech-v3474-windows.zip" .)
+          (cd /tmp/rc3474 && zip -qr "$GITHUB_WORKSPACE/backend-v340/release/raytech-v3474-1-windows.zip" .)
           cd release
-          sha256sum raytech-v3474-windows.zip > raytech-v3474-windows.zip.sha256
-          sha256sum -c raytech-v3474-windows.zip.sha256
+          sha256sum raytech-v3474-1-windows.zip > raytech-v3474-1-windows.zip.sha256
+          sha256sum -c raytech-v3474-1-windows.zip.sha256
       - uses: actions/upload-artifact@v5
         with:
-          name: raytech-v3474-windows
+          name: raytech-v3474-1-windows
           path: backend-v340/release/
           if-no-files-found: error
   windows-smoke:
@@ -92,12 +92,12 @@ jobs:
           java-version: '21'
       - uses: actions/download-artifact@v5
         with:
-          name: raytech-v3474-windows
+          name: raytech-v3474-1-windows
           path: downloaded
       - name: Verify and extract exact candidate
         shell: pwsh
         run: |
-          $zip = 'downloaded/raytech-v3474-windows.zip'
+          $zip = 'downloaded/raytech-v3474-1-windows.zip'
           $expected = ((Get-Content "$zip.sha256" -Raw).Trim() -split '\s+')[0]
           $actual = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($expected -notmatch '^[a-f0-9]{64}$' -or $expected -ne $actual) { throw 'SHA-256 mismatch' }

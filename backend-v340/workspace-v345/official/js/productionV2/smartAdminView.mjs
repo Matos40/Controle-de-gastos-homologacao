@@ -26,9 +26,10 @@ function selector(label, options) {
   return node;
 }
 function renderConsumption(account) {
-  if (!account.limits) return el('p', account.usageUnavailable ? 'Consumo indisponível' : 'Sem cota de leitor');
+  if (!account.limits || !account.usage) return el('p', account.usageUnavailable || account.limits ? 'Consumo indisponível' : 'Sem cota de leitor');
   const node = el('div', '', 'v345-usage');
   node.setAttribute('aria-label', 'Consumo do leitor simulado');
+  if(account.readerEnabled===false)node.append(el('p','Leitor indisponível · histórico de consumo'));
   if(account.outcome){const x=account.outcome.month;node.append(el('p','Reservadas: '+x.reserved+' · Concluídas: '+x.completed+' · Falhas: '+x.failed+' · Pendentes: '+x.pending));}
   for (const key of keys) {
     const count = account.usage[key];
@@ -127,7 +128,8 @@ export function mountAdmin({api, role, uid}) {
     exit.focus();
     try {
       if (!await api.role()) throw Error('ADMIN_DENIED');
-      const [accounts, audit, monitor] = await Promise.all([api.list(), api.audit(),api.monitor()]);
+      const [accounts, auditResult, monitor] = await Promise.all([api.list(), api.audit().then(value=>({value}),()=>({unavailable:true})),api.monitor()]);
+      const audit=auditResult.value??[];
       if (epoch !== serial) return;
       status.textContent = (typeof message === 'string' ? message + ' ' : '') + accounts.length + ' contas nesta amostra, até 100.';
       const stats = el('div', '', 'admin-stats');
@@ -192,15 +194,24 @@ export function mountAdmin({api, role, uid}) {
       host.append(stats,consumption,budget,tools,rows,auditPanel);
       const labels = new Map(accounts.map(a => [a.uid, accountLabel(a)]));
       for (const event of audit) {
+        if(!event||typeof event.target!=='string'||typeof event.actor!=='string'||!['free','premium'].includes(event.beforePlan)||!['free','premium'].includes(event.afterPlan)||typeof event.afterBlocked!=='boolean'){auditPanel.append(el('p','Registro de auditoria inválido.'));continue;}
+        let date='Data indisponível';try{const parsed=event.at?.toDate?.();if(parsed instanceof Date&&Number.isFinite(parsed.getTime()))date=parsed.toISOString();}catch{}
         const item = el('details');
         item.append(el('summary', (labels.get(event.target) || 'Conta') + ' · ' + event.beforePlan + ' → ' +
           event.afterPlan + ' · ' + (event.afterBlocked ? 'Bloqueada' : 'Ativa')),
-          el('small', 'Operador ' + event.actor + ' · ' + event.at.toDate().toISOString()));
+          el('small', 'Operador ' + event.actor + ' · ' + date));
         auditPanel.append(item);
       }
-      if (!audit.length) auditPanel.append(el('p', 'Nenhuma alteração registrada.', 'v345-audit-empty'));
-    } catch {
-      if (epoch === serial) status.textContent = 'Acesso administrativo não autorizado ou conexão indisponível.';
+      if(auditResult.unavailable) auditPanel.append(el('p','Auditoria temporariamente indisponível. Reabra o painel para tentar novamente.'));
+      else if (!audit.length) auditPanel.append(el('p', 'Nenhuma alteração registrada.', 'v345-audit-empty'));
+    } catch (error) {
+      if (epoch === serial) {
+        const code=String(error?.code??error?.message??'');
+        const denied=['ADMIN_DENIED','ACCESS_DENIED','permission-denied','UNAUTHENTICATED','SESSION_CHANGED'].includes(code);
+        const transport=['unavailable','deadline-exceeded','AI_UNAVAILABLE','ADMIN_UNAVAILABLE','UNAVAILABLE'].includes(code);
+        status.textContent=denied?'Acesso administrativo não autorizado.':transport?'Serviço administrativo temporariamente indisponível.':'Não foi possível carregar o painel administrativo. Reabra para tentar novamente.';
+        console.warn('[Smart Admin] '+(denied?'AUTHORIZATION':transport?'SERVICE_UNAVAILABLE':'PANEL_LOAD_FAILED'));
+      }
     }
   }
 

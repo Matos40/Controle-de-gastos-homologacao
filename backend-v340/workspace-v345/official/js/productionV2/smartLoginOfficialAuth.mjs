@@ -93,17 +93,19 @@ async function initialize() {
           const role = operatorRole(record);
           const profile = row.data();
           const base = {...profile, role, protected: !!record};
-          if (!role && profile.plan !== 'premium') return base;
+          // Free profiles can retain configured limits and historical consumption after downgrade.
+          // Never pass limits without usage to the view. Ask the authorized backend for every account.
           try {
             const {row:metrics}=await ai(uid,'workspaceUsageAdmin',{action:'get',uid:row.id});
-            return {...base, limits:metrics.limits,usage:metrics.used,outcome:metrics.outcome};
-          } catch { return {...base, limits: undefined, usageUnavailable: true}; }
+            return {...base, limits:metrics.limits,usage:metrics.used,outcome:metrics.outcome,readerEnabled:!profile.blocked&&(!!role||profile.plan==='premium')};
+          } catch { return {...base, limits: undefined, usage: undefined, usageUnavailable: true}; }
         }));
       },
       async audit() {
         assertSession(uid);
         const page = await getDocsFromServer(query(collection(db, 'raytechV345Audit'), orderBy('at', 'desc'), limit(100)));
-        return page.docs.map(row => row.data());
+        const events=page.docs.map(row => row.data());
+        assertSession(uid); return events;
       },
       change(target, patch) {
         assertSession(uid);

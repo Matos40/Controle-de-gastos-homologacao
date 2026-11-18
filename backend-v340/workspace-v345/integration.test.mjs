@@ -454,3 +454,42 @@ test('mobile options native touch swipe scrolls content, retains fixed heading a
 });
 
 test('workspace HTTP denies Free and unauthenticated callers, even with forged browser UI',async()=>{const ctx=await browser.newContext();try{const page=await ctx.newPage();await page.goto(origin);await login(page,'free');const response=await fetch('http://'+authHost+'/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo-v345',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:accounts.free.email,password,returnSecureToken:true})});assert.equal(response.status,200);const {idToken}=await response.json();const status=await page.evaluate(async token=>{window.raytechCanUseInvoiceAI=()=>true;const req=await fetch('/api/workspaceExtractInvoice',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json','x-request-id':crypto.randomUUID()},body:JSON.stringify({feature:'invoice-ai',mimeType:'application/pdf',data:btoa('%PDF-1.4\n% synthetic\n%%EOF\n')})});return req.status;},idToken);assert.equal(status,403);const missing=await page.evaluate(async()=> (await fetch('/api/workspaceUsageAdmin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'list',after:null})})).status);assert.equal(missing,401);}finally{await ctx.close();}});
+
+test('BUG-V3474-001: both operators reopen Smart Admin after Free quota edit, upgrade, downgrade and block',async()=>{
+ const owner=await browser.newContext({viewport:{width:1280,height:900}}),admin=await browser.newContext({viewport:{width:390,height:844}}),user=await browser.newContext();
+ try{
+  const a=await owner.newPage(),b=await admin.newPage(),u=await user.newPage();
+  for(const [p,name] of [[a,'owner'],[b,'admin'],[u,'free']]){await p.goto(origin);await login(p,name);}
+  const open=async p=>{await p.locator('.v345-profile summary').click();await p.locator('#smartAdminOpen').click();await p.locator('#v3473Monitor').waitFor();};
+  const close=async p=>p.getByRole('button',{name:'Fechar painel administrativo'}).click();
+  const edit=async(p,plan,blocked)=>{
+   await p.locator('.admin-row').filter({has:p.getByText('free',{exact:true})}).getByRole('button',{name:'Editar cotas e acesso'}).click();
+   const dialog=p.locator('#smartAdminHost dialog');
+   await dialog.getByRole('combobox',{name:'Plano',exact:true}).selectOption(plan);
+   await dialog.getByRole('combobox',{name:'Situação',exact:true}).selectOption(String(blocked));
+   for(const [label,n] of [['Minuto UTC','1'],['Dia UTC','2'],['Mês UTC','5']])await dialog.getByRole('spinbutton',{name:label,exact:true}).fill(n);
+   await dialog.getByRole('button',{name:'Salvar alterações'}).click();
+   await p.locator('#v3473Monitor').waitFor();await p.getByText(/Alterações salvas/).waitFor();
+   assert.equal(await p.locator('.v345-admin-rows .admin-row').count(),Object.keys(accounts).length);
+  };
+  await open(a);await edit(a,'free',false);
+  await open(b);await close(b);
+  await edit(a,'premium',false);await u.waitForFunction(()=>window.raytechCanUseInvoiceAI()===true);
+  await u.locator('#headerToolsToggleBtn').click();await u.locator('#premiumInvoiceButton').click();await u.locator('#simulatedExtract').click();await u.locator('#simulatedConfirm').click();
+  await u.waitForFunction(()=>appDb.months[appDb.selectedMonth].cardExpenses.length===2);
+  await edit(a,'free',false);await u.waitForFunction(()=>window.raytechCanUseInvoiceAI()===false);
+  assert.equal(await u.evaluate(()=>appDb.months[appDb.selectedMonth].cardExpenses.length),2);
+  await close(a);await open(a);await open(b);
+  for(const p of [a,b]){
+   const row=p.locator('.admin-row').filter({has:p.getByText('free',{exact:true})});
+   assert.match(await row.textContent(),/Leitor indisponível/);
+   assert.match(await row.textContent(),/Reservadas: 1 · Concluídas: 1/);
+   assert.match(await row.textContent(),/Mês UTC · 1\/5/);
+   assert.ok(await p.locator('.v345-audit details').count()>=3);
+  }
+  await edit(b,'free',true);await u.locator('#smartAccountApp').waitFor({state:'hidden'});
+  await edit(b,'free',false);await close(b);await open(b);
+  assert.match(await b.locator('.admin-row').filter({has:b.getByText('free',{exact:true})}).textContent(),/Ativa/);
+  await close(a);await open(a);assert.ok(await a.locator('.v345-audit details').count()>=5);
+ }finally{await Promise.all([owner.close(),admin.close(),user.close()]);}
+});
