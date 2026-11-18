@@ -79,12 +79,13 @@
 #smartAdminHost .admin-stat[aria-pressed=true]{border-color:#38bdf8;background:#123b50;box-shadow:inset 0 0 0 1px #38bdf8}
 #smartAdminHost .admin-tools{grid-template-columns:minmax(0,2fr) repeat(3,minmax(0,1fr));gap:6px}
 #smartAdminHost .v345-admin-rows{gap:5px}
-#smartAdminHost .admin-row,#smartAdminHost .v3467-columns{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1.6fr) minmax(3.25rem,.65fr) minmax(3rem,.65fr) minmax(3.65rem,.8fr) minmax(2.5rem,.45fr) auto;align-items:center;gap:8px}
+#smartAdminHost{--admin-columns:minmax(0,1.35fr) minmax(0,1.6fr) minmax(3.25rem,.65fr) minmax(3rem,.65fr) minmax(3.65rem,.8fr) minmax(2.5rem,.45fr) 7rem}
+#smartAdminHost .admin-row,#smartAdminHost .v3467-columns{display:grid;grid-template-columns:var(--admin-columns);align-items:center;gap:8px}
 #smartAdminHost .admin-row-role[data-role=owner]{color:#c4b5fd}
 #smartAdminHost .admin-row-role[data-role=admin]{color:#7dd3fc}
 @media(max-width:767px){#smartAdminHost .admin-row-role{grid-row:4}}
 #smartAdminHost .admin-row{padding:6px 10px;border-radius:8px;font-size:.8rem}
-#smartAdminHost .v3467-columns{padding:4px 12px;color:#94a3b8;font-size:.7rem}
+#smartAdminHost .v3467-columns{padding:4px 11px 4px 13px;color:#94a3b8;font-size:.7rem}
 #smartAdminHost .v345-admin-avatar{width:30px;height:30px;font-size:.7rem}
 #smartAdminHost .v345-admin-name,#smartAdminHost .v3467-email{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
 #smartAdminHost .v345-admin-name strong{overflow:hidden;text-overflow:ellipsis;display:block}

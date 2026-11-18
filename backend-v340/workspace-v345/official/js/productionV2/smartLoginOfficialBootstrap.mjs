@@ -15,9 +15,17 @@ const raw = {
   removeItem: key => localStorage.removeItem(storagePrefix + key),
 };
 let auth, active, generation = 0, started = false, invoiceAllowed = false;
+let invoicePlan, invoiceVerified = false;
 let unsubscribe = [];
 const activeSession = uid => active === uid && auth.currentUid() === uid;
 window.raytechCanUseInvoiceAI = () => !!active && activeSession(active) && invoiceAllowed && navigator.onLine;
+window.raytechInvoiceState = () => {
+  if (!active || !activeSession(active)) return {visible: false, reason: ''};
+  if (window.raytechCanUseInvoiceAI()) return {visible: true, reason: ''};
+  if (!invoiceVerified || !navigator.onLine) return {visible: true, reason: 'Leitor indisponível offline.'};
+  return {visible: !auth.invoiceBackendAvailable,
+    reason: invoicePlan === 'premium' ? 'O processamento de IA está desativado na homologação online.' : 'Recurso restrito ao plano Premium. O processamento de IA está desativado na homologação.'};
+};
 window.raytechExtractInvoice = () => {
   if (!window.raytechCanUseInvoiceAI()) throw Error('INVOICE_DENIED');
   return auth.extractInvoice(active);
@@ -30,6 +38,7 @@ const notify = () => window.dispatchEvent(new Event('raytech-ai-entitlement-chan
 const lock = () => {
   active = null;
   invoiceAllowed = false;
+  invoiceVerified = false;
   window.raytechSessionRevoked = true;
   panel.hidden = true;
   panel.inert = true;
@@ -105,6 +114,8 @@ async function observe(user) {
       const cloudPlan = role ? 'premium' : plan;
       window.raytechCloudEntitlement = cloudEntitlement({plan: cloudPlan, role, verified: !!account});
       invoiceAllowed = auth.invoiceBackendAvailable && accessVerified && (plan === 'premium' || !!role);
+      invoicePlan = plan;
+      invoiceVerified = accessVerified;
       document.getElementById('v345Identity').textContent =
         label + ' · ' +
         (role === 'owner' ? 'Owner' : role === 'admin' ? 'Admin' : plan === 'premium' ? 'Premium' : 'Free');
@@ -165,7 +176,7 @@ async function observe(user) {
     };
     const goOffline = () => {
       if (!activeSession(uid)) return;
-      offline = true; accessVerified = false; invoiceAllowed = false;
+      offline = true; accessVerified = false; invoiceAllowed = false; invoiceVerified = false;
       window.raytechOnlineAuthorizationPending = true;
       detach();
       notify();

@@ -77,11 +77,16 @@ test('modal compacto responsivo preserva proteção, cópia, cancelamento e edi�
       columns: getComputedStyle(row).gridTemplateColumns.split(' ').length,
       overflow: row.scrollWidth - row.clientWidth,
       emailBelow: row.children[1].offsetTop >= row.children[0].offsetTop + row.children[0].offsetHeight,
+      aligned: [...row.children].every((cell, i) => Math.abs(cell.getBoundingClientRect().left -
+        row.closest('#smartAdminHost').querySelector('.v3467-columns').children[i].getBoundingClientRect().left) < 0.5),
     }));
     assert.equal(rowLayout.columns, columns === 2 ? 7 : 3);
     assert.equal(rowLayout.emailBelow, columns === 1);
     assert.ok(rowLayout.overflow <= 1);
-    if (columns === 2) assert.deepEqual(new Set(rowLayout.bands), new Set(['auto']));
+    if (columns === 2) {
+      assert.deepEqual(new Set(rowLayout.bands), new Set(['auto']));
+      assert.equal(rowLayout.aligned, true);
+    }
     await openDetails('Pessoa fictícia');
     assert.ok(await dialog.getByRole('heading', {name: 'Pessoa fictícia'}).isVisible());
     assert.ok(await dialog.getByText('Smart AI Usage').isVisible());

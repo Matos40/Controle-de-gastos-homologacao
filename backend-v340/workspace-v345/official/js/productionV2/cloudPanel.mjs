@@ -90,7 +90,7 @@ export function bindCloudPanel(doc,storage,{config=PRODUCTION_CONFIG,open=async(
   if(applyOpen){applyOpen.hidden=!canSync||!uid||!applyFingerprint||!!review||invalid;applyOpen.disabled=busy||!online()||!ready()||!!session?.state().active;}
   if(applyBox)applyBox.hidden=!applyReview||!uid||!ready();
   if(applyResolve)applyResolve.disabled=busy||!online()||!ready()||!applyReview||!!applyReview?.blocked?.length;
-  connect.disabled=busy||!!cloud||!config.enabled;login.disabled=busy||!cloud||!!uid;inspect.hidden=!canSync||!premium()||bound;inspect.disabled=busy||!uid||!ready()||!online();logout.disabled=busy||!uid;
+  connect.disabled=busy||!!cloud||!config.enabled;login.disabled=busy||!cloud||!!uid;inspect.hidden=!canSync||!premium()||!uid||(bound&&writeAllowed);inspect.disabled=busy||!premium()||!uid||!ready()||!online();logout.disabled=busy||!uid;
   let st={active:false,busy:false};try{if(session)st=session.state();}catch{invalid=true;}
   const indicator=el('productionCloudConnection'),last=el('productionCloudLastSync');const waiting=!!st.budgetWaiting;const renewal=waiting?new Date(Date.parse(st.budgetDay+'T00:00:00Z')+86400000).toLocaleString('pt-BR'):'';
   if(indicator)indicator.textContent=!premium()?'Google conectado · '+(entitlement().plan==='free'?'Free · dados locais':'dados locais'):!online()?'Sem internet — dados locais preservados':!unlocked()?'Bloqueado pelo PIN':!uid?'Desconectado':invalid||review?'Revisão necessária':st.active?'Conectado · automático':bound?'Conectado · pausado':'Conectado · aguardando vínculo';
@@ -134,7 +134,7 @@ export function bindCloudPanel(doc,storage,{config=PRODUCTION_CONFIG,open=async(
   const blocked=busy||!premium()||!canSync||!session||invalid||!ready()||st.busy;
   seed.disabled=blocked||bound||plan?.mode!=='seed'||!writeAllowed;disable(adopt,blocked||bound||!['adopt','merge'].includes(plan?.mode)||plan?.conflict||!writeAllowed);
   disable(refresh,blocked||!bound||!st.active||!!review||!writeAllowed);
-  if(canSync){connect.hidden=!!cloud;login.hidden=!!uid||!cloud;inspect.hidden=bound&&writeAllowed;seed.hidden=bound||plan?.mode!=='seed';if(adopt){adopt.hidden=bound||!['adopt','merge'].includes(plan?.mode)||plan?.conflict;adopt.textContent=plan?.mode==='merge'?'Conciliar e sincronizar':'Receber da nuvem';}if(refresh)refresh.hidden=!bound;logout.hidden=!uid;}else {const p=el('productionCloudProfile');if(p)p.hidden=!uid;const state=el('productionCloudState');if(state)state.hidden=true;}
+  if(canSync){connect.hidden=!!cloud;login.hidden=!!uid||!cloud;seed.hidden=bound||plan?.mode!=='seed';if(adopt){adopt.hidden=bound||!['adopt','merge'].includes(plan?.mode)||plan?.conflict;adopt.textContent=plan?.mode==='merge'?'Conciliar e sincronizar':'Receber da nuvem';}if(refresh)refresh.hidden=!bound;logout.hidden=!uid;}else {const p=el('productionCloudProfile');if(p)p.hidden=!uid;const state=el('productionCloudState');if(state)state.hidden=true;}
 disable(pauseBtn,!canSync||!session||(!st.active&&!waiting));disable(resumeBtn,blocked||!bound||st.active||waiting||!!review||!writeAllowed);
   disable(backupBtn,blocked);disable(stageBtn,blocked||!bound||st.active||!!review||!writeAllowed);disable(reviewBtn,blocked||st.active||!review||!writeAllowed||!!displayedConflict?.blocked.length);disable(updateBtn,blocked||st.active||!review||!writeAllowed);
   for(const e of [historyBtn,historyExport,diagnosticBtn])disable(e,blocked);
@@ -181,7 +181,9 @@ disable(pauseBtn,!canSync||!session||(!st.active&&!waiting));disable(resumeBtn,b
   const previous=uid;generation++;stop(!previous||previous===user?.uid);uid=user?.uid??null;profile=user??null;reviewExpanded=false;attention=false;verifiedSync=false;storageChanged=false;
   displayedReview=null;displayedConflict=null;if(historyBox)historyBox.textContent='';if(reviewBox)reviewBox.textContent='';if(planBox)planBox.textContent='';
   reset('productionCloudConsent','productionCloudBackupSaved','productionCloudReviewConsent','productionCloudReviewBackup');
-  if(uid){if(canSync&&premium())try{session=makeSession(uid,generation);}catch(e){error(e);paint();return;}say('Conta Google conectada. Verifique a autorização da conta.');}else say('Entre com a conta Google desejada.');
+  if(uid){if(canSync&&premium())try{session=makeSession(uid,generation);}catch(e){error(e);paint();return;}
+   say(premium()?'Conta Google conectada. Se este dispositivo ainda não estiver vinculado, selecione Revisar vínculo com Firestore.':'Conta Google conectada. Os dados deste plano ficam neste dispositivo.');
+  }else say('Entre com a conta Google desejada.');
   void details().then(()=>{paint();win.setTimeout(()=>{if(!canSync||!uid||!ready()||!online()||busy)return;if(!premium())return;if(bound&&connection()===uid)void restore();},0);});
  });}
  connect.addEventListener('click',()=>action(connectCloud));
@@ -211,7 +213,7 @@ disable(pauseBtn,!canSync||!session||(!st.active&&!waiting));disable(resumeBtn,b
   planBox.replaceChildren(describe('Neste dispositivo',r.local),describe('Na nuvem',r.remote));
  }
  say(r.conflict?'Há informações incompatíveis. Exporte as duas cópias e revise as diferenças antes de tentar novamente.':r.mode==='seed'?'A nuvem está sem dados financeiros. Confirme o envio deste dispositivo.':r.mode==='adopt'?'Este dispositivo está sem dados financeiros. Confirme o recebimento da nuvem.':'As duas cópias têm dados. Confirme a união dos lançamentos compatíveis.');}
- inspect.addEventListener('click',()=>action(inspectAccount));
+ inspect.addEventListener('click',()=>{if(premium()&&!inspect.disabled)void action(inspectAccount);});
  function link(mode){return action(async()=>{const s=requireSession();if(plan?.mode!==mode||!checked('productionCloudConsent')||!checked('productionCloudBackupSaved'))throw Error('PRODUCTION_CONSENT');await authorizeWrite();await s.authorize({mode,confirmed:true,backupSaved:true});syncStorage.setItem(CONNECTION_KEY,uid);plan=null;reset('productionCloudConsent','productionCloudBackupSaved');if(planBox)planBox.textContent='';say('Vínculo confirmado. Sincronização automática ativa.');await details();const outcome=await s.tick({manual:true});result(outcome);if(outcome.status==='updated'||outcome.status!=='empty'&&s.hasLocalChanges())runtime?.signal();});}
  seed.addEventListener('click',()=>link('seed'));adopt?.addEventListener('click',()=>link(plan?.mode));
  refresh?.addEventListener('click',()=>{if(!canSync)return;void action(async()=>{const s=requireSession();if(!writeAllowed||!s.state().active)throw Error('PRODUCTION_PAUSED');syncing=true;paint();try{const r=await s.tick({manual:true});result(r);}finally{syncing=false;}});});

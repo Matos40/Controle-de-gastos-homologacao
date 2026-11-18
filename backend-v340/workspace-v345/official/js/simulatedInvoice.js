@@ -4,20 +4,31 @@
   const confirm = document.getElementById('simulatedConfirm');
   const status = document.getElementById('simulatedStatus');
   const open = document.getElementById('premiumInvoiceButton');
+  const key = document.getElementById('premiumApiKeyButton');
+  const keyDialog = document.getElementById('apiKeyModal');
+  const extract = document.getElementById('simulatedExtract');
   let review = null, turn = 0, busy = false;
   const entitled = () => window.raytechCanUseInvoiceAI() && !window.raytechSessionRevoked;
   const close = () => { review = null; dialog.close(); };
   window.openOcrModal = () => {
-    if (!entitled()) return;
+    const state = window.raytechInvoiceState();
+    if (!state.visible) return;
     review = null;
     stage.replaceChildren();
     confirm.disabled = true;
-    status.textContent = 'Gere uma amostra para revisar antes de lançar.';
-    dialog.showModal();
+    extract.disabled = !entitled();
+    status.textContent = state.reason || 'Gere uma amostra para revisar antes de lançar.';
+    if (!dialog.open) dialog.showModal();
   };
+  window.openApiKeyModal = () => {
+    if (!window.raytechInvoiceState().visible) return;
+    document.getElementById('invoiceKeyStatus').textContent =
+      'A configuração de chave Gemini está indisponível na homologação. Nenhuma chave é solicitada ou armazenada.';
+    if (!keyDialog.open) keyDialog.showModal();
+  };
+  document.getElementById('invoiceKeyClose').onclick = () => keyDialog.close();
   document.getElementById('simulatedClose').onclick = close;
   dialog.addEventListener('close', () => { review = null; turn++; });
-  const extract = document.getElementById('simulatedExtract');
   extract.onclick = async () => {
     if (busy) return;
     const id = ++turn;
@@ -87,8 +98,18 @@
     showToast('Lançamentos simulados adicionados à fatura.', 'success');
   };
   function paint() {
-    open?.classList.toggle('hidden', !entitled());
-    if (!entitled() && dialog.open) close();
+    const state = window.raytechInvoiceState();
+    open?.classList.toggle('hidden', !state.visible);
+    key?.classList.toggle('hidden', !state.visible);
+    if (!entitled() && dialog.open) {
+      turn++;
+      review = null;
+      stage.replaceChildren();
+      confirm.disabled = extract.disabled = true;
+      status.textContent = state.reason;
+      if (!state.visible) close();
+    }
+    if (!state.visible && keyDialog.open) keyDialog.close();
   }
   window.addEventListener('raytech-ai-entitlement-changed', paint);
   window.addEventListener('offline', paint);

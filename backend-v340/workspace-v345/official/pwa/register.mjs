@@ -1,3 +1,5 @@
+import {version} from '../release.mjs';
+
 const allowed = new Set([
   'https://raytech-cg-homologacao.web.app',
   'https://raytech-cg-homologacao.firebaseapp.com',
@@ -9,7 +11,7 @@ const publish = next => {
   window.dispatchEvent(new CustomEvent('raytech-pwa-state',{detail:snapshot()}));
 };
 const snapshot = () => Object.freeze({
-  version:'34.7.4.3', phase, canInstall: !!installEvent,
+  version, phase, canInstall: !!installEvent,
   standalone: matchMedia('(display-mode: standalone)').matches || navigator.standalone === true,
 });
 window.raytechPwa = Object.freeze({

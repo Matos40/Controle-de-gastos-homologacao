@@ -5,6 +5,7 @@ import {build} from 'esbuild';
 import postcss from 'postcss';
 import tailwind from 'tailwindcss';
 import {transparentOfficialIcon} from './app-identity.mjs';
+import {version} from './official/release.mjs';
 
 const out = 'dist';
 await rm(out, {force: true, recursive: true});
@@ -35,10 +36,17 @@ replace(/<!-- Tailwind CSS -->[\s\S]*?<\/script>\s*<link rel="stylesheet" href="
 <link rel="stylesheet" href="./css/v345.css">`);
 replace(/<link href="https:\/\/fonts.googleapis.com[^>]+>/, '');
 replace(/<link id="pwaManifestLink"[^>]+>/, '<link rel="manifest" href="./manifest.webmanifest">\n<script type="module" src="./pwa/register.mjs"></script>\n<script type="module" src="./pwa/visual.mjs"></script>\n<script type="module" src="./ui/drawer-viewport.mjs"></script>\n<link rel="stylesheet" href="./css/pwa-visual.css">');
-replace(/<button\s+type="button"\s+id="(?:premiumApiKeyButton|pwaHeaderBtn)"[\s\S]*?<\/button>/g, '');
+replace(/(<span id="pwaInstalledBadge" class=")hidden /, '$1');
+replace(/(<span id="pwaInstalledBadge"[^>]*>[\s\S]*?<\/span>)/, '$1<span id="raytechHeaderVersion" class="v3468-version" aria-label="Versão do aplicativo">v' + version + '</span>');
+replace(/(<h2 id="smartPwaTitle">[^<]+<\/h2>)/, '$1<p class="v3468-install-version" id="raytechInstallVersion">V' + version + '</p>');
 replace(/<!-- Modal Chave da API Gemini -->[\s\S]*?(?=  <main class="max-w-6xl)/, `
+<dialog id="apiKeyModal" aria-labelledby="invoiceKeyTitle" class="v345-dialog">
+  <h2 id="invoiceKeyTitle">Chave Gemini API</h2>
+  <p id="invoiceKeyStatus" role="status"></p>
+  <div class="v345-dialog-actions"><button type="button" class="admin-action" id="invoiceKeyClose">Fechar</button></div>
+</dialog>
 <dialog id="ocrModal" aria-labelledby="invoiceTitle" class="v345-dialog">
-  <h2 id="invoiceTitle">Leitor simulado de fatura</h2>
+  <h2 id="invoiceTitle">Leitor de fatura com IA</h2>
   <p id="simulatedStatus" role="status"></p>
   <div id="simulatedReview"></div>
   <div class="v345-dialog-actions">
@@ -61,7 +69,7 @@ replace(/<p hidden id="productionCloudStatus"/, inspection.replace('Verificar co
 replace(/<button id="smartAdminOpen"[\s\S]*?<\/button>/, '');
 replace(/(<header class="raytech-header-shell[^>]*>)/, '$1' + `
 <div class="v345-account">
-  <span class="v345-environment">V34.7.4.3 · Homologação · Dados sintéticos</span>
+  <span class="v345-environment">V${version} · Homologação · Dados sintéticos</span>
   <details class="v345-profile">
     <summary aria-label="Perfil e opções da conta"><span id="v345Avatar" aria-hidden="true"></span><strong id="v345Identity"></strong><span class="v345-chevron" aria-hidden="true">⌄</span></summary>
     <div class="v345-profile-menu">
