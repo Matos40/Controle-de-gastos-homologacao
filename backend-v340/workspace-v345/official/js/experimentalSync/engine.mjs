@@ -1,4 +1,4 @@
-import {mergeInitial} from '../productionV2/smartPremiumInitialMerge.mjs';
+import {isEmptyFinance, mergeInitial} from '../productionV2/smartPremiumInitialMerge.mjs';
 import {canonical,validatePayload,mergeThreeWay,reviewApplyFields,validId} from '../productionV2/model.mjs';
 import {validateV2Head,validateV2Receipt} from '../productionV2/capacity.mjs';
 import {prepareLocal} from '../productionV2/preview.mjs';
@@ -48,13 +48,14 @@ export function createSyncEngine({cloud,storage,local,uid,isCurrent=()=>true,onl
  async function continuity(base,remote){if(!base)return;if(!remote||remote.head.revision<base.head.revision)fail('PRODUCTION_REVISION_ROLLBACK');
   if(remote.head.revision===base.head.revision){if(canonical(remote)!==canonical(base))fail('PRODUCTION_REVISION_DIVERGENCE');}
   else if(!await cloud.confirm(uid,base.receipt))fail('PRODUCTION_RECEIPT_DIVERGENCE');check();}
- async function bind({adopt=false,plan,preserveBoth=false}={}){return run(async()=>{if(read())fail('PRODUCTION_ALREADY_BOUND');if(createQueue(storage,uid).read().length)fail('PRODUCTION_LEGACY_PENDING');if(!online())fail('PRODUCTION_OFFLINE');
+ async function bind({mode,plan}={}){return run(async()=>{if(read())fail('PRODUCTION_ALREADY_BOUND');if(createQueue(storage,uid).read().length)fail('PRODUCTION_LEGACY_PENDING');if(!online())fail('PRODUCTION_OFFLINE');
   const current=checkedLocal(),remote=await verified(await cloud.read(uid));check();if(local.read()!==current.raw)fail('PRODUCTION_LOCAL_CHANGED');
-  if(!plan||plan.local!==current.raw||canonical(plan.remote)!==canonical(remote)||adopt!==(remote!==null))fail('PRODUCTION_BIND_CHANGED');
-  if(remote&&!sameData(current.payload,remote.head.payload)&&!adopt)fail('PRODUCTION_ADOPTION_REQUIRED');
-  const target=remote&&preserveBoth?mergeInitial(current.raw,remote.head.payload):remote?.head.payload;
+  if(!plan||plan.local!==current.raw||canonical(plan.remote)!==canonical(remote))fail('PRODUCTION_BIND_CHANGED');
+  const expectedMode=!remote||isEmptyFinance(remote.head.payload)?'seed':isEmptyFinance(current.payload)?'adopt':'merge';
+  if(mode!==expectedMode)fail('PRODUCTION_BIND_CHANGED');
+  const target=mode==='seed'?current.raw:mergeInitial(current.payload,remote.head.payload);
   backup(current.raw);let s={format:1,uid,base:null,pending:null,apply:null};
-  if(remote&&!sameData(current.payload,remote.head.payload)){s.apply={before:current.raw,target:selection(current.raw,target),base:remote};write(s);s=await recoverApply(s);}
+  if(remote&&!sameData(current.payload,target)){s.apply={before:current.raw,target:selection(current.raw,target),base:remote};write(s);s=await recoverApply(s);}
   else {s.base=remote;write(s);}
   return {revision:s.base?.head.revision??0,bound:true};
  });}
@@ -86,6 +87,7 @@ export function createSyncEngine({cloud,storage,local,uid,isCurrent=()=>true,onl
    s={...s,base:remote};write(s);
   }
   const next=checkedLocal();
+  if(isEmptyFinance(next.payload)&&(!s.base||isEmptyFinance(s.base.head.payload)))return {status:'empty',revision:s.base?.head.revision};
   if(s.base&&sameData(next.payload,s.base.head.payload))return {status:'synced',revision:s.base.head.revision};
   const q={id:id(),expectedRevision:s.base?.head.revision??0,parentId:s.base?.head.lastOperationId??'',payload:next.payload};s={...s,pending:q};write(s);
   // Keep the durable intent until server receipt confirmation; next tick recovers on interruption.

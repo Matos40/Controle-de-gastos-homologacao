@@ -581,7 +581,7 @@
               
             </section>
             <div id="productionCloudTransferActions" hidden class="grid-cols-2 gap-1.5">
-              <button type="button" disabled id="productionCloudSeed" class="p-2 rounded-lg bg-slate-900 border border-slate-800 text-xs disabled:opacity-40">Vincular e sincronizar</button>
+              <button type="button" disabled id="productionCloudSeed" class="p-2 rounded-lg bg-slate-900 border border-slate-800 text-xs disabled:opacity-40">Enviar dados deste dispositivo</button>
               <button type="button" disabled id="productionCloudAdopt" class="p-2 rounded-lg bg-slate-900 border border-slate-800 text-xs disabled:opacity-40">Receber da nuvem</button>
 
 
@@ -603,10 +603,11 @@
             <p id="productionCloudNotice" role="status" class="text-xs text-amber-300" hidden></p>
             <div id="productionCloudSetup" hidden class="space-y-2 rounded-lg border border-amber-500/30 p-2">
               <p class="text-xs text-amber-300">Revise os dados antes de vincular este dispositivo.</p>
-              <pre id="productionCloudPlan" class="text-xs whitespace-pre-wrap break-all"></pre>
+              <div id="productionCloudPlan" class="text-xs space-y-1" aria-live="polite"></div>
               <button type="button" disabled id="productionCloudBackup" class="p-2 rounded-lg bg-slate-900 text-xs disabled:opacity-40">Exportar backup local</button>
+              <button type="button" hidden id="productionCloudRemoteBackup" class="p-2 rounded-lg bg-slate-900 text-xs">Exportar backup da nuvem</button>
               <label class="block text-xs"><input id="productionCloudConsent" type="checkbox"> Confirmo a operação apresentada</label>
-              <label class="block text-xs"><input id="productionCloudBackupSaved" type="checkbox"> Guardei o backup exportado</label>
+              <label class="block text-xs"><input id="productionCloudBackupSaved" type="checkbox"> Guardei o backup local e, se houver, o da nuvem</label>
             </div>
             <details hidden id="productionCloudAdvanced" class="border-t border-slate-800 pt-2 space-y-2">
               <summary class="text-xs font-semibold text-slate-300 cursor-pointer">Manutenção e recuperação</summary>

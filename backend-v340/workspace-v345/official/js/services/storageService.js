@@ -328,7 +328,7 @@
     // Cloud candidate bridge: only synchronous compare-and-replace; original local database remains authoritative offline.
     function productionV2ApplyLocal(expected, payload) {
       if (typeof document === 'undefined' || document.getElementById('pinLockOverlay') && !document.getElementById('pinLockOverlay').classList.contains('hidden')) return false;
-      if (document.querySelector('[id$="Modal"]:not(.hidden)') || document.activeElement?.matches('input,textarea,select,[contenteditable="true"]')) return false;
+      if (document.querySelector('[id$="Modal"]:not(dialog):not(.hidden), dialog[open]') || document.activeElement?.matches('input,textarea,select,[contenteditable="true"]')) return false;
       if ((globalThis.raytechStorage??globalThis.localStorage).getItem(STORAGE_DATABASE_KEY) !== expected || JSON.stringify(appDb) !== expected) return false;
       if (!MAIN_WORKSPACE || window.productionCleanWorkspaceReady !== true || !cleanWorkspaceStore) return false;
       const candidate = validateBackupDatabase(JSON.parse(payload));

@@ -1,4 +1,13 @@
 import {validatePayload,canonical} from './model.mjs';
+const emptyMonth = month => !month.closed && month.closedAt === null &&
+  !month.salary && !month.budgetLimit && !month.expenses.length &&
+  !month.cardExpenses.length && !month.extraIncomes.length &&
+  !(month.deletedInstallmentOrigins ?? []).length;
+
+export function isEmptyFinance(payload) {
+  return Object.values(validatePayload(payload).months).every(emptyMonth);
+}
+
 // No common ancestor on first link: union independent IDs, refuse conflicting fields or installment histories.
 export function mergeInitial(local,remote){
  const l=validatePayload(local),r=validatePayload(remote),out=structuredClone(r);
@@ -6,8 +15,7 @@ export function mergeInitial(local,remote){
  for(const [ym,m] of Object.entries(l.months)){
   if(!out.months[ym]){out.months[ym]=structuredClone(m);continue;}
   const n=out.months[ym];if(eq(m,n))continue;
-  const empty=x=>!x.closed&&x.closedAt===null&&!x.salary&&!x.budgetLimit&&!x.expenses.length&&!x.cardExpenses.length&&!x.extraIncomes.length&&!(x.deletedInstallmentOrigins??[]).length;
-  if(empty(m))continue;if(empty(n)){out.months[ym]=structuredClone(m);continue;}
+  if(emptyMonth(m))continue;if(emptyMonth(n)){out.months[ym]=structuredClone(m);continue;}
   if(m.closed||n.closed||m.closedAt!==n.closedAt)fail();
   for(const k of ['salary','budgetLimit']){if(m[k]&&n[k]&&m[k]!==n[k])fail();n[k]=m[k]||n[k];}
   const tomb=new Set([...(m.deletedInstallmentOrigins??[]),...(n.deletedInstallmentOrigins??[])]);

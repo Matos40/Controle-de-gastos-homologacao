@@ -56,8 +56,8 @@ export async function openProductionCloud(config = PRODUCTION_CONFIG) {
     },
     watchHead(uid, notify, error) {
       guard(uid);
-      return onSnapshot(headRef(uid), snapshot => {
-        if (auth.currentUid() === uid && !snapshot.metadata.fromCache) notify(snapshot.data()?.revision ?? 0);
+      return onSnapshot(headRef(uid), {includeMetadataChanges:true}, snapshot => {
+        if (auth.currentUid() === uid) notify(snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites ? null : snapshot.data()?.revision ?? 0);
       }, error);
     },
     sha: payloadHash,

@@ -1,4 +1,5 @@
 // Experimental only. Not imported by production HTML, PWA or Firebase adapter.
+import {isEmptyFinance, mergeInitial} from '../productionV2/smartPremiumInitialMerge.mjs';
 import {createSyncEngine,DEVICE_KEY} from './engine.mjs';
 import {requireProductionConfig} from '../productionV2/config.mjs';
 import {archiveRows,appendArchive} from './history.mjs';
@@ -62,8 +63,15 @@ function createSession({cloud,storage,local,uid,hash,id,day=()=>new Date().toISO
  const serial=async fn=>{if(busy)fail('EXPERIMENTAL_BUSY');busy=true;const requestedEpoch=epoch;try{return await lock('experimental_session',async()=>{check();policy();try{await checkpoint();}catch(e){stop();throw e;}if(requestedEpoch!==epoch)fail('EXPERIMENTAL_PAUSED');operationEpoch=epoch;return fn();});}finally{busy=false;}};
  const remoteRead=async()=>{check();if(!online()||!visible())fail('EXPERIMENTAL_OFFLINE');budget(12);const remote=await verifyRemote(await measured('read',()=>cloud.read(uid)),hash);check();return remote;};
  const summary=raw=>{const d=validatePayload(raw);return {months:Object.keys(d.months).length,entries:Object.values(d.months).reduce((n,m)=>n+m.expenses.length+m.cardExpenses.length+m.extraIncomes.length,0)};};
- async function inspect(){return serial(async()=>{if(await checkpoint())fail('EXPERIMENTAL_ALREADY_BOUND');const raw=local.read();validatePayload(raw);const e=epoch,remote=await remoteRead();if(e!==epoch||local.read()!==raw)fail('EXPERIMENTAL_BIND_CHANGED');plan={local:raw,remote,uid};return {uid,mode:remote?'adopt':'seed',local:summary(raw),remote:remote?{revision:remote.head.revision,...summary(remote.head.payload)}:null,backup:encodeMainBackup(validatePayload(raw))};});}
- async function authorize({mode,confirmed=false,backupSaved=false,preserveBoth=false}={}){return serial(async()=>{if(!confirmed){plan=null;return {status:'cancelled'};}if(!backupSaved||!plan||mode!==(plan.remote?'adopt':'seed')||local.read()!==plan.local)fail('EXPERIMENTAL_CONSENT');const expected=plan;plan=null;setPolicy('active');active=true;try{return await engine.bind({adopt:mode==='adopt',plan:expected,preserveBoth});}catch(e){stop();throw e;}});}
+ async function inspect(){return serial(async()=>{if(await checkpoint())fail('EXPERIMENTAL_ALREADY_BOUND');const raw=local.read();validatePayload(raw);const e=epoch,remote=await remoteRead();if(e!==epoch||local.read()!==raw)fail('EXPERIMENTAL_BIND_CHANGED');const localEmpty=isEmptyFinance(raw),remoteEmpty=!remote||isEmptyFinance(remote.head.payload);
+ const mode=remoteEmpty?'seed':localEmpty?'adopt':'merge';
+ let conflict=false;
+ if(mode==='merge'){try{mergeInitial(raw,remote.head.payload);}catch(e){if(e.message!=='PREMIUM_INITIAL_CONFLICT')throw e;conflict=true;}}
+ plan={local:raw,remote,uid,mode,conflict};
+ return {mode,conflict,local:{...summary(raw),empty:localEmpty},
+ remote:remote?{revision:remote.head.revision,...summary(remote.head.payload),empty:remoteEmpty}:null,
+ backup:encodeMainBackup(validatePayload(raw)),remoteBackup:remote?encodeMainBackup(validatePayload(remote.head.payload)):null};});}
+ async function authorize({mode,confirmed=false,backupSaved=false}={}){return serial(async()=>{if(!confirmed){plan=null;return {status:'cancelled'};}if(!backupSaved||!plan||mode!==plan.mode||plan.conflict||local.read()!==plan.local)fail('EXPERIMENTAL_CONSENT');const expected=plan;plan=null;setPolicy('active');active=true;try{return await engine.bind({mode,plan:expected});}catch(e){stop();throw e;}});}
  async function resume(confirmed){return serial(async()=>{if(confirmed!==true||!await checkpoint()||read(storage,REVIEW_KEY)||read(storage,RECOVERY_KEY)||!strictPrepare(local.read()).compatible||operationEpoch!==epoch)fail('EXPERIMENTAL_RESUME');if(budgetWaiting()&&budgetPause().day===day())fail('EXPERIMENTAL_BUDGET_EXHAUSTED');clearBudgetPause();setPolicy('active');active=true;next=0;});}
  async function restoreActive(){return serial(async()=>{if(policy()?.state!=='active'||!await checkpoint()||read(storage,REVIEW_KEY)||read(storage,RECOVERY_KEY)||!strictPrepare(local.read()).compatible||operationEpoch!==epoch)return false;
  if(budgetWaiting()){if(budgetPause().day===day()||!online()||!visible())return false;clearBudgetPause();}active=true;next=0;return true;});}

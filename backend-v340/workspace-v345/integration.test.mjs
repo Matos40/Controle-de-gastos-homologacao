@@ -188,3 +188,60 @@ test('Chromium integrates synthetic finance, review, quota, role changes and ses
     assert.deepEqual(errors, []);
   } finally { await context.close(); }
 });
+
+test('a funded local bank advances an empty revision and synchronizes across desktop and mobile', async () => {
+  await seedAccount('sync', 'premium');
+  const person = accounts.sync.uid;
+  const path = db => doc(db, 'raytechV345Finance', person, 'banks', 'v2-main');
+  const operationId = '12345678-1234-4123-8123-123456789123';
+  const {createHash} = await import('node:crypto');
+  const {blank} = await import('./official/js/productionV2/model.mjs');
+  const ym = new Date().toISOString().slice(0, 7);
+  const payload = JSON.stringify(blank(ym));
+  const hash = createHash('sha256').update(payload).digest('hex');
+  await env.withSecurityRulesDisabled(async context => {
+    const head = path(context.firestore());
+    await setDoc(head, {marker: 'raytech-financial-production-v2', revision: 1, lastOperationId: operationId, payload, hash});
+    await setDoc(doc(head, 'receipts', operationId), {operationId, revision: 1, parentId: '', hash});
+  });
+  const desktop = await browser.newContext({viewport: {width: 1280, height: 900}});
+  const mobile = await browser.newContext({viewport: {width: 390, height: 844}, isMobile: true, hasTouch: true});
+  try {
+    const pc=await desktop.newPage(), phone=await mobile.newPage();
+    async function review(p) {
+      await p.locator('#headerToolsToggleBtn').click();
+      await p.locator('#productionCloudInspect').click();
+      await p.locator('#productionCloudConsent').check();
+      await p.locator('#productionCloudBackupSaved').check();
+    }
+    await pc.goto(origin);
+    await login(pc, 'sync');
+    await pc.locator('#salaryInput').fill('2070');
+    await review(pc);
+    assert.match(await pc.locator('#productionCloudPlan').textContent(), /sem dados financeiros/);
+    assert.equal(await pc.locator('#productionCloudAdopt').isVisible(),false);
+    await pc.locator('#productionCloudSeed').click();
+    await pc.locator('#productionCloudHeader[data-sync-state=synced]').waitFor({timeout:5000}).catch(async e=>{throw Error(await pc.locator('#productionCloudStatus').textContent(),{cause:e});});
+    const head = path(dbAs('sync'));
+    assert.equal((await getDoc(head)).data().revision, 2);
+    assert.equal((await getDoc(doc(head, 'receipts', operationId))).data().hash, hash);
+    await phone.goto(origin);
+    await login(phone, 'sync');
+    assert.notEqual(await phone.locator('#productionCloudHeader').getAttribute('data-sync-state'),'synced');
+    await review(phone);
+    await phone.locator('#productionCloudAdopt').click();
+    await phone.locator('#productionCloudHeader[data-sync-state=synced]').waitFor({timeout:6000}).catch(async e=>{throw Error(await phone.locator('#productionCloudStatus').textContent(),{cause:e});});
+    async function propagate(source, destination, salary, direction) {
+      const start = Date.now();
+      await source.locator('#salaryInput').fill(String(salary));
+      await source.locator('#salaryInput').blur();
+      assert.notEqual(await source.locator('#productionCloudHeader').getAttribute('data-sync-state'),'synced');
+      await destination.waitForFunction(value => appDb.months[appDb.selectedMonth].salary === value, salary, {timeout:10000});
+      console.log(direction + ' ' + (Date.now()-start) + ' ms');
+      await destination.locator('#productionCloudHeader[data-sync-state=synced]').waitFor({timeout:10000});
+    }
+    await propagate(pc,phone,2180,'desktop -> mobile');
+    await propagate(phone,pc,2290,'mobile -> desktop');
+    assert.equal((await getDoc(head)).data().revision,4);
+  } finally {await mobile.close();await desktop.close();}
+});
