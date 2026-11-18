@@ -57,10 +57,14 @@ replace(/<p hidden id="productionCloudStatus"/, inspection.replace('Verificar co
 replace(/<button id="smartAdminOpen"[\s\S]*?<\/button>/, '');
 replace(/(<header class="raytech-header-shell[^>]*>)/, '$1' + `
 <div class="v345-account">
-  <span>V34.5 · Homologação · Dados sintéticos</span>
-  <span id="v345Avatar" aria-hidden="true"></span><strong id="v345Identity"></strong>
-  <button id="smartAdminOpen" hidden type="button" class="admin-action">Smart Admin</button>
-  <button id="v345Logout" type="button" class="admin-action">Sair</button>
+  <span class="v345-environment">V34.5.1 · Homologação · Dados sintéticos</span>
+  <details class="v345-profile">
+    <summary aria-label="Perfil e opções da conta"><span id="v345Avatar" aria-hidden="true"></span><strong id="v345Identity"></strong><span class="v345-chevron" aria-hidden="true">⌄</span></summary>
+    <div class="v345-profile-menu">
+      <button id="smartAdminOpen" hidden type="button" class="admin-action">Smart Admin</button>
+      <button id="v345Logout" type="button" class="admin-action">Sair</button>
+    </div>
+  </details>
 </div>`);
 await writeFile(out + '/index.html', html);
 const result = await postcss([tailwind({

@@ -28,11 +28,13 @@ function selector(label, options) {
 function renderConsumption(account) {
   if (!account.limits) return el('p', account.usageUnavailable ? 'Consumo indisponível' : 'Sem cota de leitor');
   const node = el('div', '', 'v345-usage');
+  node.setAttribute('aria-label', 'Consumo do leitor simulado');
   for (const key of keys) {
     const count = account.usage[key];
     const cap = account.limits[key];
     const label = el('label', names[key] + ' UTC · ' + count + '/' + cap);
     const meter = document.createElement('progress');
+    meter.setAttribute('aria-label', names[key] + ' UTC');
     meter.max = cap;
     meter.value = count;
     label.append(meter);
@@ -49,7 +51,9 @@ export function mountAdmin({api, role, uid}) {
     host.querySelector('dialog')?.close();
     host.hidden = true;
     host.replaceChildren();
-    open.focus();
+    const profile = open.closest('details');
+    if (profile) profile.querySelector('summary')?.focus();
+    else open.focus();
   };
 
   function edit(account, status, epoch) {
@@ -111,7 +115,12 @@ export function mountAdmin({api, role, uid}) {
     const status = el('p', 'Carregando…');
     status.setAttribute('role', 'status');
     const exit = button('Fechar', close);
-    host.replaceChildren(el('h2', 'Smart Admin · ' + plans[role]), exit, status);
+    exit.classList.add('v345-admin-close');
+    const heading = el('div', '', 'v345-admin-heading');
+    const title = el('div');
+    title.append(el('h2', 'Smart Admin · ' + plans[role]), el('p', 'Gerenciamento de usuários e consumo', 'v345-admin-subtitle'));
+    heading.append(title, exit);
+    host.replaceChildren(heading, status);
     exit.focus();
     try {
       if (!await api.role()) throw Error('ADMIN_DENIED');
@@ -120,7 +129,10 @@ export function mountAdmin({api, role, uid}) {
       status.textContent = (typeof message === 'string' ? message + ' ' : '') + accounts.length + ' contas nesta amostra, até 100.';
       const stats = el('div', '', 'admin-stats');
       for (const [label, value] of [
+        ['Usuários', accounts.length],
         ['Ativas', accounts.filter(a => !a.blocked).length],
+        ['Bloqueadas', accounts.filter(a => a.blocked).length],
+        ['Administradores', accounts.filter(a => a.role === 'owner' || a.role === 'admin').length],
         ['Free', accounts.filter(a => a.plan === 'free').length],
         ['Premium', accounts.filter(a => a.plan === 'premium').length],
       ]) {
@@ -145,27 +157,41 @@ export function mountAdmin({api, role, uid}) {
           const details = el('details');
           details.append(el('summary', 'Detalhes técnicos'), el('small', account.uid));
           const info = el('div', '', 'admin-info');
-          info.append(el('strong', accountLabel(account)),
-            el('p', plans[row.dataset.plan] + ' · ' + (account.blocked ? 'Bloqueada' : 'Ativa')), details);
+          const identity = el('div', '', 'v345-admin-identity');
+          const initials = accountLabel(account).trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
+          const avatar = el('span', initials, 'v345-admin-avatar');
+          avatar.setAttribute('aria-hidden', 'true');
+          const name = el('div', '', 'v345-admin-name');
+          name.append(el('strong', accountLabel(account)));
+          if (account.email) name.append(el('small', account.email));
+          identity.append(avatar, name);
+          const tags = el('div', '', 'v345-admin-tags');
+          tags.append(el('span', plans[row.dataset.plan], 'v345-role-tag'));
+          if (account.role) tags.append(el('span', plans[account.plan], 'v345-plan-tag'));
+          tags.append(el('span', account.blocked ? 'Bloqueada' : 'Ativa', 'v345-state-tag'));
+          info.append(identity, tags, details);
           row.append(info, renderConsumption(account));
           row.append(account.protected || account.uid === uid
-            ? el('small', 'Conta protegida') : button('Editar cotas e acesso', () => edit(account, status, epoch)));
+            ? el('small', 'Conta protegida', 'v345-protected') : button('Editar cotas e acesso', () => edit(account, status, epoch)));
           rows.append(row);
         }
         if (!rows.childElementCount) rows.append(el('p', 'Nenhuma conta encontrada.'));
       };
       search.oninput = plan.onchange = state.onchange = render;
       render();
-      host.append(stats, tools, rows, el('h3', 'Auditoria · últimos 100 registros'));
+      rows.className = 'v345-admin-rows';
+      const auditPanel = el('section', '', 'v345-audit');
+      auditPanel.append(el('h3', 'Auditoria · últimos 100 registros'));
+      host.append(stats, tools, rows, auditPanel);
       const labels = new Map(accounts.map(a => [a.uid, accountLabel(a)]));
       for (const event of audit) {
         const item = el('details');
         item.append(el('summary', (labels.get(event.target) || 'Conta') + ' · ' + event.beforePlan + ' → ' +
           event.afterPlan + ' · ' + (event.afterBlocked ? 'Bloqueada' : 'Ativa')),
           el('small', 'Operador ' + event.actor + ' · ' + event.at.toDate().toISOString()));
-        host.append(item);
+        auditPanel.append(item);
       }
-      if (!audit.length) host.append(el('p', 'Nenhuma alteração registrada.'));
+      if (!audit.length) auditPanel.append(el('p', 'Nenhuma alteração registrada.', 'v345-audit-empty'));
     } catch {
       if (epoch === serial) status.textContent = 'Acesso administrativo não autorizado ou conexão indisponível.';
     }

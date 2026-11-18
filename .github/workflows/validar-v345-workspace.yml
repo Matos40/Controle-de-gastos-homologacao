@@ -1,7 +1,7 @@
 name: V34.5 Integrated Financial Workspace
 on:
   push:
-    branches: [feature/v34-5-integrated-financial-workspace]
+    branches: [feature/v34-5-integrated-financial-workspace, feature/v34-5-1-smart-interface-refinement]
   workflow_dispatch:
 permissions:
   contents: read
@@ -78,6 +78,7 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           npm run build
+          if [ "$GITHUB_REF_NAME" = "feature/v34-5-1-smart-interface-refinement" ]; then node --test visual-refinement.test.mjs; fi
           npm run prepare:emulators
           npx playwright install --with-deps chromium
       - name: V34.5 Firestore rules and dashboard Chromium

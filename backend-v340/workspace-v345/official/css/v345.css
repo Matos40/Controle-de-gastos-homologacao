@@ -22,3 +22,70 @@
 .v345-edit :is(input, select) { padding: .35rem; color: #e2e8f0; background: #06182e; border: 1px solid #3a607d; border-radius: .35rem; }
 #v345Avatar { display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; overflow: hidden; color: #bae6fd; background: #0c4a6e; font-size: .62rem; font-weight: 700; }
 #v345Avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* V34.5.1: presentation only; existing cloud state and permissions remain authoritative. */
+.v345-account{max-width:72rem;margin:auto;justify-content:space-between;padding:.4rem 1rem;border-bottom:1px solid #33415566;gap:.5rem}
+.v345-environment{font-size:.7rem;letter-spacing:.01em}
+.v345-profile{position:relative;min-width:0;max-width:65%}
+.v345-profile summary{display:flex;align-items:center;gap:.5rem;cursor:pointer;list-style:none;min-height:40px;padding:.25rem .65rem;border:1px solid #334155;border-radius:12px;background:#0f172a}
+.v345-profile summary::-webkit-details-marker{display:none}
+.v345-profile #v345Identity{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e2e8f0}
+.v345-profile #v345Avatar{width:2rem;height:2rem;flex-shrink:0}
+.v345-profile-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:65;min-width:180px;padding:8px;background:#0f172a;border:1px solid #334155;border-radius:14px;box-shadow:0 12px 30px #0008}
+.v345-profile-menu .admin-action{display:block;width:100%;margin:0;text-align:left;min-height:44px}
+.v345-profile-menu .admin-action+.admin-action{margin-top:6px}
+.v345-profile summary:focus-visible,#smartAdminHost :is(button,input,select,summary):focus-visible{outline:2px solid #58dcff;outline-offset:3px}
+#smartAdminHost{max-width:1080px;margin:0 auto;background:#08182b;padding:clamp(16px,3vw,32px);border-color:#38bdf8;box-shadow:0 20px 70px #000a}
+.v345-admin-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+.v345-admin-subtitle{color:#94a3b8;font-size:.85rem;margin-top:4px}
+.v345-admin-close{min-height:44px;flex-shrink:0}
+#smartAdminHost .admin-stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+#smartAdminHost .admin-stat{background:#0d263b;border-color:#24455c;padding:14px;border-radius:14px;min-width:0}
+#smartAdminHost .admin-stat:nth-child(2) strong{color:#22c55e}
+#smartAdminHost .admin-stat:nth-child(3) strong{color:#f87171}
+#smartAdminHost .admin-stat:nth-child(6) strong{color:#fbbf24}
+#smartAdminHost .admin-tools{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr)}
+#smartAdminHost .admin-tools>*{min-width:0;min-height:44px;width:100%}
+.v345-admin-rows{display:grid;gap:12px}
+#smartAdminHost .admin-row{--role:#64748b;background:#0b2034;border:1px solid #24455c;border-left:3px solid var(--role);border-radius:14px;padding:16px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) auto;gap:16px}
+#smartAdminHost .admin-row[data-plan=owner]{--role:#22c55e}
+#smartAdminHost .admin-row[data-plan=admin]{--role:#22d3ee}
+#smartAdminHost .admin-row[data-plan=premium]{--role:#fbbf24}
+#smartAdminHost .admin-info{min-width:0}
+.v345-admin-identity{display:flex;align-items:center;gap:10px;min-width:0}
+.v345-admin-avatar{display:grid;place-items:center;width:42px;height:42px;flex-shrink:0;border-radius:50%;background:#124664;color:#bae6fd;font-weight:700}
+.v345-admin-name{display:grid;min-width:0;overflow-wrap:anywhere}
+.v345-admin-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+.v345-admin-tags span{padding:3px 8px;border:1px solid #334155;border-radius:999px;font-size:.72rem}
+.v345-role-tag{color:var(--role)}
+.v345-plan-tag{color:#cbd5e1}
+.v345-state-tag{color:#e2e8f0}
+.v345-protected{color:#4ade80}
+.v345-usage{display:grid;grid-template-columns:1fr;gap:8px}
+.v345-usage label{gap:5px;color:#cbd5e1}
+.v345-usage progress{appearance:none;width:100%;height:7px;border:0;border-radius:999px;background:#20394c;overflow:hidden}
+.v345-usage progress::-webkit-progress-bar{background:#20394c;border-radius:999px}
+.v345-usage progress::-webkit-progress-value{background:#38bdf8;border-radius:999px}
+.v345-usage progress::-moz-progress-bar{background:#38bdf8;border-radius:999px}
+.v345-audit{margin-top:24px;padding:16px;border:1px solid #24455c;border-radius:14px;background:#0b2034}
+#smartAdminHost .v345-audit h3{margin:0 0 12px}
+.v345-audit-empty{color:#94a3b8;padding:20px 0;text-align:center}
+#productionCloudPanel{border-radius:16px}
+#productionCloudHeader{transition:background-color .15s,border-color .15s}
+#productionCloudHeader:focus-visible{outline:2px solid #58dcff;outline-offset:2px}
+#productionCloudConnection{font-weight:700}
+#productionCloudLastSync{font-variant-numeric:tabular-nums}
+@media(max-width:639px){
+.v345-account{padding:.35rem .75rem;flex-wrap:nowrap}
+.v345-environment{font-size:.6rem;max-width:42%;line-height:1.3}
+.v345-profile{max-width:58%}
+.v345-profile summary{padding:.25rem .4rem;gap:.3rem}
+.v345-profile #v345Identity{font-size:.72rem}
+#smartAdminHost{inset:8px;padding:14px}
+#smartAdminHost .admin-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+#smartAdminHost .admin-tools{grid-template-columns:repeat(2,minmax(0,1fr))}
+#smartAdminHost .admin-tools input{grid-column:1/-1}
+#smartAdminHost .admin-row{grid-template-columns:minmax(0,1fr);gap:12px}
+#smartAdminHost .admin-row .admin-action{min-height:44px}
+}
+@media(prefers-reduced-motion:reduce){#productionCloudHeader{transition:none}}
