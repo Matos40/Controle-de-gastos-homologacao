@@ -402,6 +402,14 @@ test('mobile drawer scrolls internally and Smart Install remains accessible with
   }
   await install.tap();await page.locator('#smartPwaDialog').waitFor({state:'visible'});
   await page.locator('#smartPwaClose').click();
+  await page.locator('#smartPwaDialog').waitFor({state:'hidden'});
+  await drawer.locator('#mobileDrawerClose').waitFor({state:'visible'});
+  assert.equal(await page.locator('#raytechMobileNav').isVisible(),false);
+  await install.tap();
+  await page.locator('#smartPwaDialog').waitFor({state:'visible'});
+  await page.keyboard.press('Escape');
+  await page.locator('#smartPwaDialog').waitFor({state:'hidden'});
+  assert.equal(await drawer.locator('#mobileDrawerClose').isVisible(),true);
   await drawer.locator('#mobileDrawerClose').tap();
   await drawer.waitFor({state:'hidden'});
   await page.locator('#raytechMobileNav').waitFor({state:'visible'});

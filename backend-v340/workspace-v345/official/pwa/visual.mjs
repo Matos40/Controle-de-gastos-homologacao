@@ -21,6 +21,11 @@ if(typeof window!=='undefined'){
  const open=()=>{refresh();if(!dialog.open)dialog.showModal();};
  by('smartPwaOpen').addEventListener('click',open);
  by('smartPwaNoticeOpen').addEventListener('click',open);
+ // The mobile drawer remains the parent interaction when its native dialog is open.
+ // Do not let the global outside-click/Escape handler close the drawer underneath it.
+ const mobileDrawerOpen=()=>document.getElementById('headerToolsDrawer')?.classList.contains('raytech-mobile-portal');
+ dialog.addEventListener('click',event=>{if(mobileDrawerOpen())event.stopPropagation();});
+ dialog.addEventListener('keydown',event=>{if(event.key==='Escape'&&mobileDrawerOpen())event.stopPropagation();});
  by('smartPwaClose').addEventListener('click',()=>dialog.close());
  by('smartPwaNoticeLater').addEventListener('click',()=>{dismissed=true;refresh();});
  install.addEventListener('click',async()=>{
