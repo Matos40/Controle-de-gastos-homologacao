@@ -1,0 +1,77 @@
+name: V34.7.4 Smart Release Candidate - emulators only
+on:
+  push:
+    branches: [feature/v34-7-4-smart-release-candidate]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  security:
+    if: github.repository == 'Matos40/Controle-de-gastos-homologacao' && github.ref == 'refs/heads/feature/v34-7-4-smart-release-candidate'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GCLOUD_PROJECT: demo-raytech-v340
+      FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:19099
+      FIRESTORE_EMULATOR_HOST: 127.0.0.1:18080
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Backend isolated dependencies
+        working-directory: backend-v340/functions
+        run: npm ci --no-audit --no-fund
+      - name: Rules SDK isolated dependencies
+        working-directory: backend-v340/workspace-v345
+        run: npm ci --no-audit --no-fund
+      - name: Backend unit authorization and quota regressions
+        working-directory: backend-v340/functions
+        run: node --test policy.test.mjs invoice.test.mjs usage.test.mjs usage-admin.test.mjs security-v347.test.mjs global-budget.test.mjs outcome.test.mjs
+      - name: Candidate rules direct client negative and positive tests
+        working-directory: backend-v340/workspace-v345
+        run: npx --yes firebase-tools@15.35.0 emulators:exec --config security-v347.json --project demo-raytech-v340 --only firestore "node --test security-v347.test.mjs"
+      - name: Backend HTTP auth, roles, quotas and real atomic transactions
+        working-directory: backend-v340
+        run: npx --yes firebase-tools@15.35.0 emulators:exec --project demo-raytech-v340 --only auth,firestore,functions "node --test --test-concurrency=1 functions/emulator.test.mjs"
+      - name: Install Chromium for isolated dashboard
+        run: |
+          npm install --prefix /tmp/raytech-rc-browser --no-audit --no-fund playwright@1.56.1
+          /tmp/raytech-rc-browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Smart Admin desktop mobile and extraction in fresh emulators
+        working-directory: backend-v340
+        run: npx --yes firebase-tools@15.35.0 emulators:exec --project demo-raytech-v340 --only auth,firestore,functions "node --test functions/app-ux.test.mjs"
+      - name: Build isolated financial workspace
+        working-directory: backend-v340/workspace-v345
+        run: |
+          npm run build
+          node prepare-v3473.mjs
+          node --test scope.test.mjs online/model.test.mjs visual-refinement.test.mjs
+          npx playwright install chromium
+      - name: Full financial workspace regressions in fresh emulators
+        working-directory: backend-v340
+        run: npx --yes firebase-tools@15.35.0 emulators:exec --config firebase-v3473.json --project demo-raytech-v340 --only auth,firestore,functions "cd workspace-v345 && node --test integration.test.mjs"
+      - name: Package verified Windows candidate
+        working-directory: backend-v340
+        run: |
+          mkdir -p /tmp/rc3474/functions /tmp/rc3474/workspace-v345 release
+          cp functions/*.mjs functions/package*.json /tmp/rc3474/functions/
+          rm -f /tmp/rc3474/functions/*.test.mjs
+          cp -r workspace-v345/dist /tmp/rc3474/workspace-v345/
+          cp workspace-v345/dist-firestore.rules workspace-v345/serve.mjs /tmp/rc3474/workspace-v345/
+          cp firebase-v3473.json rc3474-session.mjs iniciar-v3474.ps1 INICIAR-RAYTECH-V3474.cmd LEIA-ME-V3474.md /tmp/rc3474/
+          (cd /tmp/rc3474 && zip -qr "$GITHUB_WORKSPACE/backend-v340/release/raytech-v3474-windows.zip" .)
+          cd release
+          sha256sum raytech-v3474-windows.zip > raytech-v3474-windows.zip.sha256
+          sha256sum -c raytech-v3474-windows.zip.sha256
+      - uses: actions/upload-artifact@v5
+        with:
+          name: raytech-v3474-windows
+          path: backend-v340/release/
+          if-no-files-found: error
