@@ -1,0 +1,31 @@
+name: Etapa 02 - combined Firestore rules (emulator only)
+on:
+  push:
+    branches: [validation/etapa02-combined-rules]
+permissions:
+  contents: read
+jobs:
+  combined:
+    if: github.repository == 'Matos40/Controle-de-gastos-homologacao'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Validate combined rules without remote access
+        working-directory: backend-v340/workspace-v345
+        run: |
+          npm ci --no-audit --no-fund
+          npx --yes firebase-tools@15.35.0 emulators:exec --config online/emulators-combined.json --project demo-raytech-v340 --only firestore "node --test online/combined-rules.test.mjs"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: regras-combinadas-etapa02
+          path: backend-v340/workspace-v345/online/combined-hml34741.rules
