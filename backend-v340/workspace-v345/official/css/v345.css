@@ -89,3 +89,9 @@
 #smartAdminHost .admin-row .admin-action{min-height:44px}
 }
 @media(prefers-reduced-motion:reduce){#productionCloudHeader{transition:none}}
+
+.v345-admin-close{width:44px;font-size:1.5rem;line-height:1;margin:0}
+.v345-profile[open] summary{border-color:#58dcff}
+#smartAdminHost .admin-stat small{overflow-wrap:anywhere}
+#smartAdminHost .admin-row>*{min-width:0}
+#smartAdminHost .admin-row .admin-action{white-space:normal}

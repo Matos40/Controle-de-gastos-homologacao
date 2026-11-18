@@ -116,6 +116,8 @@ export function mountAdmin({api, role, uid}) {
     status.setAttribute('role', 'status');
     const exit = button('Fechar', close);
     exit.classList.add('v345-admin-close');
+    exit.textContent = '×';
+    exit.setAttribute('aria-label', 'Fechar painel administrativo');
     const heading = el('div', '', 'v345-admin-heading');
     const title = el('div');
     title.append(el('h2', 'Smart Admin · ' + plans[role]), el('p', 'Gerenciamento de usuários e consumo', 'v345-admin-subtitle'));
@@ -198,10 +200,11 @@ export function mountAdmin({api, role, uid}) {
   }
 
   open.hidden = false;
-  open.addEventListener('click', load);
+  const launch = () => { const profile = open.closest('details'); if (profile) profile.open = false; void load(); };
+  open.addEventListener('click', launch);
   return () => {
     close();
     open.hidden = true;
-    open.removeEventListener('click', load);
+    open.removeEventListener('click', launch);
   };
 }
