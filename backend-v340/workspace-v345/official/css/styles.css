@@ -122,3 +122,9 @@ body {
 
 /* V33.4.5: hidden entirely at the existing mobile breakpoint. */
 @media (max-width:639px){.raytech-income-base-help{display:none!important}}
+
+/* V34.6.1: constrain the anchored drawer to the actual visible viewport. */
+@media(max-width:639px){
+ #headerToolsDrawer{max-height:var(--raytech-drawer-available,calc(100dvh - 220px - env(safe-area-inset-bottom,0px)));overflow-y:auto;overscroll-behavior-y:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;scroll-padding-block:8px;min-height:0}
+ #raytechMobileNav{padding-bottom:calc(.375rem + env(safe-area-inset-bottom,0px))}
+}

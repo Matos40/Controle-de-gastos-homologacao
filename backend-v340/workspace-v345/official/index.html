@@ -520,7 +520,7 @@
       </div>
 
       <!-- Painel Expansível de Ferramentas Organizado por Categorias (Oculto por padrão) -->
-      <div id="headerToolsDrawer" role="region" aria-label="Opções do aplicativo" class="hidden">
+      <div id="headerToolsDrawer" tabindex="0" role="region" aria-label="Opções do aplicativo" class="hidden">
         <!-- Input oculto para o arquivo Excel -->
         <input type="file" id="excelImportInput" accept=".xlsx, .xls, .xlsm" class="sr-only" onchange="handleExcelImport(event)">
 
@@ -1670,7 +1670,7 @@
   </main>
 
   <!-- Barra de Navegação Inferior Fixa para Celular (Mobile App Bar) -->
-  <nav class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-2xl">
+  <nav id="raytechMobileNav" class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-2xl">
     <button onclick="switchTab('general')" id="mobTabGeneral" class="flex flex-col items-center justify-center py-1 px-3 rounded-xl text-emerald-400 transition">
       <i class="fa-solid fa-receipt text-base"></i>
       <span class="text-[10px] font-bold mt-0.5">Contas</span>
