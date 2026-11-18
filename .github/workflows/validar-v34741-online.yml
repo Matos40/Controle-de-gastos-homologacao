@@ -68,7 +68,7 @@ jobs:
           node -e "const c=require('./hosting.json');if(Object.keys(c).join()!=='hosting'||c.hosting.site!=='raytech-cg-homologacao'||c.hosting.public!=='dist')process.exit(1)"
           mkdir -p hosting-release
           cp -r dist hosting-release/
-          cp hosting.json online/firestore-hml34741.rules.txt online/PUBLICAR.md hosting-release/
+          cp hosting.json online/firestore-hml34741.rules.txt online/PUBLICAR.md online/PLANO-DE-ACAO.md hosting-release/
       - uses: actions/upload-artifact@v5
         with:
           name: raytech-homologacao-online-v34741

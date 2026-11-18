@@ -106,3 +106,19 @@
 #labCredentials { display: grid; gap: .5rem; margin-block: .75rem; text-align: left; }
 #labCredentials input { display: block; width: 100%; border: 1px solid #3a607d; border-radius: .5rem; padding: .4rem .6rem; background: #06182e; color: #e1f5ff; }
 #v3473Monitor.admin-stats{grid-template-columns:repeat(4,minmax(0,1fr))}#v3473Monitor .admin-stat{cursor:default}@media(max-width:767px){#v3473Monitor.admin-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Restore the approved usage meters only inside the details modal. */
+.v345-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; }
+.v345-dialog button:disabled { opacity: .45; }
+.v345-usage { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
+.v345-usage label { display: grid; font-size: .75rem; }
+.v345-usage progress { width: 6.8rem; height: .55rem; accent-color: #38bdf8; }
+.v345-edit :is(input, select) { padding: .35rem; color: #e2e8f0; background: #06182e; border: 1px solid #3a607d; border-radius: .35rem; }
+.v345-usage{display:grid;grid-template-columns:1fr;gap:8px}
+.v345-usage label{gap:5px;color:#cbd5e1}
+.v345-usage progress{appearance:none;width:100%;height:7px;border:0;border-radius:999px;background:#20394c;overflow:hidden}
+.v345-usage progress::-webkit-progress-bar{background:#20394c;border-radius:999px}
+.v345-usage progress::-webkit-progress-value{background:#38bdf8;border-radius:999px}
+.v345-usage progress::-moz-progress-bar{background:#38bdf8;border-radius:999px}
+.v345-dialog .v345-edit input[type=number]{width:100%;min-width:0;box-sizing:border-box}
+.v345-dialog .v345-usage{min-width:0}
