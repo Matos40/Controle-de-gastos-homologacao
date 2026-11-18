@@ -84,6 +84,10 @@ test('online homologation renders all four profiles without enabling IA or bypas
         profile === 'premium' ? /desativado/ : /restrito ao plano Premium/);
       assert.ok(await invoice.locator('#simulatedExtract').isDisabled());
       assert.ok(await invoice.locator('#simulatedConfirm').isDisabled());
+      for (const id of ['ocrDropZone','ocrProcessBtn']) {
+        assert.ok(await invoice.locator('#'+id).isVisible());
+        assert.ok(await invoice.locator('#'+id).isDisabled());
+      }
       await invoice.getByRole('button',{name:'Fechar'}).click();
       await page.locator('#headerToolsToggleBtn').click();
       await page.locator('#premiumApiKeyButton').click();
@@ -92,6 +96,7 @@ test('online homologation renders all four profiles without enabling IA or bypas
       await key.getByRole('button',{name:'Fechar'}).click();
     }
     await page.locator('#headerToolsToggleBtn').click();
+    assert.equal(await page.locator('#v3468Logout').isVisible(), ['premium','free'].includes(profile));
     const review = page.locator('#productionCloudInspect');
     if (profile === 'free') {
       assert.equal(await review.isVisible(),false);

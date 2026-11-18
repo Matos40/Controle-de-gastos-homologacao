@@ -116,6 +116,7 @@ async function observe(user) {
       invoiceAllowed = auth.invoiceBackendAvailable && accessVerified && (plan === 'premium' || !!role);
       invoicePlan = plan;
       invoiceVerified = accessVerified;
+      document.getElementById('v3468Logout').hidden = !!role;
       document.getElementById('v345Identity').textContent =
         label + ' · ' +
         (role === 'owner' ? 'Owner' : role === 'admin' ? 'Admin' : plan === 'premium' ? 'Premium' : 'Free');
@@ -141,6 +142,7 @@ async function observe(user) {
       catch { view.paint({phase: 'workspace-blocked', message: 'Não foi possível sair. Tente novamente.'}); }
     };
     document.getElementById('v345Logout').addEventListener('click', logout);
+    document.getElementById('v3468Logout').addEventListener('click', logout);
     document.getElementById('productionCloudLogout')?.addEventListener('click', logout, {capture: true});
     const cancelDeadline = () => { if (deadline !== null) clearTimeout(deadline); deadline = null; };
     const expireIfNecessary = () => {

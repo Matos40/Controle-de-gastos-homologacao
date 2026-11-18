@@ -39,6 +39,7 @@ replace(/<link id="pwaManifestLink"[^>]+>/, '<link rel="manifest" href="./manife
 replace(/(<span id="pwaInstalledBadge" class=")hidden /, '$1');
 replace(/(<span id="pwaInstalledBadge"[^>]*>[\s\S]*?<\/span>)/, '$1<span id="raytechHeaderVersion" class="v3468-version" aria-label="Versão do aplicativo">v' + version + '</span>');
 replace(/(<h2 id="smartPwaTitle">[^<]+<\/h2>)/, '$1<p class="v3468-install-version" id="raytechInstallVersion">V' + version + '</p>');
+replace(/(<button type="button" id="smartPwaOpen")/, '<button type="button" id="v3468Logout" hidden class="pwa-tile"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i><span>Sair da conta</span></button>$1');
 replace(/<!-- Modal Chave da API Gemini -->[\s\S]*?(?=  <main class="max-w-6xl)/, `
 <dialog id="apiKeyModal" aria-labelledby="invoiceKeyTitle" class="v345-dialog">
   <h2 id="invoiceKeyTitle">Chave Gemini API</h2>
@@ -48,6 +49,12 @@ replace(/<!-- Modal Chave da API Gemini -->[\s\S]*?(?=  <main class="max-w-6xl)/
 <dialog id="ocrModal" aria-labelledby="invoiceTitle" class="v345-dialog">
   <h2 id="invoiceTitle">Leitor de fatura com IA</h2>
   <p id="simulatedStatus" role="status"></p>
+  <section id="invoiceOfflinePreview" hidden class="space-y-2 my-3" aria-label="Leitura de imagens e PDFs">
+    <button id="ocrDropZone" type="button" disabled class="w-full border-2 border-dashed border-purple-500/40 rounded-2xl p-4 text-slate-400">
+      <i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i> Selecionar imagem ou PDF
+    </button>
+    <button id="ocrProcessBtn" type="button" disabled class="admin-action">Extrair gastos com IA</button>
+  </section>
   <div id="simulatedReview"></div>
   <div class="v345-dialog-actions">
     <button type="button" class="admin-action" id="simulatedClose">Fechar</button>

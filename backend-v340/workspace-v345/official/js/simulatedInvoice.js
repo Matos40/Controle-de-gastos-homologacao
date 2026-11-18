@@ -7,6 +7,7 @@
   const key = document.getElementById('premiumApiKeyButton');
   const keyDialog = document.getElementById('apiKeyModal');
   const extract = document.getElementById('simulatedExtract');
+  const preview = document.getElementById('invoiceOfflinePreview');
   let review = null, turn = 0, busy = false;
   const entitled = () => window.raytechCanUseInvoiceAI() && !window.raytechSessionRevoked;
   const close = () => { review = null; dialog.close(); };
@@ -17,6 +18,8 @@
     stage.replaceChildren();
     confirm.disabled = true;
     extract.disabled = !entitled();
+    preview.hidden = entitled();
+    extract.hidden = confirm.hidden = !entitled();
     status.textContent = state.reason || 'Gere uma amostra para revisar antes de lançar.';
     if (!dialog.open) dialog.showModal();
   };
@@ -106,6 +109,8 @@
       review = null;
       stage.replaceChildren();
       confirm.disabled = extract.disabled = true;
+      preview.hidden = false;
+      extract.hidden = confirm.hidden = true;
       status.textContent = state.reason;
       if (!state.visible) close();
     }
