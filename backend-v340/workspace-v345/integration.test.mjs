@@ -286,6 +286,13 @@ test('PWA manifest, scoped installation, offline dashboard, UID isolation and of
     });
     assert.equal(worker.scope,origin+'/');
     assert.equal(worker.script,origin+'/raytech-pwa-sw.js');
+    await page.locator('#headerToolsToggleBtn').click();
+    await page.locator('#smartPwaOpen').click();
+    await page.locator('#smartPwaDialog').waitFor({state:'visible'});
+    assert.match(await page.locator('#smartPwaStatus').textContent(),/Recursos offline preparados/);
+    assert.match(await page.locator('.pwa-note').textContent(),/24 horas/);
+    await page.locator('#smartPwaClose').click();
+    await page.locator('#headerToolsToggleBtn').click();
     await page.locator('#salaryInput').fill('3406');
     await context.setOffline(true);
     await page.reload();
@@ -332,6 +339,8 @@ test('PWA discards incomplete updates and defers validated activation until wind
     await writeFile(htmlPath,changedHtml);
     await publish(changedHtml,'verified-fixture');
     await page.waitForFunction(()=>window.raytechPwa.state().phase==='update-waiting');
+    await page.locator('#smartPwaNotice').waitFor({state:'visible'});
+    assert.match(await page.locator('#smartPwaNotice').textContent(),/feche todas as janelas/);
     assert.equal(await page.evaluate(()=>appDb.months[appDb.selectedMonth].salary),3460);
     assert.equal(await page.evaluate(async()=>(await fetch('/index.html').then(r=>r.text())).includes('engineering update fixture')),false);
     await page.close();
