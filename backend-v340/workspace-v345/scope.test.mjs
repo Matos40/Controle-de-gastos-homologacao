@@ -38,3 +38,92 @@ test('binding two empty banks does not create a Firestore revision', async () =>
   await engine.bind({mode:'seed',plan:{local:raw,remote:null}});
   assert.deepEqual(await engine.tick(),{status:'empty',revision:undefined});
 });
+
+function recoveryFixture(tick){
+  let clock=0, sequence=0, connected=true;
+  const timers=new Map(), errors=[];
+  return {
+    errors,
+    setOnline(value){connected=value;},
+    due(){return [...timers.values()].map(x=>x.at).sort((a,b)=>a-b);},
+    config:{session:{state:()=>({active:true,busy:false}),tick},
+      environment:()=>({bound:true,visible:true,online:connected,unlocked:true}),
+      setTimer:(fn,ms)=>{const id=++sequence;timers.set(id,{at:clock+ms,fn});return id;},
+      clearTimer:id=>timers.delete(id), now:()=>clock, eventOnly:true,delay:1000,
+      onError:error=>errors.push(error)},
+    async next(){
+      const [id,job]=[...timers.entries()].sort((a,b)=>a[1].at-b[1].at)[0];
+      timers.delete(id);clock=job.at;await job.fn();
+    }
+  };
+}
+
+test('unavailable retries progressively and an online event brings the next attempt forward', async () => {
+  const {createEventRuntime}=await import('./official/js/productionV2/eventRuntime.mjs');
+  let attempts=0;
+  const fixture=recoveryFixture(async()=>{
+    if(++attempts<=2)throw Object.assign(Error('transport'),{code:'unavailable'});
+    return {status:'synced'};
+  });
+  const runtime=createEventRuntime(fixture.config);
+  runtime.signal();
+  await fixture.next();
+  assert.deepEqual(fixture.due(),[3000]);
+  assert.equal(fixture.errors[0].persistent,false);
+  await fixture.next();
+  assert.deepEqual(fixture.due(),[7000]);
+  fixture.setOnline(false);runtime.changed();
+  assert.deepEqual(fixture.due(),[]);
+  fixture.setOnline(true);runtime.reconnect();
+  assert.deepEqual(fixture.due(),[4000]);
+  await fixture.next();
+  assert.equal(attempts,3);
+  assert.deepEqual(fixture.due(),[]);
+});
+
+test('sustained transient failures back off and permission failures stop automatic retries', async () => {
+  const {createEventRuntime}=await import('./official/js/productionV2/eventRuntime.mjs');
+  const fixture=recoveryFixture(async()=>{throw Object.assign(Error('transient'),{code:'unavailable'});});
+  const runtime=createEventRuntime(fixture.config);
+  runtime.signal();
+  for(let i=0;i<5;i++)await fixture.next();
+  assert.equal(fixture.errors.filter(error=>error.persistent).length,1);
+  assert.equal(fixture.due().length,1);
+  runtime.fail({code:'permission-denied'});
+  runtime.reconnect();
+  assert.equal(fixture.errors.at(-1).kind,'persistent');
+  assert.deepEqual(fixture.due(),[]);
+});
+
+test('recovery confirms an existing receipt when Firestore committed before losing the reply', async () => {
+  const {createHash}=await import('node:crypto');
+  const {blank}=await import('./official/js/productionV2/model.mjs');
+  const {createSyncEngine}=await import('./official/js/experimentalSync/engine.mjs');
+  const data=blank('2026-06');
+  data.months['2026-06'].expenses.push({id:'fictional',title:'Teste',amount:14,type:'fixed',category:'outros',date:'2026-06-02',paid:false});
+  const raw=JSON.stringify(data), digest=async value=>createHash('sha256').update(value).digest('hex');
+  const slots=new Map();
+  const storage={getItem:key=>slots.get(key)??null,setItem:(key,value)=>slots.set(key,value)};
+  let remote=null, writes=0;
+  const cloud={
+    currentUid:()=> 'fixture',
+    read:async()=>remote,
+    confirm:async (expectedUid,receipt)=>expectedUid==='fixture'&&remote!==null&&JSON.stringify(receipt)===JSON.stringify(remote.receipt),
+    async send(_uid,command){
+      writes++;
+      const hash=await digest(command.payload);
+      const receipt={operationId:command.id,revision:command.expectedRevision+1,parentId:command.parentId,hash};
+      remote={head:{marker:'raytech-financial-production-v2',revision:receipt.revision,
+        lastOperationId:command.id,hash,payload:command.payload},receipt};
+      throw Object.assign(Error('lost acknowledgement'),{code:'unavailable'});
+    },
+  };
+  const engine=createSyncEngine({uid:'fixture',storage,cloud,local:{read:()=>raw},
+    prepare:payload=>({compatible:true,payload}),hash:digest,
+    id:()=> '12345678-1234-4123-8123-123456789abc', lock:async (_key,fn)=>fn()});
+  await engine.bind({mode:'seed',plan:{local:raw,remote:null}});
+  await assert.rejects(engine.tick(),{code:'unavailable'});
+  assert.deepEqual(await engine.tick(),{status:'synced',revision:1});
+  assert.equal(writes,1);
+  assert.equal(JSON.parse(remote.head.payload).months['2026-06'].expenses.length,1);
+});

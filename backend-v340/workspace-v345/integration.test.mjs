@@ -152,8 +152,10 @@ test('Chromium integrates synthetic finance, review, quota, role changes and ses
     assert.ok(synced, (await page.locator('#productionCloudStatus').textContent()) + ' ' + JSON.stringify(errors));
     assert.match(synced.payload, /Mercado fictício/);
     await context.setOffline(true);
+    await page.locator('#productionCloudHeader[data-sync-state=offline]').waitFor();
     await page.locator('#salaryInput').fill('2500');
     assert.equal(await page.evaluate(() => appDb.months[appDb.selectedMonth].salary), 2500);
+    const beforeRecovery=(await getDoc(head)).data().revision;
     await context.setOffline(false);
     let remoteSalary = null;
     for (let retry = 0; retry < 30 && remoteSalary !== 2500; retry++) {
@@ -163,6 +165,8 @@ test('Chromium integrates synthetic finance, review, quota, role changes and ses
       if (remoteSalary !== 2500) await new Promise(resolve => setTimeout(resolve, 250));
     }
     assert.equal(remoteSalary, 2500);
+    await page.locator('#productionCloudHeader[data-sync-state=synced]').waitFor();
+    assert.equal((await getDoc(head)).data().revision,beforeRecovery+1);
     await page.goto(origin + '?workspace=v2-clean');
     await page.locator('#smartAccountApp').waitFor({state: 'visible'});
     await page.waitForFunction(() => window.productionCleanWorkspaceReady === true);

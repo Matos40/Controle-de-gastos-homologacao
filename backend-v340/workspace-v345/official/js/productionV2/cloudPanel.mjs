@@ -2,7 +2,7 @@ import {PRODUCTION_CONFIG} from './config.mjs';
 import {databaseKey,scopeSyncStorage,canTransfer,syncPrefix} from './cleanWorkspace.mjs';
 import {createProductionSyncSession,LIMITS,RECOVERY_KEY,REVIEW_KEY} from '../experimentalSync/session.mjs';
 import {DEVICE_KEY} from '../experimentalSync/engine.mjs';
-import {createEventRuntime} from './eventRuntime.mjs';
+import {createEventRuntime,syncFailure} from './eventRuntime.mjs';
 import {payloadHash} from './initialTransfer.mjs';
 import {withQueueLock} from './queue.mjs';
 import {decodeJsonFile} from '../experimentalSync/backupFiles.mjs';
@@ -26,17 +26,66 @@ export function bindCloudPanel(doc,storage,{config=PRODUCTION_CONFIG,open=async(
  const reviewDetails=el('productionCloudReviewDetails'),reviewHome=reviewDetails?.parentElement,reviewOpen=el('productionCloudReviewOpen'),retry=el('productionCloudRetry'),manualSync=el('productionCloudSyncNow');
  const connection=()=>{const stored=syncStorage.getItem(CONNECTION_KEY);if(stored!==null)return stored==='signed-out'?null:stored;try{const p=JSON.parse(syncStorage.getItem('experimental-sync-policy-v1')),c=JSON.parse(syncStorage.getItem(DEVICE_KEY));return p?.uid&&p.uid===c?.uid&&['active','paused'].includes(p.state)?p.uid:null;}catch{return null;}};
  const online=()=>win?.navigator?.onLine!==false;
- let unsubscribe=null,watchGeneration=0,watchStarting=false,watchFailed=false,watchRevision=null,unifiedLogin=false,reviewExpanded=false,profile=null,syncing=false,attention=false,verifiedSync=false,restoring=false,cloud=null,uid=null,busy=false,generation=0,session=null,runtime=null,plan=null,bound=false,review=null,invalid=false,writeAllowed=false,storageChanged=false;
+ let unsubscribe=null,watchGeneration=0,watchStarting=false,watchFailed=false,watchTerminal=false,watchFailures=0,watchRetryTimer=null,watchRevision=null,unifiedLogin=false,reviewExpanded=false,profile=null,syncing=false,attention=false,recovering=false,verifiedSync=false,restoring=false,cloud=null,uid=null,busy=false,generation=0,session=null,runtime=null,plan=null,bound=false,review=null,invalid=false,writeAllowed=false,storageChanged=false;
  const unlocked=()=>!el('pinLockOverlay')||el('pinLockOverlay').classList.contains('hidden');
  const entitlement=()=>win?.raytechCloudEntitlement??{eligible:true,writeEnabled:true};
  const premium=()=>entitlement().eligible===true&&entitlement().writeEnabled===true;
  const ready=()=>!win?.raytechSessionRevoked&&!storageChanged&&win?.productionCleanWorkspaceReady===true&&unlocked();
  const say=message=>{status.textContent=message;};
- const result=r=>{verifiedSync=r.status==='synced'&&!session?.hasLocalChanges();attention=r.status==='conflict';const labels={synced:verifiedSync?'Sincronizado':'Aguardando envio das alterações locais',updated:'Alterações recebidas. Conferindo sincronização',empty:'Conectado. Aguardando lançamentos ou valores',paused:'Pausado',offline:'Sem internet',conflict:'Conflito: revisão necessária',idle:'Aguardando',throttled:'Aguardando próxima consulta'};if(verifiedSync&&uid){try{syncStorage.setItem(LAST_KEY,JSON.stringify({uid,at:new Date().toISOString()}));}catch{}}say('Nuvem V2 · '+(labels[r.status]??r.status)+(r.revision?' · revisão '+r.revision:''));};
- const error=e=>{if(e?.message==='EXPERIMENTAL_BUDGET_EXHAUSTED'){attention=false;verifiedSync=false;say('Reserva diária esgotada. Dados locais preservados.');return;}attention=true;verifiedSync=false;const code=String(e?.code??e?.message??'PRODUCTION_UNAVAILABLE');say('Operação não concluída ('+(/^[A-Z0-9_/-]+$/i.test(code)?code:'PRODUCTION_UNAVAILABLE')+'). Dados e pendências preservados.');};
+ const result=r=>{recovering=false;verifiedSync=r.status==='synced'&&!session?.hasLocalChanges();attention=false;const labels={synced:verifiedSync?'Sincronizado':'Aguardando envio das alterações locais',updated:'Alterações recebidas. Conferindo sincronização',empty:'Conectado. Aguardando lançamentos ou valores',paused:'Pausado',offline:'Sem internet',conflict:'Conflito: revisão necessária',idle:'Aguardando',throttled:'Aguardando próxima consulta'};if(verifiedSync&&uid){try{syncStorage.setItem(LAST_KEY,JSON.stringify({uid,at:new Date().toISOString()}));}catch{}}say('Nuvem V2 · '+(labels[r.status]??r.status)+(r.revision?' · revisão '+r.revision:''));};
+ const reportFailure=({kind,persistent=false})=>{
+  verifiedSync=false;if(kind!=='offline')attention=persistent;recovering=kind==='transient';
+  if(kind==='offline')say('Sem internet. As alterações serão sincronizadas quando a conexão voltar.');
+  else if(kind==='budget')say('Reserva diária esgotada. Os dados locais foram preservados.');
+  else if(kind==='transient')say(persistent?'A nuvem segue indisponível. As tentativas automáticas continuam.':'Nuvem temporariamente indisponível. Reconectando automaticamente.');
+  else say('A sincronização requer atenção. Os dados e as alterações pendentes foram preservados.');
+ };
+ const error=e=>{
+  const failure=syncFailure(e,online());
+  if(runtime&&bound&&session?.state().persisted==='active')runtime.fail(e);
+  else reportFailure({...failure,persistent:failure.kind==='persistent'});
+ };
  const disable=(e,v)=>{if(e)e.disabled=!!v;};
  function stopWatch(){watchGeneration++;watchStarting=false;watchRevision=null;unsubscribe?.();unsubscribe=null;}
- function watchState(){const allowed=canSync&&uid&&session&&bound&&writeAllowed&&!review&&!invalid&&ready()&&online()&&doc.visibilityState!=='hidden'&&session.state().active;if(!allowed){if(unsubscribe||watchStarting)stopWatch();return;}if(unsubscribe||watchStarting||watchFailed||!cloud?.watchHead||busy||restoring||syncing||session.state().busy)return;watchStarting=true;const token=++watchGeneration,who=uid;void session.reserveListener().then(ok=>{if(token!==watchGeneration||who!==uid)return;watchStarting=false;if(!ok){watchFailed=true;return;}unsubscribe=cloud.watchHead(who,revision=>{if(token!==watchGeneration||who!==uid)return;if(watchRevision===revision)return;watchRevision=revision;let base;try{base=JSON.parse(syncStorage.getItem(DEVICE_KEY))?.base?.head?.revision??0;}catch{return;}if(revision===null){verifiedSync=false;paint();return;}if(revision!==base||!verifiedSync){verifiedSync=false;runtime?.signal();paint();}},()=>{if(token===watchGeneration){stopWatch();watchFailed=true;verifiedSync=false;runtime?.changed();paint();}});}).catch(()=>{if(token===watchGeneration){stopWatch();watchFailed=true;runtime?.changed();paint();}});}
+ function clearWatchRetry(){
+  if(watchRetryTimer!==null)win.clearTimeout(watchRetryTimer);
+  watchRetryTimer=null;
+ }
+ function watchError(e,token){
+  if(token!==watchGeneration)return;
+  stopWatch();watchFailed=true;verifiedSync=false;
+  const failure=syncFailure(e,online());
+  watchTerminal=failure.kind==='persistent';
+  if(failure.kind==='transient'){
+    const ms=Math.min(300000,(failure.code==='resource-exhausted'?60000:2000)*2**Math.min(watchFailures++,8));
+    clearWatchRetry();
+    watchRetryTimer=win.setTimeout(()=>{watchRetryTimer=null;watchFailed=false;paint();},ms);
+  }
+  runtime?.fail(e);
+  paint();
+ }
+ function watchState(){
+  const allowed=canSync&&uid&&session&&bound&&writeAllowed&&!review&&!invalid&&ready()&&online()
+    &&doc.visibilityState!=='hidden'&&session.state().active;
+  if(!allowed){if(unsubscribe||watchStarting)stopWatch();return;}
+  if(unsubscribe||watchStarting||watchFailed||!cloud?.watchHead||busy||restoring||syncing||session.state().busy)return;
+  watchStarting=true;
+  const token=++watchGeneration,who=uid;
+  void session.reserveListener().then(ok=>{
+    if(token!==watchGeneration||who!==uid)return;
+    watchStarting=false;
+    if(!ok)return;
+    unsubscribe=cloud.watchHead(who,revision=>{
+      if(token!==watchGeneration||who!==uid||watchRevision===revision)return;
+      watchRevision=revision;
+      if(revision===null){verifiedSync=false;paint();return;}
+      watchFailures=0;
+      let base;
+      try{base=JSON.parse(syncStorage.getItem(DEVICE_KEY))?.base?.head?.revision??0;}catch{return;}
+      if(revision!==base||!verifiedSync){verifiedSync=false;runtime?.signal();paint();}
+    },e=>watchError(e,token));
+  }).catch(e=>watchError(e,token));
+ }
  function paint(){
   if(applyOpen){applyOpen.hidden=!canSync||!uid||!applyFingerprint||!!review||invalid;applyOpen.disabled=busy||!online()||!ready()||!!session?.state().active;}
   if(applyBox)applyBox.hidden=!applyReview||!uid||!ready();
@@ -54,9 +103,9 @@ export function bindCloudPanel(doc,storage,{config=PRODUCTION_CONFIG,open=async(
   if(manualSync){manualSync.hidden=!canSync||!uid||!bound||!st.active||!!review||invalid;manualSync.disabled=busy||st.busy||waiting||!online()||!ready()||!writeAllowed;}
   if(retry){retry.hidden=maintenance||!uid||!!review||invalid||(!attention&&(!bound||st.active));retry.disabled=busy||st.busy||waiting||!online()||!ready();}
   if(header&&canSync){
-   const kind=uid&&entitlement().plan==='free'&&!premium()?'free':!premium()?'disconnected':!uid?'disconnected':!online()?'offline':invalid||review?'attention':waiting?'paused':attention?'attention':syncing||st.busy?'syncing':st.active&&verifiedSync?'synced':st.active?'online':'paused';
+   const kind=uid&&entitlement().plan==='free'&&!premium()?'free':!premium()?'disconnected':!uid?'disconnected':!online()?'offline':invalid||attention?'attention':waiting||review?'paused':syncing||st.busy?'syncing':recovering?'paused':st.active&&verifiedSync?'synced':st.active?'online':'paused';
 
-   const labels={free:'Google conectado · Plano Free (dados locais)',disconnected:'Desconectado',offline:'Sem internet',attention:'Atenção necessária',syncing:'Sincronizando',synced:'Sincronizado',online:'Conectado',paused:'Pausado'};
+   const labels={free:'Google conectado · Plano Free (dados locais)',disconnected:'Desconectado',offline:'Sem internet',attention:'Atenção necessária',syncing:'Sincronizando',synced:'Sincronizado',online:'Conectado',paused:recovering?'Reconectando automaticamente':review?'Revisão necessária':'Pausado'};
    header.title='Nuvem: '+labels[kind];header.setAttribute('aria-label',header.title);header.dataset.syncState=kind;
    header.classList.remove('text-emerald-400','text-amber-400','text-slate-400','text-blue-400','text-red-400');
    header.classList.add(kind==='synced'?'text-emerald-400':kind==='syncing'?'text-blue-400':kind==='attention'?'text-red-400':kind==='offline'||kind==='paused'?'text-amber-400':'text-slate-400');
@@ -75,6 +124,7 @@ export function bindCloudPanel(doc,storage,{config=PRODUCTION_CONFIG,open=async(
    if(indicator&&!premium())indicator.textContent=kind==='free'?'Google conectado · Plano Free\nSincronização exclusiva Premium':'Google conectado · dados locais';
    if(indicator&&kind==='synced')indicator.textContent='Sincronizado';
    if(indicator&&kind==='online')indicator.textContent='Sincronização ativa · aguardando confirmação';
+   if(indicator&&recovering&&kind==='paused')indicator.textContent='Reconectando automaticamente';
    if(indicator&&kind==='syncing')indicator.textContent='Sincronizando…';
    if(indicator&&kind==='attention')indicator.textContent='Atenção necessária';if(indicator&&waiting&&!review&&!invalid)indicator.textContent='Reserva diária esgotada';
   }
@@ -93,11 +143,13 @@ disable(pauseBtn,!canSync||!session||(!st.active&&!waiting));disable(resumeBtn,b
  function renderConflictReview(){if(!reviewBox)return;const select=el('productionCloudChoice'),fingerprint=review?JSON.stringify(review):null;if(select)select.hidden=review?.kind==='conflict';if(fingerprint===displayedReview?.fingerprint&&reviewBox.childNodes.length)return;displayedReview=review?{fingerprint,snapshot:structuredClone(review)}:null;displayedConflict=null;reviewBox.replaceChildren();reset('productionCloudReviewConsent','productionCloudReviewBackup');if(!review){reviewBox.textContent='Nenhuma revisão pendente.';return;}if(review.kind!=='conflict'){reviewBox.textContent='Backup em revisão. Confira a origem e exporte as versões antes de aplicar.';return;}const data=session.conflictFields();displayedConflict=data;const add=(tag,text,home=reviewBox)=>{const e=doc.createElement(tag);e.textContent=text;home.appendChild(e);return e;};add('p','Escolha uma versão para cada divergência. Alterações independentes serão preservadas.');const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);const labels={salary:'Salário',budgetLimit:'Limite do orçamento',expenses:'Despesa',cardExpenses:'Cartão',extraIncomes:'Renda extra',title:'Nome',description:'Descrição',category:'Categoria',amount:'Valor',type:'Tipo',date:'Data',paid:'Pago',installmentValue:'Valor da parcela',totalAmount:'Valor total',installments:'Parcelas',currentInstallment:'Parcela atual',isInstallment:'Parcelado',installmentOriginId:'Série'};const describe=v=>v===null?'Registro ausente':typeof v==='number'?money(v):typeof v==='object'?Object.entries(v).filter(([k])=>k!=='id').map(([k,x])=>(labels[k]??k)+': '+(typeof x==='boolean'?(x?'Sim':'Não'):['amount','installmentValue','totalAmount'].includes(k)?money(x):String(x??'—'))).join(' · '):String(v);for(const f of data.fields){const row=add('div','');row.className='border border-slate-700 rounded-lg p-2 space-y-1';const [month,kind]=f.path.split(' · '),record=f.local??f.target??f.before;add('p',month+' · '+(record?.title??record?.description??labels[kind]??kind),row).className='font-semibold';add('p','Original: '+describe(f.before),row).className='text-slate-400';add('p','Neste dispositivo: '+describe(f.local),row);add('p','Na nuvem: '+describe(f.target),row);const choice=doc.createElement('select');choice.className='w-full bg-slate-900 rounded p-2';choice.dataset.conflictPath=f.path;for(const [v,label] of [['','Escolha a versão'],['local','Preservar neste dispositivo'],['target','Preservar da nuvem']]){const o=doc.createElement('option');o.value=v;o.textContent=label;choice.appendChild(o);}row.appendChild(choice);}for(const b of data.blocked)add('p','Revisão especializada necessária: '+b).className='text-amber-300';}
  async function details(){if(!session)return;try{const cp=await session.checkpoint();bound=!!cp;review=session.review();applyFingerprint=cp?.base&&cp?.apply&&!review?JSON.stringify(cp.apply):null;if(!applyFingerprint&&applyReview)clearApply();invalid=false;renderConflictReview();const b=session.budget();if(el('productionCloudBudget'))el('productionCloudBudget').textContent='Reserva local: '+(b?.reads??0)+'/'+LIMITS.reads+' leituras; '+(b?.writes??0)+'/'+LIMITS.writes+' escritas. Não é faturamento.';const m=session.metrics();if(el('productionCloudMetrics'))el('productionCloudMetrics').textContent='Chamadas nesta sessão (concluídas/tentadas): consultas '+m.read.completed+'/'+m.read.attempted+'; confirmações '+m.confirm.completed+'/'+m.confirm.attempted+'; envios '+m.send.completed+'/'+m.send.attempted+'; reservas de escuta '+m.listener.completed+'/'+m.listener.attempted+'. Não são contagens faturadas pelo Firebase.';if(syncStorage.getItem(RECOVERY_KEY)!==null)invalid=true;}catch{invalid=true;try{session.pause();}catch{}say('Metadados indisponíveis. Sincronização bloqueada; preserve os dados.');}}
  const action=async fn=>{if(busy||session?.state().busy||!unlocked())return;busy=true;paint();try{await fn();}catch(e){error(e);}finally{busy=false;await details();paint();runtime?.changed();if(unifiedLogin&&uid&&canSync&&ready()&&online()){void finishExplicitLogin();}}};
- function stop(preserve=false){clearApply();stopWatch();watchFailed=false;runtime?.close();runtime=null;if(session)try{preserve?session.suspend():session.sessionChanged();}catch{}session=null;plan=null;bound=false;review=null;invalid=false;writeAllowed=false;}
+ function stop(preserve=false){clearApply();stopWatch();clearWatchRetry();watchFailed=false;watchTerminal=false;watchFailures=0;recovering=false;runtime?.close();runtime=null;if(session)try{preserve?session.suspend():session.sessionChanged();}catch{}session=null;plan=null;bound=false;review=null;invalid=false;writeAllowed=false;}
  function makeSession(who,g){
   const current=()=>g===generation&&uid===who&&ready()&&premium();
   const s=createProductionSyncSession({config,location:win.location,search,cloud,storage:syncStorage,uid:who,hash:payloadHash,id:()=>win.crypto.randomUUID(),local:{read:()=>storage.getItem(dbKey),apply:(raw,payload)=>current()&&win.productionV2ApplyLocal?.(raw,payload)===true},unlocked:current,online:()=>win?.navigator?.onLine!==false,visible:()=>doc.visibilityState!=='hidden',lock:(key,fn)=>withQueueLock('main_b2_'+key,fn,win.navigator?.locks)});
-  runtime=createEventRuntime({session:{state:s.state,tick:async opts=>{try{syncing=true;paint();const r=await s.tick(opts);if(g===generation){result(r);if(r.status==='updated'||r.status==='synced'&&s.hasLocalChanges())runtime?.signal();}return r;}finally{syncing=false;await details();paint();}},pause:s.pause,sessionChanged:s.sessionChanged},environment:()=>({visible:doc.visibilityState!=='hidden',online:win.navigator?.onLine!==false,unlocked:current()&&!busy&&!review&&!invalid,bound}),delay:1000,eventOnly:true,onRenew:async()=>{if(g!==generation||!current()||!bound||review||invalid||!online()||!s.state().budgetWaiting||s.state().budgetDay>=new Date().toISOString().slice(0,10))return false;await authorizeWrite();if(g!==generation||!current())return false;const ok=await s.restoreActive();if(ok){attention=false;watchFailed=false;}await details();paint();return ok;},setTimer:(fn,ms)=>win.setTimeout(fn,ms),clearTimer:id=>win.clearTimeout(id),onError:code=>{if(g!==generation)return;if(code==='EXPERIMENTAL_BUDGET_EXHAUSTED'){attention=false;verifiedSync=false;paint();return;}attention=true;verifiedSync=false;say('Consulta automática interrompida ('+code+'). Dados preservados.');paint();}});
+  runtime=createEventRuntime({session:{state:()=>{const state=s.state();return {...state,active:state.active||bound&&state.persisted==='active'&&!state.budgetWaiting};},tick:async opts=>{try{syncing=true;paint();
+  if(!s.state().active){await authorizeWrite();if(g!==generation||!await s.restoreActive())return {status:'paused'};}
+  const r=await s.tick(opts);if(g===generation){result(r);if(r.status==='updated'||r.status==='synced'&&s.hasLocalChanges())runtime?.signal();}return r;}finally{syncing=false;await details();paint();}},pause:s.pause,sessionChanged:s.sessionChanged},environment:()=>({visible:doc.visibilityState!=='hidden',online:win.navigator?.onLine!==false,unlocked:current()&&!busy&&!review&&!invalid,bound}),delay:1000,eventOnly:true,onRenew:async()=>{if(g!==generation||!current()||!bound||review||invalid||!online()||!s.state().budgetWaiting||s.state().budgetDay>=new Date().toISOString().slice(0,10))return false;await authorizeWrite();if(g!==generation||!current())return false;const ok=await s.restoreActive();if(ok){attention=false;watchFailed=false;}await details();paint();return ok;},setTimer:(fn,ms)=>win.setTimeout(fn,ms),clearTimer:id=>win.clearTimeout(id),onError:failure=>{if(g===generation){reportFailure(failure);paint();}}});
   return s;
  }
  function requireSession(){if(!canSync||!session||!ready()||invalid)throw Error('PRODUCTION_TRANSFER_DISABLED');return session;}
@@ -150,7 +202,7 @@ disable(pauseBtn,!canSync||!session||(!st.active&&!waiting));disable(resumeBtn,b
  applyResolve?.addEventListener('click',()=>action(async()=>{const s=requireSession();if(!applyReview||!applyConfirm.checked||!applyBackup.checked)return;const choices=Object.fromEntries([...applyFields.querySelectorAll('select')].map(x=>[x.dataset.path,x.value]));if(Object.values(choices).some(x=>!x))throw Error('PRODUCTION_RECOVERY_CHOICE');await authorizeWrite();try{await s.resolveApply({choices,confirmed:true,backupSaved:true});}finally{clearApply();}attention=false;runtime?.retry();say('Recuperação validada. Retomando sincronização.');}));
  reviewOpen?.addEventListener('click',()=>{reviewExpanded=true;paint();});
  manualSync?.addEventListener('click',()=>{if(!manualSync.disabled&&session?.state().active)runtime?.retry();});
- retry?.addEventListener('click',()=>{if(!uid||review||invalid||busy||session?.state().busy)return;if(session?.state().active){runtime?.retry();return;}unifiedLogin=true;void finishExplicitLogin();});
+ retry?.addEventListener('click',()=>{if(!uid||review||invalid||busy||session?.state().busy)return;clearWatchRetry();watchFailed=false;watchTerminal=false;if(session?.state().active){runtime?.retry();return;}unifiedLogin=true;void finishExplicitLogin();});
  login.addEventListener('click',()=>action(async()=>{if(!cloud||uid)return;throw Error('SESSION_REQUIRED');}));
  async function inspectAccount(){if(!cloud||!uid)return;const who=uid,g=generation;if(!canSync){const remote=await cloud.read(who);if(g!==generation||who!==uid||!unlocked())return;say('UID: '+who+(remote?' • Nuvem existente, revisão '+remote.head.revision:' • Conta autorizada; nuvem vazia.'));return;}const s=requireSession();writeAllowed=false;await authorizeWrite();plan=null;if(planBox)planBox.replaceChildren();if(await s.checkpoint()){say('Conta autorizada para escrita. Retomada exige confirmação explícita.');return;}const r=await s.inspect();if(g!==generation||who!==uid)return;plan=r;reset('productionCloudConsent','productionCloudBackupSaved');if(planBox){
   const describe=(label,data)=>{const p=doc.createElement('p');p.textContent=data?
@@ -160,7 +212,7 @@ disable(pauseBtn,!canSync||!session||(!st.active&&!waiting));disable(resumeBtn,b
  }
  say(r.conflict?'Há informações incompatíveis. Exporte as duas cópias e revise as diferenças antes de tentar novamente.':r.mode==='seed'?'A nuvem está sem dados financeiros. Confirme o envio deste dispositivo.':r.mode==='adopt'?'Este dispositivo está sem dados financeiros. Confirme o recebimento da nuvem.':'As duas cópias têm dados. Confirme a união dos lançamentos compatíveis.');}
  inspect.addEventListener('click',()=>action(inspectAccount));
- function link(mode){return action(async()=>{const s=requireSession();if(plan?.mode!==mode||!checked('productionCloudConsent')||!checked('productionCloudBackupSaved'))throw Error('PRODUCTION_CONSENT');await authorizeWrite();await s.authorize({mode,confirmed:true,backupSaved:true});syncStorage.setItem(CONNECTION_KEY,uid);plan=null;reset('productionCloudConsent','productionCloudBackupSaved');if(planBox)planBox.textContent='';say('Vínculo confirmado. Sincronização automática ativa.');const outcome=await s.tick({manual:true});result(outcome);if(outcome.status==='updated'||outcome.status!=='empty'&&s.hasLocalChanges())runtime?.signal();});}
+ function link(mode){return action(async()=>{const s=requireSession();if(plan?.mode!==mode||!checked('productionCloudConsent')||!checked('productionCloudBackupSaved'))throw Error('PRODUCTION_CONSENT');await authorizeWrite();await s.authorize({mode,confirmed:true,backupSaved:true});syncStorage.setItem(CONNECTION_KEY,uid);plan=null;reset('productionCloudConsent','productionCloudBackupSaved');if(planBox)planBox.textContent='';say('Vínculo confirmado. Sincronização automática ativa.');await details();const outcome=await s.tick({manual:true});result(outcome);if(outcome.status==='updated'||outcome.status!=='empty'&&s.hasLocalChanges())runtime?.signal();});}
  seed.addEventListener('click',()=>link('seed'));adopt?.addEventListener('click',()=>link(plan?.mode));
  refresh?.addEventListener('click',()=>{if(!canSync)return;void action(async()=>{const s=requireSession();if(!writeAllowed||!s.state().active)throw Error('PRODUCTION_PAUSED');syncing=true;paint();try{const r=await s.tick({manual:true});result(r);}finally{syncing=false;}});});
  pauseBtn?.addEventListener('click',()=>{if(canSync&&session){try{runtime.pause();say('Sincronização pausada.');paint();}catch(e){error(e);}}});
@@ -214,9 +266,16 @@ disable(pauseBtn,!canSync||!session||(!st.active&&!waiting));disable(resumeBtn,b
    };
   };
   win.addEventListener('raytech-finance-saved',()=>{try{if(session&&!session.hasLocalChanges())return;}catch{}verifiedSync=false;runtime?.signal({local:true});paint();});
-  const lifecycle=()=>{if(online()&&doc.visibilityState!=='hidden')watchFailed=false;runtime?.changed();paint();if(!online()||!ready()||doc.visibilityState==='hidden')return;if(!cloud&&(connection()||win.raytechStorage)&&!busy)void action(connectCloud);else if(!premium())return;else if(unifiedLogin&&bound){void finishExplicitLogin();}else if(session?.state().active){runtime?.signal();}else if(!session?.state().budgetWaiting)void restore();};
+  const lifecycle=()=>{runtime?.changed();paint();if(!online()||!ready()||doc.visibilityState==='hidden')return;if(!cloud&&(connection()||win.raytechStorage)&&!busy)void action(connectCloud);else if(!premium())return;else if(unifiedLogin&&bound){void finishExplicitLogin();}else if(session?.state().active){runtime?.signal();}else if(!session?.state().budgetWaiting)void restore();};
   win.addEventListener('raytech-plan-changed',()=>{generation++;stop(true);attention=false;verifiedSync=false;if(uid&&premium()&&canSync){session=makeSession(uid,generation);unifiedLogin=connection()===uid;}paint();if(premium())void details().then(()=>{if(unifiedLogin)void finishExplicitLogin();});});
-  win.addEventListener('online',lifecycle);win.addEventListener('offline',lifecycle);doc.addEventListener?.('visibilitychange',lifecycle);
+  win.addEventListener('online',()=>{
+    verifiedSync=false;clearWatchRetry();
+    if(!watchTerminal){watchFailed=false;watchFailures=0;}
+    runtime?.reconnect();lifecycle();
+  });
+  win.addEventListener('offline',()=>{
+    verifiedSync=false;stopWatch();clearWatchRetry();reportFailure({kind:'offline'});lifecycle();
+  });doc.addEventListener?.('visibilitychange',lifecycle);
   win.addEventListener('storage',e=>{if(e.key===dbKey||e.key===syncPrefix(search)+DEVICE_KEY||e.key===syncPrefix(search)+REVIEW_KEY){storageChanged=true;stop();say('Alteração em outra aba. Feche as outras abas e reabra; sincronização bloqueada.');paint();}});
   win.addEventListener('pagehide',()=>{generation++;stop(true);},{once:true});
   const observer=new win.MutationObserver(lifecycle);const pin=el('pinLockOverlay');if(pin)observer.observe(pin,{attributes:true,attributeFilter:['class']});
