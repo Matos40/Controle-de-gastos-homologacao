@@ -8,7 +8,7 @@ permissions:
 jobs:
   security:
     if: github.repository == 'Matos40/Controle-de-gastos-homologacao' && github.ref == 'refs/heads/feature/v34-7-2-smart-ai-integration'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       GCLOUD_PROJECT: demo-raytech-v340
