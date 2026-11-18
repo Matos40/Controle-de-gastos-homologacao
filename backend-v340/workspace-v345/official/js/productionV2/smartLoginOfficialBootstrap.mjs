@@ -8,10 +8,11 @@ import {scopedStorage, revokeOfflineGrant} from './smartLoginOfficialIdentity.mj
 
 const root = document.getElementById('smartLogin');
 const panel = document.getElementById('smartAccountApp');
+const storagePrefix=location.origin===ORIGIN?'raytech:v34.5:':'raytech:hml34741:';
 const raw = {
-  getItem: key => localStorage.getItem('raytech:v34.5:' + key),
-  setItem: (key, value) => localStorage.setItem('raytech:v34.5:' + key, value),
-  removeItem: key => localStorage.removeItem('raytech:v34.5:' + key),
+  getItem: key => localStorage.getItem(storagePrefix + key),
+  setItem: (key, value) => localStorage.setItem(storagePrefix + key, value),
+  removeItem: key => localStorage.removeItem(storagePrefix + key),
 };
 let auth, active, generation = 0, started = false, invoiceAllowed = false;
 let unsubscribe = [];
@@ -103,7 +104,7 @@ async function observe(user) {
     const paintPlan = plan => {
       const cloudPlan = role ? 'premium' : plan;
       window.raytechCloudEntitlement = cloudEntitlement({plan: cloudPlan, role, verified: !!account});
-      invoiceAllowed = accessVerified && (plan === 'premium' || !!role);
+      invoiceAllowed = auth.invoiceBackendAvailable && accessVerified && (plan === 'premium' || !!role);
       document.getElementById('v345Identity').textContent =
         label + ' · ' +
         (role === 'owner' ? 'Owner' : role === 'admin' ? 'Admin' : plan === 'premium' ? 'Premium' : 'Free');
@@ -229,6 +230,8 @@ if (location.origin === ORIGIN) {
     root.querySelector('[data-login-enter]').click();
   };
   root.querySelector('[data-login-enter]').textContent = 'Entrar no laboratório';
+}else{
+  root.querySelector('[data-login-enter]').textContent='Entrar com Google · conta de teste';
 }
 try {
   auth = await openSmartLoginAuth();

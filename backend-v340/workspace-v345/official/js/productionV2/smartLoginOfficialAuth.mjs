@@ -3,7 +3,7 @@ import {getAuth, connectAuthEmulator, onAuthStateChanged, GoogleAuthProvider,
   signInWithPopup, signInWithEmailAndPassword, signOut} from 'firebase/auth';
 import {getFirestore, connectFirestoreEmulator, doc, collection, getDocFromServer,
   getDocsFromServer, query, orderBy, limit, onSnapshot, runTransaction, serverTimestamp} from 'firebase/firestore';
-import {environment} from './config.mjs';
+import {environment,collectionName} from './config.mjs';
 import {DEFAULT_LIMITS} from './v345Usage.mjs';
 import {operatorRole} from './smartAdminPolicy.mjs';
 
@@ -22,8 +22,8 @@ async function initialize() {
     connectFirestoreEmulator(db, '127.0.0.1', 18080);
   }
   const currentUid = () => auth.currentUser?.uid ?? null;
-  const account = uid => doc(db, 'raytechV345Accounts', uid);
-  const roleRef = uid => doc(db, 'raytechV345Roles', uid);
+  const account = uid => doc(db, collectionName('Accounts'), uid);
+  const roleRef = uid => doc(db, collectionName('Roles'), uid);
   const read = async ref => (await getDocFromServer(ref)).data();
   const assertSession = uid => {
     if (currentUid() !== uid) throw Error('SESSION_CHANGED');
@@ -38,6 +38,7 @@ async function initialize() {
   const profile = async uid => {
     assertSession(uid);
     let data = await read(account(uid));
+    if (!data && !local) throw Error('HOMOLOGATION_TEST_ACCOUNT_REQUIRED');
     if (!data) {
       const name = (auth.currentUser?.displayName || auth.currentUser?.email || 'Conta de teste').slice(0, 80);
       data = await runTransaction(db, async tx => {
@@ -65,7 +66,7 @@ async function initialize() {
     }, error);
   };
   return {
-    db, currentUid, profile, role, assertSession,
+    db, currentUid, profile, role, assertSession, invoiceBackendAvailable:local,
     onSession: (fn, error) => onAuthStateChanged(auth, fn, error),
     signIn: () => {
       if (!local) return signInWithPopup(auth, new GoogleAuthProvider());
@@ -84,15 +85,16 @@ async function initialize() {
     },
     admin: uid => ({
       role: () => { assertSession(uid); return role(uid); },
-      async monitor() {return ai(uid,'workspaceUsageAdmin',{action:'list',after:null});},
+      async monitor() {assertSession(uid);return local?ai(uid,'workspaceUsageAdmin',{action:'list',after:null}):{unavailable:true};},
       async list() {
         assertSession(uid);
-        const page = await getDocsFromServer(query(collection(db, 'raytechV345Accounts'), limit(100)));
+        const page = await getDocsFromServer(query(collection(db, collectionName('Accounts')), limit(100)));
         return Promise.all(page.docs.map(async row => {
           const record = await read(roleRef(row.id));
           const role = operatorRole(record);
           const profile = row.data();
           const base = {...profile, role, protected: !!record};
+          if(!local)return {...base,limits:profile.limits??(role||profile.plan==='premium'?DEFAULT_LIMITS:undefined),usageUnavailable:true,readerEnabled:false};
           // Free profiles can retain configured limits and historical consumption after downgrade.
           // Never pass limits without usage to the view. Ask the authorized backend for every account.
           try {
@@ -103,7 +105,7 @@ async function initialize() {
       },
       async audit() {
         assertSession(uid);
-        const page = await getDocsFromServer(query(collection(db, 'raytechV345Audit'), orderBy('at', 'desc'), limit(100)));
+        const page = await getDocsFromServer(query(collection(db, collectionName('Audit')), orderBy('at', 'desc'), limit(100)));
         const events=page.docs.map(row => row.data());
         assertSession(uid); return events;
       },
@@ -117,7 +119,7 @@ async function initialize() {
           const before = (await tx.get(ref)).data();
           if (!before) throw Error('ACCOUNT_NOT_FOUND');
           tx.update(ref, {plan: patch.plan, blocked: patch.blocked, limits: patch.limits, lastAudit: id});
-          tx.set(doc(db, 'raytechV345Audit', id), {actor: uid, target, beforePlan: before.plan,
+          tx.set(doc(db, collectionName('Audit'), id), {actor: uid, target, beforePlan: before.plan,
             afterPlan: patch.plan, beforeBlocked: before.blocked, afterBlocked: patch.blocked, at: serverTimestamp()});
         });
       },

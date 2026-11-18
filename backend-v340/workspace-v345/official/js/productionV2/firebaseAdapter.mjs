@@ -1,5 +1,5 @@
 import {doc, getDocFromServer, onSnapshot, runTransaction} from 'firebase/firestore';
-import {PRODUCTION_CONFIG, requireProductionConfig} from './config.mjs';
+import {PRODUCTION_CONFIG, requireProductionConfig, collectionName} from './config.mjs';
 import {canTransfer} from './cleanWorkspace.mjs';
 import {openSmartLoginAuth} from './smartLoginOfficialAuth.mjs';
 import {commitV2, validateV2Head, validateV2Receipt} from './capacity.mjs';
@@ -9,7 +9,7 @@ import {payloadHash} from './initialTransfer.mjs';
 export async function openProductionCloud(config = PRODUCTION_CONFIG) {
   requireProductionConfig(config);
   const auth = await openSmartLoginAuth();
-  const headRef = uid => doc(auth.db, 'raytechV345Finance', uid, 'banks', 'v2-main');
+  const headRef = uid => doc(auth.db, collectionName('Finance'), uid, 'banks', 'v2-main');
   const receiptRef = (uid, op) => doc(headRef(uid), 'receipts', op);
   const guard = uid => {
     requireProductionConfig(config);

@@ -12,7 +12,7 @@
         "headers": [
           {
             "key": "Cache-Control",
-            "value": "no-cache"
+            "value": "no-store, max-age=0, must-revalidate"
           },
           {
             "key": "X-Content-Type-Options",

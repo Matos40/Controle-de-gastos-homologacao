@@ -9,7 +9,7 @@ const publish = next => {
   window.dispatchEvent(new CustomEvent('raytech-pwa-state',{detail:snapshot()}));
 };
 const snapshot = () => Object.freeze({
-  version:'34.6', phase, canInstall: !!installEvent,
+  version:'34.7.4.1', phase, canInstall: !!installEvent,
   standalone: matchMedia('(display-mode: standalone)').matches || navigator.standalone === true,
 });
 window.raytechPwa = Object.freeze({
@@ -22,7 +22,7 @@ window.raytechPwa = Object.freeze({
     finally {publish(phase);}
   },
   async checkUpdate() {
-    if (registration && navigator.onLine) await registration.update();
+    if (registration && navigator.onLine) {await registration.update(); if(registration.waiting)publish('update-waiting');}
     return snapshot();
   },
 });
@@ -54,5 +54,7 @@ if (allowed.has(location.origin) && navigator.serviceWorker) {
     registration.addEventListener('updatefound',watch);
     navigator.serviceWorker.addEventListener('controllerchange',refresh);
     watch();
+    if(navigator.onLine)void registration.update().catch(()=>{});
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine)void registration.update().catch(()=>{});});
   } catch { publish('unavailable'); }
 } else publish('unavailable');

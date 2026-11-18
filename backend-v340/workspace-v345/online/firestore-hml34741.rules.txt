@@ -1,0 +1,117 @@
+// Insert inside match /databases/{database}/documents after reviewing the
+// complete live rules for overlapping matches. Never replace the live rules.
+function hml34741Self(uid) {
+  return request.auth != null && request.auth.uid == uid;
+}
+function hml34741Account(uid) {
+  return /databases/$(database)/documents/raytechHml34741Accounts/$(uid);
+}
+function hml34741Role(uid) {
+  return /databases/$(database)/documents/raytechHml34741Roles/$(uid);
+}
+function hml34741Active(uid) {
+  return exists(hml34741Account(uid)) && get(hml34741Account(uid)).data.blocked == false;
+}
+function hml34741Operator(uid) {
+  return exists(hml34741Role(uid)) && get(hml34741Role(uid)).data.active == true
+    && get(hml34741Role(uid)).data.role in ['owner', 'admin'];
+}
+function hml34741IsOperator() {
+  return request.auth != null && hml34741Active(request.auth.uid) && hml34741Operator(request.auth.uid);
+}
+function hml34741Premium(uid) {
+  return hml34741Self(uid) && hml34741Active(uid)
+    && (get(hml34741Account(uid)).data.plan == 'premium' || hml34741Operator(uid));
+}
+function hml34741Id(id) {
+  return id is string && id.matches('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
+}
+function hml34741Limits(limits) {
+  return limits is map && limits.keys().hasOnly(['minute', 'day', 'month'])
+    && limits.minute is int && limits.day is int && limits.month is int
+    && limits.minute >= 1 && limits.minute <= limits.day
+    && limits.day <= limits.month && limits.month <= 10000;
+}
+function hml34741Audit(id) {
+  return /databases/$(database)/documents/raytechHml34741Audit/$(id);
+}
+
+match /raytechHml34741Accounts/{uid} {
+  function valid(d) {
+    return d.keys().hasOnly(['uid', 'name', 'plan', 'blocked', 'limits', 'lastAudit'])
+      && d.uid == uid && d.name is string && d.name.size() > 0 && d.name.size() <= 80
+      && d.plan in ['free', 'premium'] && d.blocked is bool
+      && (!('limits' in d) || hml34741Limits(d.limits))
+      && (!('lastAudit' in d) || hml34741Id(d.lastAudit));
+  }
+  allow get: if hml34741Self(uid) || hml34741IsOperator();
+  allow list: if hml34741IsOperator() && request.query.limit <= 100;
+  allow create: if false; // Pre-provision synthetic accounts using authorized Firebase Console operator.
+  allow update: if hml34741IsOperator() && !hml34741Self(uid) && !exists(hml34741Role(uid))
+    && valid(request.resource.data)
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plan', 'blocked', 'limits', 'lastAudit'])
+    && !exists(hml34741Audit(request.resource.data.lastAudit))
+    && getAfter(hml34741Audit(request.resource.data.lastAudit)).data.target == uid;
+  allow delete: if false;
+}
+
+match /raytechHml34741Roles/{uid} {
+  allow get: if hml34741Self(uid) || hml34741IsOperator();
+  allow list, write: if false;
+}
+
+match /raytechHml34741Audit/{id} {
+  function valid(d) {
+    let before = get(hml34741Account(d.target)).data;
+    let after = getAfter(hml34741Account(d.target)).data;
+    return d.keys().hasOnly(['actor', 'target', 'beforePlan', 'afterPlan', 'beforeBlocked', 'afterBlocked', 'at'])
+      && d.actor == request.auth.uid && d.target != d.actor && !exists(hml34741Role(d.target))
+      && d.at == request.time && before.get('lastAudit', '') != id && after.lastAudit == id
+      && d.beforePlan == before.plan && d.afterPlan == after.plan
+      && d.beforeBlocked == before.blocked && d.afterBlocked == after.blocked;
+  }
+  allow list: if hml34741IsOperator() && request.query.limit <= 100;
+  allow create: if hml34741IsOperator() && hml34741Id(id) && valid(request.resource.data);
+  allow get, update, delete: if false;
+}
+
+match /raytechHml34741Finance/{uid}/banks/v2-main {
+  function headPath() {
+    return /databases/$(database)/documents/raytechHml34741Finance/$(uid)/banks/v2-main;
+  }
+  function receiptPath(id) {
+    return /databases/$(database)/documents/raytechHml34741Finance/$(uid)/banks/v2-main/receipts/$(id);
+  }
+  function valid(d, revision, parentId) {
+    let id = d.lastOperationId;
+    let receipt = getAfter(receiptPath(id)).data;
+    return d.keys().hasOnly(['marker', 'revision', 'lastOperationId', 'hash', 'payload'])
+      && d.marker == 'raytech-financial-production-v2'
+      && d.payload is string && d.payload.size() <= 180000
+      && d.revision is int && d.revision == revision && revision <= 9007199254740991
+      && d.hash is string && d.hash.matches('[0-9a-f]{64}')
+      && hml34741Id(id) && id != parentId && !exists(receiptPath(id))
+      && receipt.operationId == id && receipt.parentId == parentId
+      && receipt.revision == revision && receipt.hash == d.hash;
+  }
+  allow get: if hml34741Premium(uid);
+  allow create: if hml34741Premium(uid) && valid(request.resource.data, 1, '');
+  allow update: if hml34741Premium(uid)
+    && valid(request.resource.data, resource.data.revision + 1, resource.data.lastOperationId);
+  allow delete, list: if false;
+
+  match /receipts/{id} {
+    function validReceipt(d) {
+      let next = getAfter(headPath()).data;
+      return d.keys().hasOnly(['operationId', 'parentId', 'revision', 'hash'])
+        && d.operationId == id && hml34741Id(id) && next.lastOperationId == id
+        && d.revision == next.revision && d.hash == next.hash
+        && (exists(headPath())
+          ? d.parentId == get(headPath()).data.lastOperationId && d.revision == get(headPath()).data.revision + 1
+          : d.revision == 1 && d.parentId == '');
+    }
+    allow get: if hml34741Premium(uid);
+    allow create: if hml34741Premium(uid) && validReceipt(request.resource.data);
+    allow list, update, delete: if false;
+  }
+}

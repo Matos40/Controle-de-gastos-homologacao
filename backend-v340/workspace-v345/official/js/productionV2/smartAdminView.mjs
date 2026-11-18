@@ -26,7 +26,13 @@ function selector(label, options) {
   return node;
 }
 function renderConsumption(account) {
-  if (!account.limits || !account.usage) return el('p', account.usageUnavailable || account.limits ? 'Consumo indisponível' : 'Sem cota de leitor');
+  if (!account.usage) {
+    const unavailable=el('div','','v345-usage');
+    unavailable.append(el('p',account.usageUnavailable?'Consumo indisponível · leitor desativado no Spark online':'Sem cota de leitor'));
+    if(account.limits)for(const key of keys)unavailable.append(el('p',names[key]+' UTC · limite configurado: '+account.limits[key]));
+    return unavailable;
+  }
+  if(!account.limits)return el('p','Sem cota de leitor');
   const node = el('div', '', 'v345-usage');
   node.setAttribute('aria-label', 'Consumo do leitor simulado');
   if(account.readerEnabled===false)node.append(el('p','Leitor indisponível · histórico de consumo'));
@@ -188,10 +194,15 @@ export function mountAdmin({api, role, uid}) {
       const auditPanel = el('section', '', 'v345-audit');
       auditPanel.append(el('h3', 'Auditoria · últimos 100 registros'));
       const consumption=el('section','','admin-stats');consumption.id='v3473Monitor';
+      if(monitor.unavailable){
+        consumption.append(el('p','Consumo e orçamento indisponíveis · backend de IA não ativado no Spark online.'));
+        host.append(stats,consumption,tools,rows,auditPanel);
+      }else{
       const month=monitor.outcomes.month;
       for(const [label,value] of [['Reservadas',month.reserved],['Concluídas',month.completed],['Falhas',month.failed],['Pendentes',month.pending]]){const card=el('div','','admin-stat');card.append(el('small',label+' · mês UTC'),el('strong',String(value)));consumption.append(card);}
       const budget=el('p','Orçamento global simulado · mês: R$ '+(monitor.global.used.month/1000000).toFixed(2)+' / R$ '+(monitor.global.limits.month/1000000).toFixed(2));
       host.append(stats,consumption,budget,tools,rows,auditPanel);
+      }
       const labels = new Map(accounts.map(a => [a.uid, accountLabel(a)]));
       for (const event of audit) {
         if(!event||typeof event.target!=='string'||typeof event.actor!=='string'||!['free','premium'].includes(event.beforePlan)||!['free','premium'].includes(event.afterPlan)||typeof event.afterBlocked!=='boolean'){auditPanel.append(el('p','Registro de auditoria inválido.'));continue;}
