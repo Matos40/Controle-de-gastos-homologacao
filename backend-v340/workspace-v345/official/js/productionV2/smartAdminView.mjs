@@ -1,7 +1,7 @@
 import {accountLabel, filterAccounts} from './smartAdminIdentity.mjs';
 
-const keys = ['minute', 'day', 'month'];
-const names = {minute: 'Minuto', day: 'Dia', month: 'Mês'};
+const keys=['minute','day','month'];
+const names={minute:'Minuto',day:'Dia',month:'Mês'};
 const plans = {owner: 'Owner', admin: 'Admin', premium: 'Premium', free: 'Free'};
 function el(tag, text = '', cls = '') {
   const node = document.createElement(tag);
@@ -50,13 +50,15 @@ function renderConsumption(account) {
   }
   return node;
 }
+function safeDate(v){try{const d=v?.toDate?.();return d instanceof Date&&Number.isFinite(d.getTime())?d.toLocaleString('pt-BR'):'—';}catch{return '—';}}
 export function mountAdmin({api, role, uid}) {
   const host = document.getElementById('smartAdminHost');
   const open = document.getElementById('smartAdminOpen');
-  let serial = 0;
+  let serial = 0, alive = true;
+  let filters = {search:'',plan:'',state:'',admins:false};
   const close = () => {
     serial++;
-    host.querySelector('dialog')?.close();
+    host.querySelectorAll('dialog[open]').forEach(d=>d.close());
     host.hidden = true;
     host.replaceChildren();
     const profile = open.closest('details');
@@ -66,14 +68,20 @@ export function mountAdmin({api, role, uid}) {
 
   function edit(account, status, epoch) {
     const dialog = el('dialog', '', 'v345-dialog');
-    const title = el('h2', 'Editar ' + accountLabel(account));
+    const title = el('h2', accountLabel(account));
     title.id = 'v345EditTitle';
     dialog.setAttribute('aria-labelledby', title.id);
+    const locked = account.protected || account.uid === uid || ['owner','admin'].includes(account.role);
+    const details = el('dl','','v3467-details');
+    const date=safeDate;
+    for(const [label,value] of [['E-mail',account.email||'—'],['UID',account.uid],['Função',plans[account.role]||'Usuário'],['Plano',plans[account.plan]||'—'],['Situação',account.blocked?'Bloqueada':'Ativa'],['Cadastro',date(account.createdAt)],['Último acesso',date(account.lastAccess)]]){details.append(el('dt',label),el('dd',value));}
+    const usage=el('section','','v3467-ai');usage.append(el('h3','Smart AI Usage'),renderConsumption(account));
     const form = el('form', '', 'v345-edit');
     const plan = selector('Plano', [['free', 'Free'], ['premium', 'Premium']]);
     plan.value = account.plan;
     const blocked = selector('Situação', [['false', 'Ativa'], ['true', 'Bloqueada']]);
     blocked.value = String(account.blocked);
+
     const limits = Object.fromEntries(keys.map(key => {
       const input = el('input');
       input.type = 'number';
@@ -90,19 +98,16 @@ export function mountAdmin({api, role, uid}) {
     const cancel = button('Cancelar', () => dialog.close());
     const save = button('Salvar alterações');
     save.type = 'submit';
-    form.append(plan, blocked, ...keys.map(key => limits[key].label), message, cancel, save);
+    form.append(plan, blocked, message, cancel, save);
     form.onsubmit = async event => {
       event.preventDefault();
-      if (save.disabled) return;
-      const values = Object.fromEntries(keys.map(key => [key, limits[key].input.valueAsNumber]));
-      if (values.minute > values.day || values.day > values.month) {
-        message.textContent = 'A cota por minuto deve ser menor ou igual à diária, e a diária à mensal.';
-        return;
-      }
+      if (locked || save.disabled || !alive || epoch!==serial) return;
+      const values=Object.fromEntries(keys.map(key=>[key,limits[key].input.valueAsNumber]));
+      if(!keys.every(key=>Number.isInteger(values[key])&&values[key]>=1&&values[key]<=10000)||values.minute>values.day||values.day>values.month){message.textContent='Cotas inválidas: minuto ≤ dia ≤ mês.';return;}
       save.disabled = true;
       cancel.disabled = true;
       try {
-        await api.change(account.uid, {plan: plan.value, blocked: blocked.value === 'true', limits: values});
+        await api.change(account.uid, {plan: plan.value, blocked: blocked.value === 'true',limits:values});
         if (epoch === serial) {
           dialog.close();
           await load('Alterações salvas.');
@@ -112,12 +117,15 @@ export function mountAdmin({api, role, uid}) {
       } finally { save.disabled = false; cancel.disabled = false; }
     };
     dialog.addEventListener('close', () => dialog.remove(), {once: true});
-    dialog.append(title, form);
+    dialog.append(title, details, usage);
+    if(locked) dialog.append(el('p','Conta protegida','v345-protected'),button('Fechar',()=>dialog.close()));
+    else {const pl=el('label','Plano');pl.append(plan);const st=el('label','Situação');st.append(blocked);form.replaceChildren(pl,st,...keys.map(key=>limits[key].label),message,cancel,save);dialog.append(form);}
     status.after(dialog);
     dialog.showModal();
   }
 
   async function load(message) {
+    if(!alive)return;
     const epoch = ++serial;
     host.hidden = false;
     const status = el('p', 'Carregando…');
@@ -128,13 +136,13 @@ export function mountAdmin({api, role, uid}) {
     exit.setAttribute('aria-label', 'Fechar painel administrativo');
     const heading = el('div', '', 'v345-admin-heading');
     const title = el('div');
-    title.append(el('h2', 'Smart Admin · ' + plans[role]), el('p', 'Gerenciamento de usuários e consumo', 'v345-admin-subtitle'));
+    title.append(el('h2', 'Smart Admin · ' + plans[role]), el('p', 'Gerenciamento de usuários e acesso', 'v345-admin-subtitle'));
     heading.append(title, exit);
     host.replaceChildren(heading, status);
     exit.focus();
     try {
       if (!await api.role()) throw Error('ADMIN_DENIED');
-      const [accounts, auditResult, monitor] = await Promise.all([api.list(), api.audit().then(value=>({value}),()=>({unavailable:true})),api.monitor()]);
+      const [accounts,auditResult,metrics]=await Promise.all([api.list(),api.audit().then(value=>({value}),()=>({unavailable:true})),api.monitor().catch(()=>({unavailable:true}))]);
       const audit=auditResult.value??[];
       if (epoch !== serial) return;
       status.textContent = (typeof message === 'string' ? message + ' ' : '') + accounts.length + ' contas nesta amostra, até 100.';
@@ -147,73 +155,71 @@ export function mountAdmin({api, role, uid}) {
         ['Free', accounts.filter(a => a.plan === 'free').length],
         ['Premium', accounts.filter(a => a.plan === 'premium').length],
       ]) {
-        const card = el('div', '', 'admin-stat');
+        const card = el('button', '', 'admin-stat');
+        card.type='button';card.dataset.filter=label;card.setAttribute('aria-pressed','false');
         card.append(el('small', label), el('strong', String(value)));
         stats.append(card);
       }
       const search = el('input');
       search.type = 'search';
-      search.placeholder = 'Buscar nome, e-mail ou UID';
+      search.placeholder = 'Buscar nome ou e-mail';
       search.setAttribute('aria-label', 'Buscar contas');
       const plan = selector('Plano', [['', 'Todos os planos'], ['free', 'Free'], ['premium', 'Premium']]);
       const state = selector('Situação', [['', 'Todas as situações'], ['active', 'Ativas'], ['blocked', 'Bloqueadas']]);
       const tools = el('div', '', 'admin-tools');
-      tools.append(search, plan, state);
+      const roleFilter=selector('Função',[['','Todas as funções'],['admins','Administradores']]);
+      tools.append(search, plan, state, roleFilter);
+      search.value=filters.search;plan.value=filters.plan;state.value=filters.state;roleFilter.value=filters.admins?'admins':'';
+      const monitor=el('details','','v3467-ai v3467-monitor');monitor.append(el('summary','Smart AI Monitor'));
+      const consumption=el('section','','admin-stats');consumption.id='v3473Monitor';
+      if(metrics?.unavailable||!metrics?.outcomes?.month||!metrics?.global?.used||!metrics?.global?.limits)consumption.append(el('p','Consumo e orçamento indisponíveis.'));
+      else{const month=metrics.outcomes.month;for(const [label,value] of [['Reservadas',month.reserved],['Concluídas',month.completed],['Falhas',month.failed],['Pendentes',month.pending]]){const card=el('div','','admin-stat');card.append(el('small',label+' · mês UTC'),el('strong',String(value)));consumption.append(card);}monitor.append(el('p','Orçamento global simulado · mês: R$ '+(metrics.global.used.month/1000000).toFixed(2)+' / R$ '+(metrics.global.limits.month/1000000).toFixed(2)));}monitor.append(consumption);
       const rows = el('div');
       const render = () => {
         rows.replaceChildren();
-        for (const account of filterAccounts(accounts, search.value, plan.value, state.value)) {
+        filters={search:search.value,plan:plan.value,state:state.value,admins:roleFilter.value==='admins'};
+        const active=filters.admins&&!filters.plan&&!filters.state?'Administradores':!filters.admins&&filters.plan&&!filters.state?plans[filters.plan]:!filters.admins&&!filters.plan&&filters.state?(filters.state==='active'?'Ativas':'Bloqueadas'):!filters.admins&&!filters.plan&&!filters.state&&!filters.search?'Usuários':'';
+        for(const card of stats.children)card.setAttribute('aria-pressed',String(card.dataset.filter===active));
+        for (const account of filterAccounts(accounts, search.value, plan.value, state.value).filter(a=>!filters.admins||['owner','admin'].includes(a.role))) {
           const row = el('article', '', 'admin-row');
           row.dataset.plan = account.role || account.plan;
-          const details = el('details');
-          details.append(el('summary', 'Detalhes técnicos'), el('small', account.uid));
-          const info = el('div', '', 'admin-info');
+          
           const identity = el('div', '', 'v345-admin-identity');
           const initials = accountLabel(account).trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
           const avatar = el('span', initials, 'v345-admin-avatar');
           avatar.setAttribute('aria-hidden', 'true');
           const name = el('div', '', 'v345-admin-name');
-          name.append(el('strong', accountLabel(account)));
-          if (account.email) name.append(el('small', account.email));
+          name.append(el('strong', accountLabel(account)));name.title=accountLabel(account);
+          if(account.photo){try{const url=new URL(account.photo);if(url.protocol==='https:'&&/(^|\.)googleusercontent\.com$/.test(url.hostname)&&!url.username&&!url.password){const img=el('img');img.alt='';img.referrerPolicy='no-referrer';img.loading='lazy';img.onload=()=>avatar.replaceChildren(img);img.src=url.href;}}catch{}}
           identity.append(avatar, name);
-          const tags = el('div', '', 'v345-admin-tags');
-          tags.append(el('span', plans[row.dataset.plan], 'v345-role-tag'));
-          if (account.role) tags.append(el('span', plans[account.plan], 'v345-plan-tag'));
-          tags.append(el('span', account.blocked ? 'Bloqueada' : 'Ativa', 'v345-state-tag'));
-          info.append(identity, tags, details);
-          row.append(info, renderConsumption(account));
-          row.append(account.protected || account.uid === uid
-            ? el('small', 'Conta protegida', 'v345-protected') : button('Editar cotas e acesso', () => edit(account, status, epoch)));
+          const email=el('span',account.email||'—','v3467-email');email.title=account.email||'';
+          const planTag=el('span',plans[account.plan]||'—','v3467-plan');planTag.dataset.value=account.plan;
+          const stateTag=el('span',account.blocked?'Bloqueada':'Ativa','v3467-state');stateTag.dataset.blocked=String(account.blocked);
+          const usage=el('span',account.usage&&account.limits?account.usage.month+'/'+account.limits.month:'—','v3467-usage');usage.title=account.usage&&account.limits?'Consumo mensal UTC':'Consumo de IA indisponível';
+          const detailButton=button('Exibir detalhes',()=>edit(account,status,epoch));detailButton.setAttribute('aria-label','Exibir detalhes de '+accountLabel(account));
+          row.append(identity,email,planTag,stateTag,usage,detailButton);
           rows.append(row);
         }
         if (!rows.childElementCount) rows.append(el('p', 'Nenhuma conta encontrada.'));
       };
-      search.oninput = plan.onchange = state.onchange = render;
+      search.oninput = plan.onchange = state.onchange = roleFilter.onchange = render;
+      for(const card of stats.children)card.onclick=()=>{search.value='';plan.value='';state.value='';roleFilter.value='';switch(card.dataset.filter){case 'Ativas':state.value='active';break;case 'Bloqueadas':state.value='blocked';break;case 'Administradores':roleFilter.value='admins';break;case 'Free':plan.value='free';break;case 'Premium':plan.value='premium';break;}render();};
       render();
       rows.className = 'v345-admin-rows';
       const auditPanel = el('section', '', 'v345-audit');
       auditPanel.append(el('h3', 'Auditoria · últimos 100 registros'));
-      const consumption=el('section','','admin-stats');consumption.id='v3473Monitor';
-      if(monitor.unavailable){
-        consumption.append(el('p','Consumo e orçamento indisponíveis · backend de IA não ativado no Spark online.'));
-        host.append(stats,consumption,tools,rows,auditPanel);
-      }else{
-      const month=monitor.outcomes.month;
-      for(const [label,value] of [['Reservadas',month.reserved],['Concluídas',month.completed],['Falhas',month.failed],['Pendentes',month.pending]]){const card=el('div','','admin-stat');card.append(el('small',label+' · mês UTC'),el('strong',String(value)));consumption.append(card);}
-      const budget=el('p','Orçamento global simulado · mês: R$ '+(monitor.global.used.month/1000000).toFixed(2)+' / R$ '+(monitor.global.limits.month/1000000).toFixed(2));
-      host.append(stats,consumption,budget,tools,rows,auditPanel);
-      }
+      const columns=el('div','','v3467-columns');for(const label of ['Usuário','E-mail','Plano','Situação','Uso IA','Ação'])columns.append(el('span',label));
+      host.append(stats, tools, monitor, columns, rows, auditPanel);
       const labels = new Map(accounts.map(a => [a.uid, accountLabel(a)]));
       for (const event of audit) {
         if(!event||typeof event.target!=='string'||typeof event.actor!=='string'||!['free','premium'].includes(event.beforePlan)||!['free','premium'].includes(event.afterPlan)||typeof event.afterBlocked!=='boolean'){auditPanel.append(el('p','Registro de auditoria inválido.'));continue;}
-        let date='Data indisponível';try{const parsed=event.at?.toDate?.();if(parsed instanceof Date&&Number.isFinite(parsed.getTime()))date=parsed.toISOString();}catch{}
         const item = el('details');
         item.append(el('summary', (labels.get(event.target) || 'Conta') + ' · ' + event.beforePlan + ' → ' +
           event.afterPlan + ' · ' + (event.afterBlocked ? 'Bloqueada' : 'Ativa')),
-          el('small', 'Operador ' + event.actor + ' · ' + date));
+          el('small', 'Operador ' + (labels.get(event.actor)||'Conta não identificada') + ' · ' + safeDate(event.at)));
         auditPanel.append(item);
       }
-      if(auditResult.unavailable) auditPanel.append(el('p','Auditoria temporariamente indisponível. Reabra o painel para tentar novamente.'));
+      if(auditResult.unavailable)auditPanel.append(el('p','Auditoria temporariamente indisponível. Reabra o painel para tentar novamente.'));
       else if (!audit.length) auditPanel.append(el('p', 'Nenhuma alteração registrada.', 'v345-audit-empty'));
     } catch (error) {
       if (epoch === serial) {
@@ -230,6 +236,7 @@ export function mountAdmin({api, role, uid}) {
   const launch = () => { const profile = open.closest('details'); if (profile) profile.open = false; void load(); };
   open.addEventListener('click', launch);
   return () => {
+    alive=false;
     close();
     open.hidden = true;
     open.removeEventListener('click', launch);

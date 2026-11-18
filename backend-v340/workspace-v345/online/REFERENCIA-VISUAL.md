@@ -1,0 +1,3 @@
+# Baseline visual de produção
+Origem somente leitura: Matos40/Controle-de-gastos-2.0@b880872fc48e5832eb7f9d299d342ef5bf5c376d.
+Smart Admin e CSS smart-interface extraídos dessa versão (layout V34.6.7); seis indicadores clicáveis, filtros por função, linhas compactas responsivas, detalhes em modal, monitor recolhido, proteção de operadores, auditoria com identificação legível. Integrações de cotas e consumo apenas dentro do modal/monitor; falhas de métricas não impedem acesso ao painel. CSS base styles.css já idêntico. Não substituir bootstrap/config/adaptadores de homologação por arquivos de produção. Cabeçalho de identificação sintética permanece explícito na homologação; não alterar produção.

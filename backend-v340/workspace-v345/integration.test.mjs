@@ -197,9 +197,10 @@ test('Chromium integrates synthetic finance, review, quota, role changes and ses
     await page.locator('#smartAdminOpen').click();
     await page.locator('.v345-admin-rows .admin-row').first().waitFor();
     assert.equal(await page.locator('.admin-stat').count(), 10);
+    assert.equal(await page.locator('button.admin-stat').count(),6);assert.equal(await page.locator('.v3467-monitor').getAttribute('open'),null);assert.equal(await page.locator('.v3467-columns span').count(),6);await page.locator('button.admin-stat[data-filter=Administradores]').click();assert.equal(await page.locator('.admin-row').count(),2);await page.locator('button.admin-stat[data-filter=Usuários]').click();
     assert.equal(await page.locator('#v3473Monitor .admin-stat').count(),4);
     assert.deepEqual(await page.locator('#v3473Monitor strong').allTextContents(),['2','2','0','0']);
-    assert.equal(await page.locator('.admin-row[data-plan=owner] button').count(), 0);
+    await page.locator('.admin-row[data-plan=owner] button').click();assert.equal(await page.locator('dialog[open]').getByText('Conta protegida').count(),1);assert.equal(await page.locator('dialog[open]').getByRole('button',{name:'Salvar alterações'}).count(),0);await page.locator('dialog[open]').getByRole('button',{name:'Fechar',exact:true}).click();
     assert.equal(await page.locator('.v345-profile').getAttribute('open'), null);
     await page.setViewportSize({width: 390, height: 844});
     assert.equal(await page.locator('#smartAdminHost').evaluate(el => el.scrollWidth <= el.clientWidth + 1), true);
@@ -208,11 +209,11 @@ test('Chromium integrates synthetic finance, review, quota, role changes and ses
     await page.getByRole('searchbox', {name:'Buscar contas'}).fill('');
     await page.setViewportSize({width: 1280, height: 900});
     const premium = page.locator('.admin-row').filter({hasText: 'premium'});
-    await premium.getByRole('button', {name: 'Editar cotas e acesso'}).click();
+    await premium.getByRole('button', {name: /Exibir detalhes/}).click();
     await page.getByRole('spinbutton', {name: 'Minuto UTC', exact: true}).fill('1');
     await page.getByRole('button', {name: 'Salvar alterações'}).click();
     await page.getByText(/Alterações salvas/).waitFor();
-    assert.equal(await page.locator('.admin-row[data-plan=admin]').getByRole('button').count(), 0);
+    await page.locator('.admin-row[data-plan=admin] button').click();assert.equal(await page.locator('dialog[open]').getByRole('button',{name:'Salvar alterações'}).count(),0);await page.locator('dialog[open]').getByRole('button',{name:'Fechar',exact:true}).click();
     assert.equal(external.length, 0, external.join('\n'));
     assert.deepEqual(errors, []);
   } finally { await context.close(); }
@@ -460,16 +461,16 @@ test('BUG-V3474-001: both operators reopen Smart Admin after Free quota edit, up
  try{
   const a=await owner.newPage(),b=await admin.newPage(),u=await user.newPage();
   for(const [p,name] of [[a,'owner'],[b,'admin'],[u,'free']]){await p.goto(origin);await login(p,name);}
-  const open=async p=>{await p.locator('.v345-profile summary').click();await p.locator('#smartAdminOpen').click();await p.locator('#v3473Monitor').waitFor();};
+  const open=async p=>{await p.locator('.v345-profile summary').click();await p.locator('#smartAdminOpen').click();await p.locator('#v3473Monitor').waitFor({state:'attached'});};
   const close=async p=>p.getByRole('button',{name:'Fechar painel administrativo'}).click();
   const edit=async(p,plan,blocked)=>{
-   await p.locator('.admin-row').filter({has:p.getByText('free',{exact:true})}).getByRole('button',{name:'Editar cotas e acesso'}).click();
+   await p.locator('.admin-row').filter({has:p.getByText('free',{exact:true})}).getByRole('button',{name:/Exibir detalhes/}).click();
    const dialog=p.locator('#smartAdminHost dialog');
    await dialog.getByRole('combobox',{name:'Plano',exact:true}).selectOption(plan);
    await dialog.getByRole('combobox',{name:'Situação',exact:true}).selectOption(String(blocked));
    for(const [label,n] of [['Minuto UTC','1'],['Dia UTC','2'],['Mês UTC','5']])await dialog.getByRole('spinbutton',{name:label,exact:true}).fill(n);
    await dialog.getByRole('button',{name:'Salvar alterações'}).click();
-   await p.locator('#v3473Monitor').waitFor();await p.getByText(/Alterações salvas/).waitFor();
+   await p.locator('#v3473Monitor').waitFor({state:'attached'});await p.getByText(/Alterações salvas/).waitFor();
    assert.equal(await p.locator('.v345-admin-rows .admin-row').count(),Object.keys(accounts).length);
   };
   await open(a);await edit(a,'free',false);
@@ -482,9 +483,8 @@ test('BUG-V3474-001: both operators reopen Smart Admin after Free quota edit, up
   await close(a);await open(a);await open(b);
   for(const p of [a,b]){
    const row=p.locator('.admin-row').filter({has:p.getByText('free',{exact:true})});
-   assert.match(await row.textContent(),/Leitor indisponível/);
-   assert.match(await row.textContent(),/Reservadas: 1 · Concluídas: 1/);
-   assert.match(await row.textContent(),/Mês UTC · 1\/5/);
+   assert.match(await row.textContent(),/1\/5/);
+   await row.getByRole('button',{name:/Exibir detalhes/}).click();const dialog=p.locator('dialog[open]');assert.match(await dialog.textContent(),/Leitor indisponível/);assert.match(await dialog.textContent(),/Reservadas: 1 · Concluídas: 1/);assert.match(await dialog.textContent(),/Mês UTC · 1\/5/);await dialog.getByRole('button',{name:'Cancelar'}).click();
    assert.ok(await p.locator('.v345-audit details').count()>=3);
   }
   await edit(b,'free',true);await u.locator('#smartAccountApp').waitFor({state:'hidden'});

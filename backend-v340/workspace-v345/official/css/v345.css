@@ -1,28 +1,7 @@
-[hidden] { display: none !important; }
-.v345-account { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .25rem .75rem; padding: .25rem .8rem; font-size: .75rem; }
-.v345-account span { color: #94a3b8; }
-.v345-dialog { width: min(32rem, calc(100% - 2rem)); padding: 1.25rem; color: #e2e8f0; background: #0f172a; border: 1px solid #6366f1; border-radius: 1rem; }
-.v345-dialog::backdrop { background: #020617db; }
-.v345-dialog h2 { font-size: 1.15rem; font-weight: 700; }
-.v345-dialog p, #simulatedReview { margin-block: .75rem; }
-#simulatedReview label { display: block; padding: .35rem; }
-.v345-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; }
-.v345-dialog button:disabled { opacity: .45; }
-#labCredentials { display: grid; gap: .5rem; margin-block: .75rem; text-align: left; }
-#labCredentials input { display: block; width: 100%; border: 1px solid #3a607d; border-radius: .5rem; padding: .4rem .6rem; background: #06182e; color: #e1f5ff; }
-.admin-row[data-plan="owner"] { border-color: #22c55e; }
-.admin-row[data-plan="admin"] { border-color: #22d3ee; }
-.admin-row[data-plan="premium"] { border-color: #fbbf24; }
-.admin-row[data-plan="free"] { border-color: #64748b; }
-.v345-usage { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
-.v345-usage label { display: grid; font-size: .75rem; }
-.v345-usage progress { width: 6.8rem; height: .55rem; accent-color: #38bdf8; }
-.v345-edit { display: grid; gap: .55rem; margin-top: .8rem; }
-.v345-edit label { display: flex; justify-content: space-between; gap: .5rem; }
-.v345-edit :is(input, select) { padding: .35rem; color: #e2e8f0; background: #06182e; border: 1px solid #3a607d; border-radius: .35rem; }
-#v345Avatar { display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; overflow: hidden; color: #bae6fd; background: #0c4a6e; font-size: .62rem; font-weight: 700; }
-#v345Avatar img { width: 100%; height: 100%; object-fit: cover; }
-
+[hidden]{display:none!important}
+.v345-account{display:flex;align-items:center;gap:.5rem;font-size:.75rem;position:relative;z-index:50}
+#v345Avatar{display:inline-grid;place-items:center;width:2rem;height:2rem;border-radius:50%;overflow:hidden;color:#bae6fd;background:#0c4a6e;font-weight:700}#v345Avatar img,.v345-admin-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.v345-dialog{width:min(32rem,calc(100% - 2rem));margin:auto;padding:1.25rem;color:#e2e8f0;background:#0f172a;border:1px solid #6366f1;border-radius:1rem}.v345-dialog::backdrop{background:#020617db}.v345-edit{display:grid;gap:.55rem}.v345-edit select{padding:.5rem;color:#e2e8f0;background:#06182e;border:1px solid #3a607d;border-radius:.35rem}
 /* V34.5.1: presentation only; existing cloud state and permissions remain authoritative. */
 .v345-account{max-width:72rem;margin:auto;justify-content:space-between;padding:.4rem 1rem;border-bottom:1px solid #33415566;gap:.5rem}
 .v345-environment{font-size:.7rem;letter-spacing:.01em}
@@ -61,12 +40,6 @@
 .v345-plan-tag{color:#cbd5e1}
 .v345-state-tag{color:#e2e8f0}
 .v345-protected{color:#4ade80}
-.v345-usage{display:grid;grid-template-columns:1fr;gap:8px}
-.v345-usage label{gap:5px;color:#cbd5e1}
-.v345-usage progress{appearance:none;width:100%;height:7px;border:0;border-radius:999px;background:#20394c;overflow:hidden}
-.v345-usage progress::-webkit-progress-bar{background:#20394c;border-radius:999px}
-.v345-usage progress::-webkit-progress-value{background:#38bdf8;border-radius:999px}
-.v345-usage progress::-moz-progress-bar{background:#38bdf8;border-radius:999px}
 .v345-audit{margin-top:24px;padding:16px;border:1px solid #24455c;border-radius:14px;background:#0b2034}
 #smartAdminHost .v345-audit h3{margin:0 0 12px}
 .v345-audit-empty{color:#94a3b8;padding:20px 0;text-align:center}
@@ -95,3 +68,41 @@
 #smartAdminHost .admin-stat small{overflow-wrap:anywhere}
 #smartAdminHost .admin-row>*{min-width:0}
 #smartAdminHost .admin-row .admin-action{white-space:normal}
+
+#smartAdminHost .admin-row{grid-template-columns:minmax(0,1fr) auto}.v345-profile-menu[hidden]{display:none!important}.v345-environment{color:#94a3b8}.v345-admin-avatar{overflow:hidden}@media(max-width:639px){#smartAdminHost .admin-row{grid-template-columns:minmax(0,1fr)}}
+
+/* V34.6.7 compact admin */
+#smartAdminHost{max-width:1280px}
+#smartAdminHost .admin-stats{grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:10px 0}
+#smartAdminHost .admin-stat{padding:8px;text-align:left;cursor:pointer;gap:2px;border-radius:9px;font-size:.72rem;min-height:58px}
+#smartAdminHost .admin-stat strong{font-size:1.25rem;line-height:1.2}
+#smartAdminHost .admin-stat[aria-pressed=true]{border-color:#38bdf8;background:#123b50;box-shadow:inset 0 0 0 1px #38bdf8}
+#smartAdminHost .admin-tools{grid-template-columns:minmax(0,2fr) repeat(3,minmax(0,1fr));gap:6px}
+#smartAdminHost .v345-admin-rows{gap:5px}
+#smartAdminHost .admin-row,#smartAdminHost .v3467-columns{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1.6fr) minmax(0,.65fr) minmax(0,.8fr) minmax(0,.45fr) auto;align-items:center;gap:8px}
+#smartAdminHost .admin-row{padding:6px 10px;border-radius:8px;font-size:.8rem}
+#smartAdminHost .v3467-columns{padding:4px 12px;color:#94a3b8;font-size:.7rem}
+#smartAdminHost .v345-admin-avatar{width:30px;height:30px;font-size:.7rem}
+#smartAdminHost .v345-admin-name,#smartAdminHost .v3467-email{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+#smartAdminHost .v345-admin-name strong{overflow:hidden;text-overflow:ellipsis;display:block}
+#smartAdminHost .v3467-email{color:#9ac2d8}
+#smartAdminHost .admin-row .admin-action{font-size:.72rem;margin:0;padding:6px 8px;min-height:36px;white-space:nowrap}
+.v3467-plan[data-value=premium]{color:#fbbf24}.v3467-state{color:#4ade80}.v3467-state[data-blocked=true]{color:#fb7185}.v3467-usage{color:#94a3b8}
+#smartAdminHost .v345-dialog{max-height:85dvh;overflow:auto;width:min(34rem,calc(100% - 24px))}
+.v3467-details{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;margin:12px 0;font-size:.85rem}.v3467-details dt{color:#94a3b8}.v3467-details dd{overflow-wrap:anywhere;margin:0}
+#smartAdminHost .v3467-ai{padding:8px;border:1px solid #24455c;border-radius:8px;color:#94a3b8;font-size:.78rem;margin:8px 0}#smartAdminHost .v3467-ai h3{margin:0 0 5px;font-size:.9rem}#smartAdminHost .v3467-monitor summary{cursor:pointer}
+.v345-edit label{display:grid;gap:4px}
+@media(max-width:767px){#smartAdminHost .admin-stats{grid-template-columns:repeat(3,minmax(0,1fr))}#smartAdminHost .admin-tools{grid-template-columns:repeat(2,minmax(0,1fr))}#smartAdminHost .admin-tools input{grid-column:1/-1}#smartAdminHost .v3467-columns{display:none}#smartAdminHost .admin-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:5px 8px}#smartAdminHost .v345-admin-identity{grid-column:1/3}#smartAdminHost .v3467-email{grid-column:1/-1;grid-row:2}#smartAdminHost .admin-row .admin-action{grid-column:3;grid-row:1;min-height:40px}#smartAdminHost .v3467-plan,#smartAdminHost .v3467-state,#smartAdminHost .v3467-usage{grid-row:3}}
+
+/* V34.6.8: compact public header; no privileged bar when hidden. */
+.v345-account[hidden],#v3468Logout[hidden]{display:none!important}
+.v3468-version{font-size:9px;line-height:1.2;color:#94a3b8;font-weight:400;white-space:nowrap;flex-shrink:0}
+.v3468-question{margin-left:.12em}
+.v3468-install-version{font-size:.8rem;color:#94a3b8;margin:.35rem 0}
+@media(max-width:639px){.v3468-version{font-size:8px}.raytech-header-brand>.truncate{display:block!important}.raytech-header-row{flex-wrap:wrap}.raytech-header-brand{flex:1 1 auto;min-width:0}.raytech-header-controls{flex:1 1 auto;justify-content:flex-end}.raytech-header-brand h1{font-size:.8rem}.raytech-header-brand>.truncate>div{gap:3px}.raytech-header-controls{min-width:0}}
+
+/* Homologation additions only: quota fields and consumption inside original details. */
+#simulatedReview label { display: block; padding: .35rem; }
+#labCredentials { display: grid; gap: .5rem; margin-block: .75rem; text-align: left; }
+#labCredentials input { display: block; width: 100%; border: 1px solid #3a607d; border-radius: .5rem; padding: .4rem .6rem; background: #06182e; color: #e1f5ff; }
+#v3473Monitor.admin-stats{grid-template-columns:repeat(4,minmax(0,1fr))}#v3473Monitor .admin-stat{cursor:default}@media(max-width:767px){#v3473Monitor.admin-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
