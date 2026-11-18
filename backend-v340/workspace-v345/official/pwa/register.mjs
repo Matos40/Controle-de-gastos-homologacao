@@ -9,7 +9,7 @@ const publish = next => {
   window.dispatchEvent(new CustomEvent('raytech-pwa-state',{detail:snapshot()}));
 };
 const snapshot = () => Object.freeze({
-  version:'34.7.4.1', phase, canInstall: !!installEvent,
+  version:'34.7.4.2', phase, canInstall: !!installEvent,
   standalone: matchMedia('(display-mode: standalone)').matches || navigator.standalone === true,
 });
 window.raytechPwa = Object.freeze({

@@ -61,7 +61,7 @@ replace(/<p hidden id="productionCloudStatus"/, inspection.replace('Verificar co
 replace(/<button id="smartAdminOpen"[\s\S]*?<\/button>/, '');
 replace(/(<header class="raytech-header-shell[^>]*>)/, '$1' + `
 <div class="v345-account">
-  <span class="v345-environment">V34.7.4.1 · Homologação · Dados sintéticos</span>
+  <span class="v345-environment">V34.7.4.2 · Homologação · Dados sintéticos</span>
   <details class="v345-profile">
     <summary aria-label="Perfil e opções da conta"><span id="v345Avatar" aria-hidden="true"></span><strong id="v345Identity"></strong><span class="v345-chevron" aria-hidden="true">⌄</span></summary>
     <div class="v345-profile-menu">

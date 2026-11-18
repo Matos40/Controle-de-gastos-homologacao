@@ -122,3 +122,54 @@
 .v345-usage progress::-moz-progress-bar{background:#38bdf8;border-radius:999px}
 .v345-dialog .v345-edit input[type=number]{width:100%;min-width:0;box-sizing:border-box}
 .v345-dialog .v345-usage{min-width:0}
+
+#smartAdminHost .admin-detail-dialog {
+  box-sizing: border-box;
+  width: min(50rem, calc(100% - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+}
+.admin-detail-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .75rem;
+  padding-bottom: .75rem;
+  border-bottom: 1px solid #24455c;
+}
+.admin-detail-header h2 { overflow-wrap: anywhere; }
+.admin-detail-badges { display: flex; flex-wrap: wrap; gap: .2rem .75rem; font-size: .85rem; }
+.admin-detail-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-top: .75rem;
+}
+.admin-detail-information .v3467-details { margin: 0 0 .75rem; }
+.admin-detail-dialog .admin-detail-uid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: .25rem .4rem;
+  align-items: center;
+}
+.admin-detail-uid code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-detail-uid-expanded code { white-space: normal; overflow-wrap: anywhere; }
+.admin-detail-copy-status { grid-column: 1 / -1; }
+.admin-detail-copy-status:empty, .admin-detail-dialog form > [role=status]:empty { display: none; }
+.admin-detail-dialog .admin-action { margin: 0; }
+.admin-detail-settings { display: grid; align-content: start; gap: .75rem; }
+.admin-detail-quotas { min-width: 0; }
+.admin-detail-quotas legend { margin-bottom: .35rem; }
+.admin-detail-quota-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
+.admin-detail-quota-fields label { font-size: .8rem; }
+.admin-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: .5rem;
+  padding-top: .75rem;
+  border-top: 1px solid #24455c;
+}
+@media (max-width: 767px) {
+  .admin-detail-columns { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+  #smartAdminHost .admin-detail-dialog { padding: .9rem; }
+}
