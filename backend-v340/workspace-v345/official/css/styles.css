@@ -128,3 +128,17 @@ body {
  #headerToolsDrawer{max-height:var(--raytech-drawer-available,calc(100dvh - 220px - env(safe-area-inset-bottom,0px)));overflow-y:auto;overscroll-behavior-y:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;scroll-padding-block:8px;min-height:0}
  #raytechMobileNav{padding-bottom:calc(.375rem + env(safe-area-inset-bottom,0px))}
 }
+
+/* V34.6.2: portal outside sticky/backdrop-filter header; single scroll surface. */
+.raytech-drawer-heading{display:none}
+@media(max-width:639px){
+ html.raytech-drawer-open,html.raytech-drawer-open body{overflow:hidden;overscroll-behavior:none}
+ html.raytech-drawer-open #raytechMobileNav{visibility:hidden;pointer-events:none}
+ #headerToolsDrawer.raytech-mobile-portal{position:fixed;inset:auto;top:var(--drawer-top,0px);left:var(--drawer-left,0px);width:var(--drawer-width,100%);height:var(--raytech-drawer-available,100dvh);max-width:none;max-height:none;margin:0;border:0;border-radius:0;z-index:99990;padding:0;display:flex;flex-direction:column;overflow:hidden;touch-action:auto;box-shadow:none}
+ #headerToolsDrawer.raytech-mobile-portal .raytech-drawer-heading{display:flex;flex:none;align-items:center;justify-content:space-between;padding:calc(8px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px));border-bottom:1px solid #334155;background:#08182b;color:#58dcff}
+ .raytech-drawer-heading h2{font-size:1.1rem;font-weight:800}
+ #mobileDrawerClose{min-width:44px;min-height:44px;border:1px solid #334155;border-radius:10px;color:#e2e8f0;font-size:1.5rem}
+ #headerToolsDrawer.raytech-mobile-portal .raytech-options-grid{display:flex;flex-direction:column;flex:1 1 0;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;padding:12px max(12px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));scroll-padding:12px;gap:10px}
+ #headerToolsDrawer.raytech-mobile-portal .raytech-options-grid>div{flex:none;width:100%;align-self:stretch}
+ #headerToolsDrawer.raytech-mobile-portal #raytechSecurityOptions{order:-1}
+}

@@ -521,6 +521,7 @@
 
       <!-- Painel Expansível de Ferramentas Organizado por Categorias (Oculto por padrão) -->
       <div id="headerToolsDrawer" tabindex="0" role="region" aria-label="Opções do aplicativo" class="hidden">
+        <div class="raytech-drawer-heading"><h2>Opções</h2><button type="button" id="mobileDrawerClose" aria-label="Fechar opções">×</button></div>
         <!-- Input oculto para o arquivo Excel -->
         <input type="file" id="excelImportInput" accept=".xlsx, .xls, .xlsm" class="sr-only" onchange="handleExcelImport(event)">
 
@@ -707,7 +708,7 @@
           </div>
 
           <!-- Categoria 3: Segurança & Aplicativo -->
-          <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-2.5 space-y-2">
+          <div id="raytechSecurityOptions" class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-2.5 space-y-2">
             <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 px-1">
               <i class="fa-solid fa-shield-halved text-amber-400"></i> Segurança & App
             </div>

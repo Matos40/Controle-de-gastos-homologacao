@@ -382,27 +382,55 @@ test('PWA revalidates a blocked account before resuming online access', async ()
   } finally { await context.close(); }
 });
 
-test('mobile drawer scrolls internally to Smart Install above the bottom navigation',async()=>{
+test('mobile drawer scrolls internally and Smart Install remains accessible without bottom navigation',async()=>{
  const context=await browser.newContext({viewport:{width:390,height:700},isMobile:true,hasTouch:true});
  try{
   const page=await context.newPage();
   await page.goto(origin);await login(page,'owner');
   await page.locator('#headerToolsToggleBtn').click();
-  const drawer=page.locator('#headerToolsDrawer'), install=page.locator('#smartPwaOpen');
-  await page.waitForFunction(()=>!!document.getElementById('headerToolsDrawer').style.getPropertyValue('--raytech-drawer-available'));
-  const geometry=()=>page.evaluate(()=>{
-   const d=document.getElementById('headerToolsDrawer'),n=document.getElementById('raytechMobileNav'),b=document.getElementById('smartPwaOpen');
-   const dr=d.getBoundingClientRect(), br=b.getBoundingClientRect(),v=visualViewport;
-   return {bottom:dr.bottom,limit:Math.min(n.getBoundingClientRect().top,v.offsetTop+v.height),top:dr.top,buttonTop:br.top,buttonBottom:br.bottom,scroll:d.scrollTop,overflow:d.scrollHeight>d.clientHeight,bodyScroll:window.scrollY};
-  });
-  const initial=await geometry();assert.ok(initial.overflow);assert.ok(initial.bottom<=initial.limit);
-  await drawer.evaluate(el=>{el.scrollTop=el.scrollHeight;});
-  const end=await geometry();assert.ok(end.scroll>0);assert.ok(end.buttonTop>=end.top&&end.buttonBottom<=end.bottom+1);assert.equal(end.bodyScroll,initial.bodyScroll);
-  await page.setViewportSize({width:390,height:560});
-  await page.waitForFunction(()=>document.getElementById('headerToolsDrawer').getBoundingClientRect().bottom<=document.getElementById('raytechMobileNav').getBoundingClientRect().top-7);
-  await drawer.evaluate(el=>{el.scrollTop=el.scrollHeight;});
-  await install.focus();assert.equal(await install.evaluate(el=>document.activeElement===el),true);
+  const drawer=page.locator('#headerToolsDrawer'), install=page.locator('#smartPwaOpen'), content=drawer.locator('.raytech-options-grid');
+  await drawer.locator('#mobileDrawerClose').waitFor({state:'visible'});
+  assert.equal(await page.locator('#raytechMobileNav').isVisible(),false);
+  assert.equal(await drawer.evaluate(el=>el.parentElement.id),'smartAccountApp');
+  for(const height of [700,560,480]){
+   await page.setViewportSize({width:390,height});
+   await page.waitForFunction(()=>Math.abs(document.getElementById('headerToolsDrawer').getBoundingClientRect().height-visualViewport.height)<2);
+   await content.evaluate(el=>el.scrollTop=0);
+   const br=await install.boundingBox(), dr=await drawer.boundingBox();
+   assert.ok(br.y>=dr.y&&br.y+br.height<=dr.y+dr.height);
+   await install.focus();assert.equal(await install.evaluate(el=>document.activeElement===el),true);
+  }
   await install.tap();await page.locator('#smartPwaDialog').waitFor({state:'visible'});
   await page.locator('#smartPwaClose').click();
+  await drawer.locator('#mobileDrawerClose').tap();
+  await drawer.waitFor({state:'hidden'});
+  await page.locator('#raytechMobileNav').waitFor({state:'visible'});
+ }finally{await context.close();}
+});
+
+test('mobile options native touch swipe scrolls content, retains fixed heading and restores desktop drawer',async()=>{
+ const context=await browser.newContext({viewport:{width:390,height:480},isMobile:true,hasTouch:true});
+ try{
+  const page=await context.newPage();await page.goto(origin);await login(page,'owner');
+  await page.locator('#headerToolsToggleBtn').click();
+  const drawer=page.locator('#headerToolsDrawer'),heading=drawer.locator('.raytech-drawer-heading'),scroll=drawer.locator('.raytech-options-grid');
+  await heading.waitFor({state:'visible'});
+  const initial=await heading.boundingBox(),box=await scroll.boundingBox(),body=await page.evaluate(()=>window.scrollY);
+  assert.ok(await scroll.evaluate(el=>el.scrollHeight>el.clientHeight));
+  const client=await context.newCDPSession(page),x=Math.round(box.x+box.width/2),y=Math.round(box.y+box.height-24),end=Math.round(box.y+30);
+  await client.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+  for(let i=1;i<=12;i++){
+   await client.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:Math.round(y+(end-y)*i/12)}]});
+   await new Promise(resolve=>setTimeout(resolve,16));
+  }
+  await client.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await page.waitForFunction(()=>document.querySelector('#headerToolsDrawer .raytech-options-grid').scrollTop>20);
+  assert.equal((await heading.boundingBox()).y,initial.y);
+  assert.equal(await page.evaluate(()=>window.scrollY),body);
+  await page.setViewportSize({width:1280,height:900});
+  await page.waitForFunction(()=>!document.getElementById('headerToolsDrawer').classList.contains('raytech-mobile-portal'));
+  assert.equal(await drawer.evaluate(el=>!!el.closest('.raytech-header-anchor')),true);
+  assert.equal(await heading.isVisible(),false);
+  assert.equal(await page.evaluate(()=>document.documentElement.classList.contains('raytech-drawer-open')),false);
  }finally{await context.close();}
 });
