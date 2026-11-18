@@ -35,7 +35,7 @@ export function validateResult(items){
 export async function extractInvoice(req,deps,{timeoutMs=TIMEOUT_MS}={}){
  // Project-specific guard is enforced by the actual HTTP function before any SDK use.
  let verifiedUid;
- const authorize=()=>authorizePremium({method:req.method,headers:req.headers,query:req.query,body:{feature:FEATURE}},{...deps,verifyToken:async token=>{const claims=await deps.verifyToken(token);verifiedUid=claims?.uid;return claims;}});
+ const authorize=()=>authorizePremium({method:req.method,headers:req.headers,query:req.query,body:{feature:FEATURE}},{...deps,verifyToken:async token=>{const claims=await deps.verifyToken(token);if(verifiedUid!==undefined&&claims?.uid!==verifiedUid)throw Error('SESSION_CHANGED');verifiedUid=claims?.uid;return claims;}});
  const first=await authorize();
  if(first.status!==200)return fail(first.status,'ACCESS_DENIED');
  let file;

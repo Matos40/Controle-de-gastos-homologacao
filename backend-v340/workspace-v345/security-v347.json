@@ -1,0 +1,15 @@
+{
+  "firestore": {
+    "rules": "security-v347/hardened.rules"
+  },
+  "emulators": {
+    "firestore": {
+      "host": "127.0.0.1",
+      "port": 18080
+    },
+    "ui": {
+      "enabled": false
+    },
+    "singleProjectMode": true
+  }
+}

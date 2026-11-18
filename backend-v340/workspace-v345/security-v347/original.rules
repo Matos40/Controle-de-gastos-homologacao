@@ -1,0 +1,132 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /raytechProductionAccessV2/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
+    match /raytechProductionFinanceV2/{uid} {
+      function accessPath() { return /databases/$(database)/documents/raytechProductionAccessV2/$(uid); }
+      function accountPath() { return /databases/$(database)/documents/raytechAccountsV334/$(uid); }
+      function rolePath() { return /databases/$(database)/documents/raytechAdminRolesV334/$(uid); }
+      function owner() { return exists(rolePath()) && get(rolePath()).data.active == true && get(rolePath()).data.role == 'owner'; }
+      function legacyAllowed() { return exists(accessPath()) && get(accessPath()).data.enabled == true; }
+      function activeAccount() { return exists(accountPath()) && get(accountPath()).data.blocked == false; }
+      function approved() {
+        return request.auth != null && request.auth.uid == uid
+          && (!exists(accessPath()) || legacyAllowed())
+          && ((!exists(accountPath()) && legacyAllowed())
+            || (activeAccount() && ((owner() && legacyAllowed()) || get(accountPath()).data.plan == 'premium')));
+      }
+      function writable() {
+        return approved() && (!exists(accessPath()) || get(accessPath()).data.get('writeEnabled', false) == true);
+      }
+      function uuid(x) { return x is string && x.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'); }
+      function validHash(x) { return x is string && x.matches('^[0-9a-f]{64}$'); }
+      function validHead(h) {
+        return h.keys().hasAll(['marker','revision','payload','lastOperationId','hash'])
+          && h.keys().hasOnly(['marker','revision','payload','lastOperationId','hash'])
+          && h.marker == 'raytech-financial-production-v2'
+          && h.revision is int && h.revision >= 1 && h.revision <= 9007199254740991
+          && h.payload is string && h.payload.size() <= 180000
+          && uuid(h.lastOperationId) && validHash(h.hash);
+      }
+      function validReceipt(r, op) {
+        return r.keys().hasAll(['operationId','revision','parentId','hash'])
+          && r.keys().hasOnly(['operationId','revision','parentId','hash'])
+          && uuid(op) && r.operationId == op
+          && r.revision is int && r.revision >= 1 && r.revision <= 9007199254740991
+          && ((r.revision == 1 && r.parentId == '') || (r.revision > 1 && uuid(r.parentId) && r.parentId != op))
+          && validHash(r.hash);
+      }
+      function paired(h, parent) {
+        let p = /databases/$(database)/documents/raytechProductionFinanceV2/$(uid)/receipts/$(h.lastOperationId);
+        let r = getAfter(p).data;
+        return !exists(p) && existsAfter(p) && validReceipt(r,h.lastOperationId)
+          && r.revision == h.revision && r.parentId == parent && r.hash == h.hash;
+      }
+      allow get: if approved();
+      allow list, delete: if false;
+      allow create: if writable() && validHead(request.resource.data) && request.resource.data.revision == 1 && paired(request.resource.data,'');
+      allow update: if writable() && validHead(request.resource.data)
+        && request.resource.data.revision == resource.data.revision + 1
+        && paired(request.resource.data,resource.data.lastOperationId);
+      match /receipts/{op} {
+        function pairedHead(r) {
+          let p = /databases/$(database)/documents/raytechProductionFinanceV2/$(uid);
+          let h = getAfter(p).data;
+          return existsAfter(p) && validHead(h) && h.lastOperationId == op && h.revision == r.revision && h.hash == r.hash
+            && ((!exists(p) && r.revision == 1 && r.parentId == '') ||
+                (exists(p) && r.revision == get(p).data.revision + 1 && r.parentId == get(p).data.lastOperationId));
+        }
+        allow get: if approved();
+        allow create: if writable() && validReceipt(request.resource.data,op) && pairedHead(request.resource.data);
+        allow list, update, delete: if false;
+      }
+    }
+    
+
+function smart334Operator() {
+  return request.auth != null &&
+    exists(/databases/$(database)/documents/raytechAdminRolesV334/$(request.auth.uid)) &&
+    get(/databases/$(database)/documents/raytechAdminRolesV334/$(request.auth.uid)).data.active == true &&
+    get(/databases/$(database)/documents/raytechAdminRolesV334/$(request.auth.uid)).data.role in ['owner','admin'];
+}
+match /raytechAdminRolesV334/{uid} {
+  allow get: if (request.auth != null && request.auth.uid == uid) || smart334Operator();
+  allow list, create, update, delete: if false;
+}
+match /raytechAccountsV334/{uid} {
+  function self() { return request.auth != null && request.auth.uid == uid; }
+  function identityValid(d) {
+    return request.auth.token.email_verified == true
+      && request.auth.token.firebase.sign_in_provider == 'google.com'
+      && d.email is string && d.email.size() <= 320 && d.email == request.auth.token.email
+      && d.name is string && d.name == request.auth.token.get('name','')
+      && d.photo is string && d.photo == request.auth.token.get('picture','');
+  }
+  function isOperatorTarget() {
+    return exists(/databases/$(database)/documents/raytechAdminRolesV334/$(uid));
+  }
+  function auditMatches(d) {
+    let p = /databases/$(database)/documents/raytechAdminAuditV334/$(d.lastAudit);
+    let a = getAfter(p).data;
+    return !exists(p) && existsAfter(p) && a.actor == request.auth.uid && a.target == uid
+      && a.beforePlan == resource.data.plan && a.afterPlan == d.plan
+      && a.beforeBlocked == resource.data.blocked && a.afterBlocked == d.blocked
+      && a.at == request.time;
+  }
+  allow get: if self() || smart334Operator();
+  allow list: if smart334Operator() && request.query.limit <= 100;
+  allow create: if self() && request.resource.data.keys().hasOnly(['uid','plan','blocked','createdAt','lastAccess','email','name','photo'])
+    && (!request.resource.data.keys().hasAny(['email','name','photo']) || identityValid(request.resource.data))
+    && request.resource.data.keys().hasAll(['uid','plan','blocked','createdAt','lastAccess'])
+    && request.resource.data.uid == uid && request.resource.data.plan == 'free'
+    && request.resource.data.blocked == false && request.resource.data.createdAt == request.time
+    && request.resource.data.lastAccess == request.time;
+  allow update: if (self() && resource.data.blocked == false
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastAccess','email','name','photo'])
+    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['email','name','photo']) || identityValid(request.resource.data))
+    && request.resource.data.lastAccess == request.time)
+    || (smart334Operator() && !isOperatorTarget()
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plan','blocked','lastAudit'])
+      && request.resource.data.plan in ['free','premium'] && request.resource.data.blocked is bool
+      && (request.resource.data.plan != resource.data.plan || request.resource.data.blocked != resource.data.blocked)
+      && request.resource.data.lastAudit is string && auditMatches(request.resource.data));
+  allow delete: if false;
+}
+match /raytechAdminAuditV334/{id} {
+  allow get: if smart334Operator();
+  allow list: if smart334Operator() && request.query.limit <= 100;
+  allow create: if smart334Operator() && request.resource.data.keys().hasAll(['actor','target','beforePlan','afterPlan','beforeBlocked','afterBlocked','at'])
+    && request.resource.data.keys().hasOnly(['actor','target','beforePlan','afterPlan','beforeBlocked','afterBlocked','at'])
+    && request.resource.data.actor == request.auth.uid && request.resource.data.target is string
+    && request.resource.data.at == request.time
+    && getAfter(/databases/$(database)/documents/raytechAccountsV334/$(request.resource.data.target)).data.lastAudit == id
+    && get(/databases/$(database)/documents/raytechAccountsV334/$(request.resource.data.target)).data.get('lastAudit','') != id;
+  allow update, delete: if false;
+}
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}
