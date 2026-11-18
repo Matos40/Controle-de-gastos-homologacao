@@ -15,7 +15,15 @@ const csp = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 's
 export async function serve() {
   const server = createServer(async (req, res) => {
     try {
-      if (req.headers.host !== '127.0.0.1:15003' || !['GET', 'HEAD'].includes(req.method)) throw Error();
+      if (req.headers.host !== '127.0.0.1:15003') throw Error();
+      const endpoints=new Set(['/api/workspaceAuthorizeInvoice','/api/workspaceExtractInvoice','/api/workspaceUsageAdmin']);
+      if(req.method==='POST'&&endpoints.has(req.url)){
+        if(req.headers.origin!=='http://127.0.0.1:15003'||process.env.GCLOUD_PROJECT!=='demo-raytech-v340'||process.env.FIREBASE_AUTH_EMULATOR_HOST!=='127.0.0.1:19099'||process.env.FIRESTORE_EMULATOR_HOST!=='127.0.0.1:18080'){res.writeHead(403).end();return;}
+        const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>4096){res.writeHead(413).end();return;}chunks.push(chunk);}
+        const upstream=await fetch('http://127.0.0.1:15001/demo-raytech-v340/us-central1/'+req.url.slice(5),{method:'POST',headers:{authorization:req.headers.authorization??'','x-request-id':req.headers['x-request-id']??'','content-type':'application/json'},body:Buffer.concat(chunks),signal:AbortSignal.timeout(30000),redirect:'error'});
+        res.writeHead(upstream.status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(await upstream.text());return;
+      }
+      if(!['GET','HEAD'].includes(req.method))throw Error();
       const path = decodeURIComponent(new URL(req.url, origin).pathname);
       const file = resolve(root, '.' + (path === '/' ? '/index.html' : path));
       if (!file.startsWith(root + sep) || !(await stat(file)).isFile()) throw Error();

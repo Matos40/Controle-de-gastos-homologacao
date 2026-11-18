@@ -31,7 +31,7 @@ export function parseAdminBody(body){
  }
  return null;
 }
-export async function handleUsageAdmin(req,{db,verifyToken,clock=Date.now}){
+export async function handleUsageAdmin(req,{db,verifyToken,clock=Date.now,workspace=false}){
  if(req.method!=='POST')return error(405,'METHOD_NOT_ALLOWED');
  const header=req.headers?.authorization;
  if(typeof header!=='string'||header.length>8192||!/^Bearer [^\s,]+$/.test(header))return error(401,'UNAUTHENTICATED');
@@ -39,7 +39,8 @@ export async function handleUsageAdmin(req,{db,verifyToken,clock=Date.now}){
  if(!uidOk(uid))return error(401,'UNAUTHENTICATED');
  const body=parseAdminBody(req.body);
  if(!body||Object.keys(req.query??{}).length)return error(400,'INVALID_REQUEST');
- const accounts=db.collection(ACCOUNT_COLLECTION),roles=db.collection(ROLE_COLLECTION),usage=db.collection(USAGE_COLLECTION),limits=db.collection(LIMITS_COLLECTION);
+ if(workspace&&body.action==='set')return error(403,'ACCESS_DENIED');
+ const accounts=db.collection(workspace?'raytechV345Accounts':ACCOUNT_COLLECTION),roles=db.collection(workspace?'raytechV345Roles':ROLE_COLLECTION),usage=db.collection(USAGE_COLLECTION),limits=db.collection(LIMITS_COLLECTION);
  try{
   return await db.runTransaction(async tx=>{
    const [actor,role]=await tx.getAll(accounts.doc(uid),roles.doc(uid));
@@ -53,7 +54,7 @@ export async function handleUsageAdmin(req,{db,verifyToken,clock=Date.now}){
     if(l.exists&&(!Number.isSafeInteger(settings.version)||settings.version<1))throw Error('INVALID_VERSION');
     const targetRole=operator.data()?.active===true&&['owner','admin'].includes(operator.data()?.role)?operator.data().role:null;
     const outcome=(await readOutcome(tx,db,target,now)).user;
-    return {outcome,uid:target,name:typeof account.name==='string'?account.name.slice(0,120):'',email:typeof account.email==='string'?account.email.slice(0,320):'',role:targetRole,editable:role.data().role==='owner'||(target!==uid&&!targetRole),plan:account.plan,blocked:account.blocked,version:settings?.version??0,...summarizeUsage(u.data(),l.exists?settings.limits:DEFAULT_LIMITS,now)};
+    return {outcome,uid:target,name:typeof account.name==='string'?account.name.slice(0,120):'',email:typeof account.email==='string'?account.email.slice(0,320):'',role:targetRole,editable:role.data().role==='owner'||(target!==uid&&!targetRole),plan:account.plan,blocked:account.blocked,version:settings?.version??0,...summarizeUsage(u.data(),workspace?validateLimits(account.limits??DEFAULT_LIMITS):l.exists?settings.limits:DEFAULT_LIMITS,now)};
    };
    if(body.action==='list'){
     let query=accounts.orderBy(FieldPath.documentId()).limit(26);

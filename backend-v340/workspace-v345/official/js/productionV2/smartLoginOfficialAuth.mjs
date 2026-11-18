@@ -4,7 +4,7 @@ import {getAuth, connectAuthEmulator, onAuthStateChanged, GoogleAuthProvider,
 import {getFirestore, connectFirestoreEmulator, doc, collection, getDocFromServer,
   getDocsFromServer, query, orderBy, limit, onSnapshot, runTransaction, serverTimestamp} from 'firebase/firestore';
 import {environment} from './config.mjs';
-import {DEFAULT_LIMITS, countsInWindow, nextCounts} from './v345Usage.mjs';
+import {DEFAULT_LIMITS} from './v345Usage.mjs';
 import {operatorRole} from './smartAdminPolicy.mjs';
 
 let ready;
@@ -23,11 +23,17 @@ async function initialize() {
   }
   const currentUid = () => auth.currentUser?.uid ?? null;
   const account = uid => doc(db, 'raytechV345Accounts', uid);
-  const usageRef = uid => doc(db, 'raytechV345Usage', uid);
   const roleRef = uid => doc(db, 'raytechV345Roles', uid);
   const read = async ref => (await getDocFromServer(ref)).data();
   const assertSession = uid => {
     if (currentUid() !== uid) throw Error('SESSION_CHANGED');
+  };
+  const ai=async(uid,endpoint,body,id)=>{
+    assertSession(uid);
+    if(!local||location.origin!=='http://127.0.0.1:15003'||!navigator.onLine)throw Error('AI_UNAVAILABLE');
+    const token=await auth.currentUser.getIdToken();assertSession(uid);
+    const res=await fetch('/api/'+endpoint,{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json',...(id?{'x-request-id':id}:{})},body:JSON.stringify(body),cache:'no-store',redirect:'error',signal:AbortSignal.timeout(35000)});
+    const result=await res.json();assertSession(uid);if(!res.ok)throw Error(result.error||'ACCESS_DENIED');return result;
   };
   const profile = async uid => {
     assertSession(uid);
@@ -70,19 +76,15 @@ async function initialize() {
     signOut: () => signOut(auth),
     watchAccount: (uid, fn, error, unavailable) => watch(account(uid), fn, error, unavailable),
     watchRole: (uid, fn, error, unavailable) => watch(roleRef(uid), value => fn(operatorRole(value)), error, unavailable),
-    async reserveInvoice(uid) {
-      assertSession(uid);
-      await runTransaction(db, async tx => {
-        assertSession(uid);
-        const [profile, usage] = await Promise.all([tx.get(account(uid)), tx.get(usageRef(uid))]);
-        const counts = nextCounts(usage.data(), profile.data()?.limits ?? DEFAULT_LIMITS);
-        assertSession(uid);
-        tx.set(usageRef(uid), {at: serverTimestamp(), ...counts});
-      });
-      assertSession(uid);
+    async extractInvoice(uid) {
+      return ai(uid,'workspaceExtractInvoice',{feature:'invoice-ai',mimeType:'application/pdf',data:btoa('%PDF-1.4\n% synthetic workspace\n%%EOF\n')},crypto.randomUUID());
+    },
+    async authorizeInvoice(uid) {
+      const out=await ai(uid,'workspaceAuthorizeInvoice',{feature:'invoice-ai'});if(out.allowed!==true)throw Error('ACCESS_DENIED');
     },
     admin: uid => ({
       role: () => { assertSession(uid); return role(uid); },
+      async monitor() {return ai(uid,'workspaceUsageAdmin',{action:'list',after:null});},
       async list() {
         assertSession(uid);
         const page = await getDocsFromServer(query(collection(db, 'raytechV345Accounts'), limit(100)));
@@ -93,8 +95,8 @@ async function initialize() {
           const base = {...profile, role, protected: !!record};
           if (!role && profile.plan !== 'premium') return base;
           try {
-            return {...base, limits: profile.limits ?? DEFAULT_LIMITS,
-              usage: countsInWindow(await read(usageRef(row.id)))};
+            const {row:metrics}=await ai(uid,'workspaceUsageAdmin',{action:'get',uid:row.id});
+            return {...base, limits:metrics.limits,usage:metrics.used,outcome:metrics.outcome};
           } catch { return {...base, limits: undefined, usageUnavailable: true}; }
         }));
       },

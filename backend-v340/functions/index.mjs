@@ -59,3 +59,15 @@ export const usageAdmin=onRequest({region:'us-central1',cors:false,timeoutSecond
   res.status(out.status).json(out.body);
  }catch{res.status(503).json({error:'ADMIN_UNAVAILABLE'});}
 });
+
+import {workspaceAiRequest} from './workspace-ai.mjs';
+const workspaceEndpoint=kind=>onRequest({region:'us-central1',cors:false,timeoutSeconds:30},async(req,res)=>{
+ res.set('Cache-Control','no-store');
+ try{assertLocalEmulators();const app=getApps()[0]??initializeApp({projectId:PROJECT});if(app.options.projectId!==PROJECT)throw Error('PROJECT_MISMATCH');
+ const out=await workspaceAiRequest(kind,req,{db:getFirestore(app),verifyToken:token=>getAuth(app).verifyIdToken(token,true)});
+ res.status(out.status).json(out.body);
+ }catch{res.status(503).json({error:'UNAVAILABLE'});}
+});
+export const workspaceAuthorizeInvoice=workspaceEndpoint('authorize');
+export const workspaceExtractInvoice=workspaceEndpoint('extract');
+export const workspaceUsageAdmin=workspaceEndpoint('admin');

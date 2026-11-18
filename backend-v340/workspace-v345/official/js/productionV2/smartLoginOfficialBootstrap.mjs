@@ -17,9 +17,13 @@ let auth, active, generation = 0, started = false, invoiceAllowed = false;
 let unsubscribe = [];
 const activeSession = uid => active === uid && auth.currentUid() === uid;
 window.raytechCanUseInvoiceAI = () => !!active && activeSession(active) && invoiceAllowed && navigator.onLine;
-window.raytechReserveInvoice = () => {
+window.raytechExtractInvoice = () => {
   if (!window.raytechCanUseInvoiceAI()) throw Error('INVOICE_DENIED');
-  return auth.reserveInvoice(active);
+  return auth.extractInvoice(active);
+};
+window.raytechAuthorizeInvoice = () => {
+  if (!window.raytechCanUseInvoiceAI()) throw Error('INVOICE_DENIED');
+  return auth.authorizeInvoice(active);
 };
 const notify = () => window.dispatchEvent(new Event('raytech-ai-entitlement-changed'));
 const lock = () => {

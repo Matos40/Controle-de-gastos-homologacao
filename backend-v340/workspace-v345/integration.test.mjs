@@ -62,6 +62,8 @@ test('Firestore isolates accounts, protects privileged profiles and requires ato
   await assertFails(setDoc(role(db, premium), {active: true, role: 'owner'}));
   await assertFails(updateDoc(account(dbAs('owner'), accounts.admin.uid), {plan: 'premium'}));
   await assertFails(setDoc(usage(dbAs('free'), accounts.free.uid), {at: serverTimestamp(), minute: 1, day: 1, month: 1}));
+  await assertFails(setDoc(usage(db,premium),{at:serverTimestamp(),minute:1,day:1,month:1}));
+  await assertFails(setDoc(doc(db,'raytechLabOutcomeV3472','global_month_2026-11'),{reserved:0,completed:0,failed:0,pending:0}));
   const ref = doc(db, 'raytechV345Finance', premium, 'banks', 'v2-main');
   const op = '12345678-1234-4123-8123-123456789abc';
   const receipt = doc(ref, 'receipts', op);
@@ -112,14 +114,19 @@ test('Chromium integrates synthetic finance, review, quota, role changes and ses
     assert.equal(await page.evaluate(() => appDb.months[appDb.selectedMonth].salary), 2000);
     await page.locator('#headerToolsToggleBtn').click();
     await page.locator('#premiumInvoiceButton').click();
+    const response=page.waitForResponse(r=>r.url().endsWith('/api/workspaceExtractInvoice'));
     await page.locator('#simulatedExtract').click();
+    assert.equal((await response).status(),200);
+    assert.equal(await page.evaluate(()=>appDb.months[appDb.selectedMonth].cardExpenses.length),0);
     await page.locator('#simulatedConfirm').click();
     const readCards = () => page.evaluate(() => appDb.months[appDb.selectedMonth].cardExpenses.length);
+    await page.waitForFunction(()=>appDb.months[appDb.selectedMonth].cardExpenses.length===2);
     assert.equal(await readCards(), 2);
     await page.locator('#headerToolsToggleBtn').click();
     await page.locator('#premiumInvoiceButton').click();
     await page.locator('#simulatedExtract').click();
     await page.locator('#simulatedConfirm').click();
+    await page.getByText(/já foi lançada/).waitFor();
     assert.match(await page.locator('#simulatedStatus').textContent(), /já foi lançada/);
     assert.equal(await readCards(), 2);
     await page.locator('#simulatedClose').click();
@@ -153,6 +160,7 @@ test('Chromium integrates synthetic finance, review, quota, role changes and ses
     assert.match(synced.payload, /Mercado fictício/);
     await context.setOffline(true);
     await page.locator('#productionCloudHeader[data-sync-state=offline]').waitFor();
+    assert.equal(await page.evaluate(()=>window.raytechCanUseInvoiceAI()),false);
     await page.locator('#salaryInput').fill('2500');
     assert.equal(await page.evaluate(() => appDb.months[appDb.selectedMonth].salary), 2500);
     const beforeRecovery=(await getDoc(head)).data().revision;
@@ -188,7 +196,9 @@ test('Chromium integrates synthetic finance, review, quota, role changes and ses
     await page.locator('.v345-profile summary').click();
     await page.locator('#smartAdminOpen').click();
     await page.locator('.v345-admin-rows .admin-row').first().waitFor();
-    assert.equal(await page.locator('.admin-stat').count(), 6);
+    assert.equal(await page.locator('.admin-stat').count(), 10);
+    assert.equal(await page.locator('#v3473Monitor .admin-stat').count(),4);
+    assert.deepEqual(await page.locator('#v3473Monitor strong').allTextContents(),['2','2','0','0']);
     assert.equal(await page.locator('.admin-row[data-plan=owner] button').count(), 0);
     assert.equal(await page.locator('.v345-profile').getAttribute('open'), null);
     await page.setViewportSize({width: 390, height: 844});
@@ -442,3 +452,5 @@ test('mobile options native touch swipe scrolls content, retains fixed heading a
   assert.equal(await page.evaluate(()=>document.documentElement.classList.contains('raytech-drawer-open')),false);
  }finally{await context.close();}
 });
+
+test('workspace HTTP denies Free and unauthenticated callers, even with forged browser UI',async()=>{const ctx=await browser.newContext();try{const page=await ctx.newPage();await page.goto(origin);await login(page,'free');const response=await fetch('http://'+authHost+'/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo-v345',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:accounts.free.email,password,returnSecureToken:true})});assert.equal(response.status,200);const {idToken}=await response.json();const status=await page.evaluate(async token=>{window.raytechCanUseInvoiceAI=()=>true;const req=await fetch('/api/workspaceExtractInvoice',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json','x-request-id':crypto.randomUUID()},body:JSON.stringify({feature:'invoice-ai',mimeType:'application/pdf',data:btoa('%PDF-1.4\n% synthetic\n%%EOF\n')})});return req.status;},idToken);assert.equal(status,403);const missing=await page.evaluate(async()=> (await fetch('/api/workspaceUsageAdmin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'list',after:null})})).status);assert.equal(missing,401);}finally{await ctx.close();}});

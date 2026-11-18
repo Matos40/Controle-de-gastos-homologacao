@@ -29,6 +29,7 @@ function renderConsumption(account) {
   if (!account.limits) return el('p', account.usageUnavailable ? 'Consumo indisponível' : 'Sem cota de leitor');
   const node = el('div', '', 'v345-usage');
   node.setAttribute('aria-label', 'Consumo do leitor simulado');
+  if(account.outcome){const x=account.outcome.month;node.append(el('p','Reservadas: '+x.reserved+' · Concluídas: '+x.completed+' · Falhas: '+x.failed+' · Pendentes: '+x.pending));}
   for (const key of keys) {
     const count = account.usage[key];
     const cap = account.limits[key];
@@ -126,7 +127,7 @@ export function mountAdmin({api, role, uid}) {
     exit.focus();
     try {
       if (!await api.role()) throw Error('ADMIN_DENIED');
-      const [accounts, audit] = await Promise.all([api.list(), api.audit()]);
+      const [accounts, audit, monitor] = await Promise.all([api.list(), api.audit(),api.monitor()]);
       if (epoch !== serial) return;
       status.textContent = (typeof message === 'string' ? message + ' ' : '') + accounts.length + ' contas nesta amostra, até 100.';
       const stats = el('div', '', 'admin-stats');
@@ -184,7 +185,11 @@ export function mountAdmin({api, role, uid}) {
       rows.className = 'v345-admin-rows';
       const auditPanel = el('section', '', 'v345-audit');
       auditPanel.append(el('h3', 'Auditoria · últimos 100 registros'));
-      host.append(stats, tools, rows, auditPanel);
+      const consumption=el('section','','admin-stats');consumption.id='v3473Monitor';
+      const month=monitor.outcomes.month;
+      for(const [label,value] of [['Reservadas',month.reserved],['Concluídas',month.completed],['Falhas',month.failed],['Pendentes',month.pending]]){const card=el('div','','admin-stat');card.append(el('small',label+' · mês UTC'),el('strong',String(value)));consumption.append(card);}
+      const budget=el('p','Orçamento global simulado · mês: R$ '+(monitor.global.used.month/1000000).toFixed(2)+' / R$ '+(monitor.global.limits.month/1000000).toFixed(2));
+      host.append(stats,consumption,budget,tools,rows,auditPanel);
       const labels = new Map(accounts.map(a => [a.uid, accountLabel(a)]));
       for (const event of audit) {
         const item = el('details');

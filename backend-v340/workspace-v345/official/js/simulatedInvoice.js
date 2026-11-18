@@ -4,10 +4,6 @@
   const confirm = document.getElementById('simulatedConfirm');
   const status = document.getElementById('simulatedStatus');
   const open = document.getElementById('premiumInvoiceButton');
-  const fixtures = [
-    {title: 'Mercado fictício', category: 'alimentacao', cents: 12590},
-    {title: 'Transporte fictício', category: 'transporte', cents: 3500},
-  ];
   let review = null, turn = 0, busy = false;
   const entitled = () => window.raytechCanUseInvoiceAI() && !window.raytechSessionRevoked;
   const close = () => { review = null; dialog.close(); };
@@ -26,23 +22,28 @@
     if (busy) return;
     const id = ++turn;
     if (!entitled()) { close(); return; }
+    review=null;stage.replaceChildren();
     confirm.disabled = extract.disabled = busy = true;
+    const month = appDb.selectedMonth;
+    let result;
     try {
-      await window.raytechReserveInvoice();
+      result=await window.raytechExtractInvoice();
+      if(result.simulated!==true||result.requiresReview!==true||!Array.isArray(result.items))throw Error('INVALID_RESPONSE');
     } catch (error) {
       if (id === turn) status.textContent = error.message === 'QUOTA_EXCEEDED'
-        ? 'Cota atingida. Tente novamente na pr?xima janela UTC.'
-        : 'N?o foi poss?vel autorizar a leitura simulada.';
+        ? 'Cota atingida. Tente novamente na próxima janela UTC.'
+        : error.message==='GLOBAL_BUDGET_EXCEEDED'?'Orçamento global atingido.':'Não foi possível autorizar a leitura simulada.';
       return;
     } finally { busy = extract.disabled = false; }
     if (id !== turn || !dialog.open) return;
     if (!entitled()) { close(); return; }
-    const month = appDb.selectedMonth;
-    review = {month, items: fixtures.map((item, i) => ({
-      id: 'simulated_v345_' + month + '_' + i,
-      title: item.title, category: item.category, installmentValue: item.cents / 100,
-      totalAmount: item.cents / 100, installments: 1, currentInstallment: 1,
-      isInstallment: false, paid: false, date: month + '-01',
+    if(month!==appDb.selectedMonth){status.textContent='O mês mudou. Gere uma nova revisão.';return;}
+    review = {month, items: result.items.map((item,i)=>({
+      id:'simulated_v345_'+month+'_'+i,
+      title:item.title, category:i===0?'alimentacao':'transporte',
+      installmentValue:item.installmentValue,totalAmount:item.totalAmount,
+      installments:item.installments,currentInstallment:item.currentInstallment,
+      isInstallment:item.isInstallment,paid:false,date:month+'-01',
     }))};
     stage.replaceChildren(...review.items.map((item, i) => {
       const row = document.createElement('label');
@@ -56,7 +57,15 @@
     confirm.disabled = false;
     status.textContent = 'Revise os lançamentos para ' + month + '.';
   };
-  confirm.onclick = () => {
+  confirm.onclick = async () => {
+    if(busy)return;
+    const original=review,stamp=turn;
+    if(!original)return;
+    busy=confirm.disabled=true;
+    try{await window.raytechAuthorizeInvoice();}
+    catch{if(stamp===turn)status.textContent='Acesso à leitura não autorizado.';return;}
+    finally{busy=false;if(stamp===turn&&review===original)confirm.disabled=false;}
+    if(stamp!==turn||review!==original||!dialog.open)return;
     if (!entitled()) { close(); return; }
     if (!review || review.month !== appDb.selectedMonth) {
       confirm.disabled = true;
