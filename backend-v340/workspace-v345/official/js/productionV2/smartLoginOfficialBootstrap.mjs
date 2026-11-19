@@ -267,8 +267,6 @@ if (location.origin === ORIGIN) {
     root.querySelector('[data-login-enter]').click();
   };
   root.querySelector('[data-login-enter]').textContent = 'Entrar no laboratório';
-}else{
-  root.querySelector('[data-login-enter]').textContent='Entrar com Google · conta de teste';
 }
 try {
   auth = await openSmartLoginAuth();
