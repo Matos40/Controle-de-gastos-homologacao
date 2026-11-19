@@ -6,7 +6,7 @@ workers_dev = false
 preview_urls = false
 
 [vars]
-FIREBASE_PROJECT_ID = "raytech-smart-ai-0831"
+FIREBASE_PROJECT_ID = "gen-lang-client-0593667072"
 
 [observability.logs]
 enabled = true

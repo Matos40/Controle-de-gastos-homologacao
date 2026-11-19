@@ -9,7 +9,7 @@ import {createFirebaseVerifier} from './auth.mjs';
 import {createGoogleAccessToken} from './google-access.mjs';
 
 const requestCap = 4 * Math.ceil(MAX_BYTES / 3) + 1024;
-const experimentProject = 'raytech-smart-ai-0831';
+const experimentProject = 'gen-lang-client-0593667072';
 const reply = (status, body) => Response.json(body, {status, headers:{
   'cache-control':'no-store', 'x-content-type-options':'nosniff',
 }});

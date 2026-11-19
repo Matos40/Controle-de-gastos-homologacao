@@ -5,7 +5,7 @@ import {createFirebaseVerifier} from './auth.mjs';
 import {createGoogleAccessToken} from './google-access.mjs';
 import {createRemoteWorker} from './worker.mjs';
 
-const project = 'raytech-smart-ai-0831';
+const project = 'gen-lang-client-0593667072';
 const forbiddenFetch = () => assert.fail('unexpected network request');
 
 test('remote worker rejects emulator bindings and other project IDs without network access', async () => {

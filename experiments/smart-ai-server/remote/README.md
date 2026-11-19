@@ -12,5 +12,6 @@ O teto em código é de 10 MiB de documento, com margem para o envelope JSON em 
 
 - Quatro testes locais de isolamento passaram em `node --test remote/worker.test.mjs`.
 - O Wrangler gerou o pacote de implantação em modo `--dry-run`, sem publicar.
-- A criação de um novo projeto Firebase atingiu a cota de projetos da conta. O projeto Gemini experimental preexistente apareceu como opção para adicionar Firebase Spark, mediante autorização.
+- A criação de um novo projeto atingiu a cota da conta. Com autorização, o Firebase Spark foi adicionado ao projeto experimental `gen-lang-client-0593667072`. O Firestore Standard `(default)` foi provisionado em `southamerica-east1`, com as regras iniciais que negam acesso direto de clientes. O método e-mail/senha foi configurado para contas sintéticas.
+- O painel Cloudflare aprovou o OAuth do Wrangler. O acesso ao cofre do Windows falhou com erro 5 e a sessão da CLI permanece pendente.
 - Testes remotos, latência, CPU, memória, subrequisições reais e conclusão sobre 10 MiB permanecem pendentes.
