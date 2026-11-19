@@ -5,6 +5,9 @@
 - Aprovação prática do proprietário registrada para a interface definitiva de `d276e2e02390deafaddbac182399bbae9874d8ac`, inclusive o login original. Essa revisão é a referência visual congelada para produção.
 - Evidência automatizada anterior: 178/178 no workflow `44426582854`, artefato `14484622434`. A aprovação visual não equivale à aprovação dos fluxos em um candidato oficial, que requerem registro próprio de testes sintéticos.
 - A autorização atual permite preparar e testar a compatibilidade. Publicação, merge na main oficial e alterações nas regras remotas permanecem sujeitos a autorização específica. Cotas e auditoria precisam funcionar pelo contrato de produção, sem usar coleções de homologação.
+- Testes automatizados de preparação: fluxo financeiro e administrativo em emuladores, T08 de bloqueio/desbloqueio, restauração JSON e Excel, regras atuais e proposta de cotas com auditoria atômica. Esses resultados usam dados sintéticos e são distintos da aprovação prática da interface em homologação.
+- Exceção de produção autorizada: preservar a captura, a prévia, a configuração de chave e o leitor Gemini existentes na V34.6.8. A preparação oficial mantém os componentes comuns congelados e exercita a integração do leitor com respostas simuladas. A autorização cobre preparação, não publicação.
+- O candidato oficial fica no repositório de produção em `release-candidate/v34.7.4.5-production`. A regra validada em emulador para persistir cotas e sua auditoria continua pendente de autorização remota. Preparação e validação do candidato não autorizam gravações ou migração de dados reais.
 
 ## Decisões aprovadas da V34.7.4.5
 
