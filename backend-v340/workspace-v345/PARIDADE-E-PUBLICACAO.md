@@ -1,5 +1,11 @@
 # Paridade e publicação do Raytech CG
 
+## Interface V34.7.4.5 congelada
+
+O proprietário aprovou definitivamente a interface de `d276e2e02390deafaddbac182399bbae9874d8ac`, incluindo a tela original de login. A evidência imutável é o workflow `44426582854`, artefato `14484622434`, SHA-256 `955d1f808edb7aec0a7e28af3293086af7532e6ea474819f5bc619d0b367151a`, Hosting `91b1e7870cc00e40`. Usar essa revisão e seus hashes nas comparações visuais, inclusive para o Smart Admin, o modal de duas colunas e o perfil por função.
+
+Compatibilidade técnica de produção deve preservar telas, componentes, cores, fontes, ícones, dimensões, espaçamentos e funcionalidades. Qualquer exceção exige autorização expressa antes da alteração. O leitor existente em produção, a Chave API e a identidade PWA fazem parte do inventário. IA centralizada é um ciclo posterior.
+
 Referência de produção para a V34.7.4.4: V34.6.8, commit `b880872fc48e5832eb7f9d299d342ef5bf5c376d`. O SHA-256 do HTML servido é `19d4d8b53defc9666f48645d9b0a0f63dd4bf0cdd759cd9a3863974d10fef591`. A referência de homologação é a V34.7.4.3, commit `fe16c8427ba9640cad58b6ad011278ebda32b012`.
 
 | Funcionalidade aprovada | Controle de regressão |

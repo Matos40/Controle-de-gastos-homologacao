@@ -1,5 +1,11 @@
 # Raytech CG — Plano de ação consolidado
 
+## Preparação oficial V34.7.4.5
+
+- Aprovação prática do proprietário registrada para a interface definitiva de `d276e2e02390deafaddbac182399bbae9874d8ac`, inclusive o login original. Essa revisão é a referência visual congelada para produção.
+- Evidência automatizada anterior: 178/178 no workflow `44426582854`, artefato `14484622434`. A aprovação visual não equivale à aprovação dos fluxos em um candidato oficial, que requerem registro próprio de testes sintéticos.
+- A autorização atual permite preparar e testar a compatibilidade. Publicação, merge na main oficial e alterações nas regras remotas permanecem sujeitos a autorização específica. Cotas e auditoria precisam funcionar pelo contrato de produção, sem usar coleções de homologação.
+
 ## Decisões aprovadas da V34.7.4.5
 
 - Cabeçalho com marca, logo, selo APP e versão. Perfil, menu suspenso e faixa técnica exclusivamente para Owner/Admin verificados. Free/Premium sem lacuna no cabeçalho e com identidade, plano e logout em Opções → Sincronização na nuvem. O login de teste mantém a identificação da homologação.
