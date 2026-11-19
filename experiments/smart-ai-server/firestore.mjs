@@ -29,9 +29,13 @@ const unpack = data => Object.fromEntries(Object.entries(data).map(([k,v])=>[k,d
 export function createEmulatorStore(signal, transport=fetch) {
   const db = 'projects/demo-raytech-v340/databases/(default)';
   const base = 'http://127.0.0.1:18080/v1/' + db + '/documents';
+  return createRestStore(db, base, async () => 'owner', signal, transport);
+}
+
+export function createRestStore(db, base, accessToken, signal, transport=fetch) {
   async function call(method, body, requestSignal=signal) {
     const r = await transport(base + ':' + method,{method:'POST',redirect:'manual',signal:requestSignal,
-      headers:{authorization:'Bearer owner','content-type':'application/json'},body:JSON.stringify(body)});
+      headers:{authorization:'Bearer ' + await accessToken(),'content-type':'application/json'},body:JSON.stringify(body)});
     if (!r.ok) throw Error('FIRESTORE_UNAVAILABLE');
     return r.json();
   }
