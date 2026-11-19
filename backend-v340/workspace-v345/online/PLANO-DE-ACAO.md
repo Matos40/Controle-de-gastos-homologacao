@@ -1,5 +1,24 @@
 # Raytech CG — Plano de ação consolidado
 
+## Estado atual · V34.7.4.5 Stable Edition
+
+**Ciclo encerrado.** O proprietário aprovou os sete testes práticos da Etapa 07. A referência oficial é o commit `121cca799aa7072094c668697249214b899e86d5`, preservado na branch `restore/v34-7-4-5-estavel`. O [documento mestre](../DOCUMENTO-MESTRE.md) reúne os identificadores e as evidências definitivas.
+
+| Etapa | Estado no encerramento |
+| --- | --- |
+| 01 · Consolidar a versão de homologação | Concluída |
+| 02 · Ativar a homologação online | Concluída |
+| 03 · Concluir Smart Admin | Concluída |
+| 04 · Validar o núcleo financeiro | Concluída |
+| 05 · Finalizar o escopo de Smart AI do ciclo | Concluída, preservando a Chave API e o leitor existente |
+| 06 · Atualização oficial | Concluída, workflow `44433045711` |
+| 07 · Stable Validation | Concluída, 7/7 testes práticos aprovados pelo proprietário |
+| 08 · Smart AI Server | Aberta, somente em planejamento |
+
+O fechamento registra 178 testes automatizados de referência e 329/329 arquivos oficiais verificados. Na Etapa 08, preservar o plano Spark, a Chave API e o leitor de faturas funcional até a aprovação definitiva da IA centralizada. Qualquer mudança de plano exige autorização expressa.
+
+ChatGPT é responsável pelo planejamento, pela arquitetura e pela interface visual. Codex é responsável pela implementação, pelos testes e pelas publicações autorizadas. A implementação de ciclos futuros começa exclusivamente em homologação.
+
 ## Diretriz permanente de execução
 
 A referência estável atual é **V34.7.4.5 Stable Edition**, branch `restore/v34-7-4-5-estavel`, commit de produção `121cca799aa7072094c668697249214b899e86d5`.
@@ -34,25 +53,29 @@ Consultar também o [documento mestre](../DOCUMENTO-MESTRE.md) e o [inventário 
 - Proteger os sete campos por linha e o modal compacto do Smart Admin, perfis Google, indicadores, filtros, auditoria, regras de plano, sincronização, PWA, backups, importação, exportação e isolamento dos bancos. Alterações ou remoções de itens aprovados exigem autorização expressa do proprietário, inclusive a separação do perfil por função.
 - Publicar o candidato verificado somente no Hosting de homologação. Para a atualização oficial, preparar a mesma revisão comum com os adaptadores de produção, backup, rollback e testes de autenticação, bancos, sincronização, Smart Admin e IA. Solicitar uma única autorização final depois da aprovação prática da homologação, antes da publicação oficial.
 
-Versão de trabalho: V34.7.4.1 Online Spark. Branch exclusiva: feature/v34-7-4-1-online-spark.
+## Histórico de execução das etapas 01 a 06
+
+Registros preservados da abertura do ciclo. Seus estados atuais constam na tabela de encerramento acima.
+
+Versão inicial de trabalho: V34.7.4.1 Online Spark. Branch exclusiva à época: feature/v34-7-4-1-online-spark.
 Referência visual oficial, somente leitura: Matos40/Controle-de-gastos-2.0@b880872fc48e5832eb7f9d299d342ef5bf5c376d. Preservar componentes e funcionalidades aprovados; novas funcionalidades não justificam regressão visual.
 
-## 01 — Consolidar a versão de homologação (em execução)
+### 01 — Consolidar a versão de homologação
 Corrigir a falha de estilos no workflow 44391590168 (seletor .v345-usage progress ausente após restauração do CSS oficial). Preservar layout compacto, filtros, proteção de administradores, monitor e cotas no modal, tratamento BUG-V3474-001. Executar regressões essenciais e preparar artefato estático Hosting. Conclusão exige workflow completo bem-sucedido e artefato correspondente ao HEAD. Não publicar nesta etapa.
 
-## 02 — Ativar homologação online (aguarda autorização)
+### 02 — Ativar homologação online
 Comparar regras remotas completas e inserir bloco exclusivo de homologação sem sobrescrever regras válidas; validar regras combinadas. Provisionar somente contas fictícias Owner, Admin, Premium e Free. Publicar exclusivamente Hosting no projeto raytech-cg-homologacao com Spark; conferir atualização PWA e isolamento. Nenhuma intervenção na produção.
 
-## 03 — Concluir Smart Admin
+### 03 — Concluir Smart Admin
 Retomar T08 (bloqueio e desbloqueio) online. T01–T07 tiveram aprovação prática local, alguns apenas de interface; T08-A evidência de tela bloqueada, T08-B interrompido pelo erro. Não repetir desnecessariamente testes anteriores; confirmar os fluxos afetados pela integração, proteção Owner/Admin, auditoria e ausência da regressão. Usar dados sintéticos.
 
-## 04 — Validar núcleo financeiro
+### 04 — Validar núcleo financeiro
 Sincronização PC/celular, offline/reconexão, isolamento de usuários e três bancos, preservação de lançamentos, JSON/Excel. Validar fluxos afetados, sem migrar bancos reais.
 
-## 05 — Finalizar Smart AI
+### 05 — Finalizar o escopo de Smart AI do ciclo
 Definir infraestrutura segura, leitor de faturas, autorização, cotas, monitor e controle de custos. IA online fica desativada enquanto backend seguro não estiver disponível no Spark. Não contratar serviços pagos nem relaxar regras. Recursos de IA simulados nos emuladores não equivalem a backend publicado.
 
-## 06 — Atualização oficial (autorização específica posterior)
+### 06 — Atualização oficial
 Backup, versão homologada, publicação e reversão, validação prática. Produção permanece intocada até aprovação explícita.
 
 ## Regras permanentes

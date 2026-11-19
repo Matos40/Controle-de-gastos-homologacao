@@ -1,5 +1,11 @@
 # Paridade e publicação do Raytech CG
 
+## Encerramento Stable Edition
+
+A V34.7.4.5 encerrou as Etapas 01 a 07 com **7/7 testes práticos aprovados pelo proprietário**, **178 testes automatizados de referência** e **329/329 arquivos oficiais verificados**. O artefato `14487086882` foi servido pelo workflow `44433045711`, com o ruleset oficial `56bab118-3b69-46b6-8b84-d04ec6be8a13`. O [documento mestre](DOCUMENTO-MESTRE.md) mantém as referências definitivas, e o [inventário de funcionalidades protegidas](INVENTARIO-FUNCIONALIDADES-PROTEGIDAS.md) reúne os controles a preservar.
+
+A Etapa 08 Smart AI Server começa somente em planejamento. Manter a Chave API e o leitor de faturas funcional até a aprovação definitiva da IA centralizada. Manter Spark até autorização expressa em contrário. ChatGPT responde pelo planejamento, pela arquitetura e pela interface visual. Codex responde pela implementação, pelos testes e pelas publicações autorizadas.
+
 ## Diretriz permanente de paridade
 
 A referência estável atual é **V34.7.4.5 Stable Edition**, branch `restore/v34-7-4-5-estavel`, commit de produção `121cca799aa7072094c668697249214b899e86d5`.
