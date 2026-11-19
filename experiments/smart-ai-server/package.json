@@ -1,0 +1,15 @@
+{
+  "name": "raytech-smart-ai-server-synthetic",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test worker.test.mjs legacy/policy.test.mjs legacy/invoice.test.mjs legacy/usage.test.mjs legacy/global-budget.test.mjs legacy/outcome.test.mjs legacy/usage-admin.test.mjs legacy/security-v347.test.mjs",
+    "dev": "wrangler dev --local",
+    "test:emulator": "node --test emulator.test.mjs"
+  },
+  "devDependencies": {
+    "firebase-admin": "14.5.1",
+    "firebase-functions": "7.4.0",
+    "wrangler": "4.165.0"
+  }
+}

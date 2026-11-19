@@ -1,0 +1,16 @@
+name = "raytech-ai-synthetic-poc"
+main = "worker.mjs"
+compatibility_date = "2026-06-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[dev]
+ip = "127.0.0.1"
+port = 8787
+
+[vars]
+GCLOUD_PROJECT = "demo-raytech-v340"
+FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:19099"
+FIRESTORE_EMULATOR_HOST = "127.0.0.1:18080"
+PROVIDER = "simulated"
