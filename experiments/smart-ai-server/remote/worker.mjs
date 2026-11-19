@@ -2,7 +2,7 @@ import {Buffer} from 'node:buffer';
 import {createRestStore} from '../firestore.mjs';
 import {geminiProvider} from '../gemini.mjs';
 import {authorizePremium, FEATURE} from '../legacy/policy.mjs';
-import {extractInvoice, MAX_BYTES} from '../legacy/invoice.mjs';
+import {extractInvoice, MAX_BYTES, validateInvoiceBytes} from '../legacy/invoice.mjs';
 import {createUsageStore, validRequestId} from '../legacy/usage.mjs';
 import {createOutcomeStore} from '../legacy/outcome.mjs';
 import {createFirebaseVerifier} from './auth.mjs';
@@ -10,6 +10,7 @@ import {createGoogleAccessToken} from './google-access.mjs';
 
 const requestCap = 4 * Math.ceil(MAX_BYTES / 3) + 1024;
 const experimentProject = 'gen-lang-client-0593667072';
+const binaryTypes = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/webp']);
 const reply = (status, body) => Response.json(body, {status, headers:{
   'cache-control':'no-store', 'x-content-type-options':'nosniff',
 }});
@@ -42,6 +43,38 @@ async function boundedJson(request, signal) {
   }
 }
 
+export async function boundedBinary(request, mimeType, signal) {
+  const declared = request.headers.get('content-length') ?? '';
+  if (!/^\d+$/.test(declared)) throw Error('INVALID_FILE');
+  const length = Number(declared);
+  if (!Number.isSafeInteger(length) || length < 1) throw Error('INVALID_FILE');
+  if (length > MAX_BYTES) throw Error('FILE_TOO_LARGE');
+  const reader = request.body?.getReader();
+  if (!reader) throw Error('INVALID_FILE');
+  const bytes = Buffer.allocUnsafe(length);
+  let offset = 0;
+  const cancel = () => { void reader.cancel().catch(() => {}); };
+  signal.addEventListener('abort', cancel, {once:true});
+  try {
+    while (offset < length) {
+      signal.throwIfAborted();
+      const {done, value} = await reader.read();
+      if (done || value.length > length-offset) throw Error('INVALID_FILE');
+      bytes.set(value, offset);
+      offset += value.length;
+    }
+    signal.throwIfAborted();
+    if (!(await reader.read()).done) throw Error('INVALID_FILE');
+    return {mimeType,bytes};
+  } catch (error) {
+    bytes.fill(0,0,offset);
+    throw error;
+  } finally {
+    signal.removeEventListener('abort', cancel);
+    await reader.cancel().catch(() => {});
+  }
+}
+
 export function createRemoteWorker(transport = fetch) {
   const verifyFirebase = createFirebaseVerifier(experimentProject);
   let googleAccessToken;
@@ -61,7 +94,9 @@ export function createRemoteWorker(transport = fetch) {
       'x-request-id':request.headers.get('x-request-id'),
     };
     if (!validRequestId(headers['x-request-id'])) return reply(400, {error:'INVALID_REQUEST_ID'});
-    if (!/^application\/json(?:;|$)/i.test(request.headers.get('content-type') ?? '')) {
+    const contentType = request.headers.get('content-type') ?? '';
+    const binary = binaryTypes.has(contentType);
+    if (!binary && !/^application\/json(?:;|$)/i.test(contentType)) {
       return reply(415, {error:'INVALID_FILE'});
     }
     const deadline = AbortSignal.any([AbortSignal.timeout(30000), request.signal]);
@@ -90,7 +125,11 @@ export function createRemoteWorker(transport = fetch) {
         {verifyToken, readPermissions});
       if (auth.status !== 200) return reply(auth.status, {error:'ACCESS_DENIED'});
       let body;
-      try { body = await boundedJson(request, deadline); }
+      try {
+        body = binary
+          ? await boundedBinary(request, contentType, deadline)
+          : await boundedJson(request, deadline);
+      }
       catch (error) {
         if (deadline.aborted) return reply(504, {error:'TIMEOUT'});
         return error.message === 'FILE_TOO_LARGE'
@@ -98,14 +137,19 @@ export function createRemoteWorker(transport = fetch) {
       }
       let providerMetrics;
       const provider = geminiProvider(env.RAYTECH_GEMINI_API_KEY, counted,
-        metrics => { providerMetrics = metrics; });
+        metrics => { providerMetrics = metrics; }, binary);
       const reserveUsage = createUsageStore(db, {
         budget:{day:30, month:60, perAttempt:1}, trackOutcomes:true, workspace:true,
       });
-      const result = await extractInvoice({method:'POST',headers,body},{
-        verifyToken, readPermissions, reserveUsage, finishOutcome:createOutcomeStore(db),
-        provider:file => provider({...file,signal:AbortSignal.any([file.signal, deadline])}),
-      }, {timeoutMs:27000});
+      let result;
+      try {
+        result = await extractInvoice({method:'POST',headers,body},{
+          verifyToken, readPermissions, reserveUsage, finishOutcome:createOutcomeStore(db),
+          provider:file => provider({...file,signal:AbortSignal.any([file.signal, deadline])}),
+        }, {timeoutMs:27000, decodeFile:binary ? file => validateInvoiceBytes(file.mimeType,file.bytes) : undefined});
+      } finally {
+        if(binary)body.bytes.fill(0);
+      }
       if (result.status === 200) {
         result.body.simulated = false;
         result.body.metrics = {...counts, ...providerMetrics, wallMs:Date.now() - start};

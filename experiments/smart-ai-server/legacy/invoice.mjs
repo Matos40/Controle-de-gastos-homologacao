@@ -18,8 +18,13 @@ export function decodeInvoice(body){
  if(!s.length||s.length%4||!/^[A-Za-z0-9+/]+={0,2}$/.test(s))throw Error('INVALID_FILE');
  const bytes=Buffer.from(s,'base64');
  if(bytes.length>MAX_BYTES)throw Error('FILE_TOO_LARGE');
- if(bytes.toString('base64')!==s||!formats[body.mimeType](bytes))throw Error('INVALID_FILE');
- return {mimeType:body.mimeType,bytes};
+ if(bytes.toString('base64')!==s)throw Error('INVALID_FILE');
+ return validateInvoiceBytes(body.mimeType,bytes);
+}
+export function validateInvoiceBytes(mimeType,bytes){
+ if(bytes.length>MAX_BYTES)throw Error('FILE_TOO_LARGE');
+ if(!Object.hasOwn(formats,mimeType)||!formats[mimeType](bytes))throw Error('INVALID_FILE');
+ return {mimeType,bytes};
 }
 const money=n=>typeof n==='number'&&Number.isFinite(n)&&n>0&&n<=10000000&&Math.abs(n*100-Math.round(n*100))<1e-5;
 const nullableMoney=n=>n===null||money(n);
@@ -33,14 +38,14 @@ export function validateResult(items){
   return Object.fromEntries(keys.map(k=>[k,row[k]]));
  });
 }
-export async function extractInvoice(req,deps,{timeoutMs=TIMEOUT_MS}={}){
+export async function extractInvoice(req,deps,{timeoutMs=TIMEOUT_MS,decodeFile=decodeInvoice}={}){
  // Project-specific guard is enforced by the actual HTTP function before any SDK use.
  let verifiedUid;
  const authorize=()=>authorizePremium({method:req.method,headers:req.headers,query:req.query,body:{feature:FEATURE}},{...deps,verifyToken:async token=>{const claims=await deps.verifyToken(token);if(verifiedUid!==undefined&&claims?.uid!==verifiedUid)throw Error('SESSION_CHANGED');verifiedUid=claims?.uid;return claims;}});
  const first=await authorize();
  if(first.status!==200)return fail(first.status,'ACCESS_DENIED');
  let file;
- try{file=decodeInvoice(req.body);}catch(e){return fail(e.message==='FILE_TOO_LARGE'?413:400,e.message==='FILE_TOO_LARGE'?'FILE_TOO_LARGE':'INVALID_FILE');}
+ try{file=decodeFile(req.body);}catch(e){return fail(e.message==='FILE_TOO_LARGE'?413:400,e.message==='FILE_TOO_LARGE'?'FILE_TOO_LARGE':'INVALID_FILE');}
  // The HTTP entrypoint always supplies reserveUsage; legacy pure unit fixtures do not.
  if(deps.reserveUsage){
   let reservation;
