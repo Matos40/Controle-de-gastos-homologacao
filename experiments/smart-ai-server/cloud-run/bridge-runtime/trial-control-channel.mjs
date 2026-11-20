@@ -1,4 +1,5 @@
 import {validRequestId} from '../../legacy/usage.mjs';
+import {createPushVerifier} from '../security-guard.mjs';
 
 export const TRIAL_COLLECTION='raytechLabTrialControlV350';
 export const TRIAL_PATH='/internal/smart-ai/trial-control';
@@ -34,6 +35,10 @@ export function authorizeTransition(before,next,{role,executionId,clock=Date.now
  if(role==='controller'){
   if(next.phase==='reconciling'&&!end.has(before.phase))
    return next.until===0&&only(before,next,['revision','phase','until']);
+  // Cleanup must remain possible after an expired absolute trial deadline.
+  if(before.phase==='reconciling'&&next.phase==='reversing'||
+     before.phase==='reversing'&&next.phase==='reversed')
+   return only(before,next,['revision','phase']);
   if(now>=before.absoluteDeadline)return false;
   if(before.phase==='identity-ready'&&next.phase==='identity-ready')
    return next.profilePrepared===true&&only(before,next,['revision','profilePrepared']);
@@ -42,9 +47,6 @@ export function authorizeTransition(before,next,{role,executionId,clock=Date.now
   if(before.phase==='finance-verified'&&next.phase==='authorized')
    return Number.isSafeInteger(next.until)&&now<next.until&&next.until<=before.absoluteDeadline&&
     only(before,next,['revision','phase','until']);
-  if(before.phase==='reconciling'&&next.phase==='reversing'||
-     before.phase==='reversing'&&next.phase==='reversed')
-   return only(before,next,['revision','phase']);
   return false;
  }
  if(role==='job'){
@@ -82,7 +84,7 @@ export function createFirestoreTrialControlStore(db,{runId}={}){
 // Must be mounted behind private Cloud Run IAM. verifyGoogle validates a signed
 // audience-bound ID token and returns the verified service account principal.
 export function createAuthenticatedTrialChannel({store,runId,requestId,absoluteDeadline,
-  controller,job,executionId,verifyGoogle,clock=Date.now}={}){
+  controller,job,executionId,verifyGoogle=createPushVerifier(),transport=fetch,clock=Date.now}={}){
  if(!id(runId)||!validRequestId(requestId)||!Number.isSafeInteger(absoluteDeadline)||
   !id(executionId)||!controller?.email||!controller?.subject||!job?.email||!job?.subject||
   typeof verifyGoogle!=='function')throw Error('INVALID_TRIAL_CHANNEL');
@@ -97,10 +99,9 @@ export function createAuthenticatedTrialChannel({store,runId,requestId,absoluteD
   const proof=request.headers.get('x-raytech-trial-proof')?.match(/^Bearer ([^\s,]{1,8192})$/)?.[1];
   if(!proof)return reject(401,'ACCESS_DENIED');
   try{
-   const principal=await verifyGoogle(proof,request.signal);
    const allowed=expected[role];
-   if(principal?.email!==allowed.email||principal?.subject!==allowed.subject||
-    principal?.audience!==allowed.audience)return reject(403,'ACCESS_DENIED');
+   await verifyGoogle(proof,{audience:allowed.audience,email:allowed.email,
+    subject:allowed.subject},transport,request.signal);
   }catch{return reject(401,'ACCESS_DENIED');}
   let command;
   try{
@@ -110,7 +111,8 @@ export function createAuthenticatedTrialChannel({store,runId,requestId,absoluteD
   }catch{return reject(400,'INVALID_REQUEST');}
   if(!command||typeof command!=='object'||Array.isArray(command)||!['read','cas'].includes(command.action))
    return reject(400,'INVALID_REQUEST');
-  if(clock()>=absoluteDeadline&&command.action==='cas'&&command.next?.phase!=='reconciling')
+  if(clock()>=absoluteDeadline&&command.action==='cas'&&
+     !end.has(command.next?.phase))
    return reject(409,'TRIAL_CLOSED');
   try{
    if(command.action==='read'){
