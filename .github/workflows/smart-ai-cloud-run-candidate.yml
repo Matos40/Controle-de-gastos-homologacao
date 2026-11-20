@@ -22,11 +22,14 @@ jobs:
           node-version: '22'
       - run: node --test experiments/smart-ai-server/cloud-run/commercial.test.mjs experiments/smart-ai-server/remote/worker.test.mjs experiments/smart-ai-server/legacy/invoice.test.mjs
       - name: Test synthetic Smart AI UX in desktop and mobile engines
+        timeout-minutes: 5
         run: |
-          npm install --no-save --package-lock=false --prefix "$RUNNER_TEMP/raytech-ux" playwright@1.56.1
-          "$RUNNER_TEMP/raytech-ux/node_modules/.bin/playwright" install --with-deps chromium webkit
-          PLAYWRIGHT_MODULE="$RUNNER_TEMP/raytech-ux/node_modules/playwright/index.mjs" \
-            node --test --test-timeout=45000 experiments/smart-ai-server/cloud-run/ux/smart-ai.browser.test.mjs
+          docker run --rm --ipc=host --volume "$GITHUB_WORKSPACE:/work:ro" --workdir /work \
+            mcr.microsoft.com/playwright:v1.56.1-noble bash -euc '
+              npm install --no-save --package-lock=false --prefix /tmp/raytech-ux playwright@1.56.1
+              export PLAYWRIGHT_MODULE=/tmp/raytech-ux/node_modules/playwright/index.mjs
+              node --test --test-timeout=45000 experiments/smart-ai-server/cloud-run/ux/smart-ai.browser.test.mjs
+            '
       - run: docker build -f experiments/smart-ai-server/cloud-run/Dockerfile -t smart-ai-candidate .
       - name: Verify disabled container without external network
         run: |
