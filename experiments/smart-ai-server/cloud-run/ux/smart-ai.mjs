@@ -58,11 +58,13 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch,n
     if(native){
      const cap=balance?.plan==='premium'?15:2;
      el('cap').textContent=balance?'de '+cap:'';
+     el('used').textContent=balance?'Utilizados: '+(cap-balance.remaining):'';
+     el('used').hidden=!balance;
      const meter=el('credit-progress');meter.hidden=!balance;
      if(balance){meter.max=cap;meter.value=balance.remaining;}
     }
     el('count').textContent=balance ? String(balance.remaining) : '—';
-    el('plan').textContent=balance ? 'Créditos '+(balance.plan==='free'?'Free':'Premium') : 'Créditos disponíveis';
+    el('plan').textContent=balance ? (native?'Plano ':'Créditos ')+(balance.plan==='free'?'Free':'Premium') : 'Créditos disponíveis';
     const operational=el('operational');
     operational.hidden=!balance?.operational;
     operational.textContent=busy?'Processando':balance?.operational==='suspended'?messages.FINANCE_SUSPENDED:
@@ -70,13 +72,25 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch,n
       balance?.operational==='unavailable'?unavailable:exhausted?'':
       balance?.busy?messages.ACTIVE_REQUEST:'Disponível';
     operational.hidden=!operational.textContent||(!balance?.operational&&!busy);
+    if(native){
+     if(!balance||refreshing){
+      operational.textContent=refreshing?'Verificando disponibilidade…':
+       status.textContent.includes('Sem conexão')?'Sem conexão':'Disponibilidade sem informação válida';
+      operational.hidden=false;operational.dataset.state='unknown';
+     }else{
+      const canRead=balance.operational==='available'&&!balance.busy&&!busy&&!exhausted;
+      operational.dataset.state=canRead?'available':'blocked';
+      if(!balance.operational&&!busy&&!exhausted){operational.hidden=false;operational.textContent='Disponibilidade sem informação válida';operational.dataset.state='unknown';}
+     }
+    }
     el('filename').textContent=selectedFile?.name??(native?'':'Escolher arquivo');
     const blocked=Boolean(balance?.operational&&balance.operational!=='available');
     const renewal=el('renewal');
     renewal.hidden=balance?.plan!=='premium';
     renewal.textContent=renewal.hidden?'':'Próxima renovação em '+balance.nextRenewalDate.split('-').reverse().join('/');
+    if(native&&balance?.plan==='free'){renewal.hidden=false;renewal.textContent='Vitalícios · sem renovação automática';}
     el('lock').hidden=!exhausted;
-    el('upgrade').hidden=balance?.plan!=='free'||typeof onUpgrade!=='function';
+    el('upgrade').hidden=balance?.plan!=='free'||typeof onUpgrade!=='function'||(native&&(!exhausted||blocked));
     input.disabled=busy||blocked||Boolean(exhausted)||(native&&(!balance||refreshing||balance.busy));
     el('send').disabled=busy||refreshing||blocked||!balance||exhausted||balance.busy||!selectedFile;
     if(!native)el('send').textContent=busy?'Processando…':'Ler fatura';

@@ -308,7 +308,7 @@ test('experimental PWA migrates only known obsolete caches and excludes invoices
  await page.evaluate(()=>navigator.serviceWorker.ready.then(()=>true));
  await page.waitForFunction(async()=>!(await caches.keys()).includes('raytech-smart-ai-0852-shell'));
  const result=await page.evaluate(async()=>{
-  const keys=await caches.keys(),cache=await caches.open('raytech-smart-ai-0853-shell');
+  const keys=await caches.keys(),cache=await caches.open('raytech-smart-ai-0854-shell');
   return {keys,paths:(await cache.keys()).map(request=>new URL(request.url).pathname)};
  });
  assert.ok(result.keys.includes('foreign-cache'));
@@ -353,4 +353,93 @@ test('server-only Premium exhaustion preserves renewal and the neutral finance i
  await unified.press('Enter');
  await page.getByRole('button',{name:/Perfil fictício premium/}).waitFor();
  if(process.env.RAYTECH_SCREENSHOTS)await budget.screenshot({path:join(process.env.RAYTECH_SCREENSHOTS,'server-only-orcamento-neutro.png')});
+});
+
+test('credit scenarios bind the commercial plan on the server and render six exact balances',async t=>{
+ const lab=await startLab(),browser=await chromium.launch();
+ t.after(async()=>{await browser.close();await lab.close();});
+ const cases=[['free-full','free',2,2],['free-1','free',1,2],['free-0','free',0,2],['premium-full','premium',15,15],
+  ['premium-partial','premium',2,15],['premium-0','premium',0,15]];
+ const page=await browser.newPage();
+ for(const [scenario,plan,remaining,cap] of cases){
+  const wrong=plan==='free'?'premium':'free',headers={origin:lab.origin};
+  const auth=await page.request.post(lab.origin+'/lab/session',{headers,data:{action:'login',profile:wrong,scenario}});
+  const session=await auth.json();
+  assert.equal(session.profile,plan);
+  const res=await page.request.get(lab.origin+'/v1/credits',{headers:{authorization:'Bearer '+session.token}});
+  const actual=await res.json();
+  assert.equal(actual.plan,plan);assert.equal(actual.remaining,remaining);
+  if(plan==='premium')assert.match(actual.nextRenewalDate,/^\d{4}-\d{2}-01$/);
+  else assert.equal(actual.nextRenewalDate,null);
+  if(remaining===0){
+   const denied=await page.request.post(lab.origin+'/v1/invoices',{headers:{authorization:'Bearer '+session.token,
+    'x-request-id':'00000000-0000-4000-8000-000000000092'},
+    data:{feature:'invoice-ai',mimeType:file.mimeType,data:file.buffer.toString('base64')}});
+   assert.equal(denied.status(),429);
+  }
+  await page.goto(lab.origin+'/app/?utm_source=codex');
+  await page.getByLabel('Perfil experimental').selectOption(wrong);
+  await page.getByLabel('Cenário experimental').selectOption(scenario);
+  assert.equal(await page.getByLabel('Perfil experimental').inputValue(),plan);
+  assert.equal(await page.getByLabel('Perfil experimental').isDisabled(),true);
+  await page.getByRole('button',{name:'Entrar com Google'}).click();
+  await page.locator('#smartAccountApp').waitFor();
+  await page.locator('#headerToolsToggleBtn').click();
+  await page.locator('#premiumInvoiceButton').click();
+  const modal=page.locator('#ocrModal');
+  await modal.getByText('Plano '+(plan==='free'?'Free':'Premium'),{exact:true}).waitFor();
+  assert.equal(await modal.locator('[data-count]').textContent(),String(remaining));
+  assert.equal(await modal.locator('[data-cap]').textContent(),'de '+cap);
+  assert.equal(await modal.locator('[data-used]').textContent(),'Utilizados: '+(cap-remaining));
+  const bar=await modal.locator('[data-credit-progress]').evaluate(el=>({value:el.value,max:el.max,height:getComputedStyle(el).height}));
+  assert.deepEqual(bar,{value:remaining,max:cap,height:'6px'});
+  await page.waitForFunction(()=>!document.querySelector('#ocrModal [data-refresh]').disabled);
+  assert.equal(await modal.locator('[data-file]').isDisabled(),remaining===0);
+  assert.match(await modal.locator('[data-renewal]').textContent(),plan==='premium'?/Próxima renovação em 01\//:/Vitalícios/);
+  if(process.env.RAYTECH_SCREENSHOTS)await modal.screenshot({path:join(process.env.RAYTECH_SCREENSHOTS,'creditos-'+scenario+'.png')});
+  await page.keyboard.press('Escape');
+  await page.locator('#headerToolsToggleBtn').click();
+  await page.locator('#productionCloudLogout').click();
+  await page.getByLabel('Cenário experimental').waitFor();
+ }
+ assert.equal((await page.request.get(lab.origin+'/app?utm_source=codex')).status(),200);
+ assert.equal((await page.request.get(lab.origin+'/v1/credits?utm_source=codex')).status(),404);
+});
+
+test('compact monitor shows four responsive cards and separates unavailable, zero and simulated consumption',async t=>{
+ const lab=await startLab(),browser=await chromium.launch();
+ t.after(async()=>{await browser.close();await lab.close();});
+ for(const [scenario,columns,label] of [['',2,'indisponivel'],['cost-0',2,'zero'],['cost-75',2,'75'],
+  ['cost-125',2,'125'],['cost-75',1,'mobile']]){
+  const page=await browser.newPage(columns===1?devices['Pixel 7']:{viewport:{width:1280,height:900}});
+  await page.goto(lab.origin+'/app/');
+  await page.getByLabel('Perfil experimental').selectOption('owner');
+  await page.getByLabel('Cenário experimental').selectOption(scenario);
+  await page.getByRole('button',{name:'Entrar com Google'}).click();
+  await page.locator('.v345-account summary').click();
+  await page.locator('#smartAdminOpen').click();
+  await page.getByText('Smart AI Monitor',{exact:true}).click();
+  const grid=page.locator('.raytech-ai-monitor-grid');await grid.waitFor();
+  assert.equal(await grid.locator(':scope > *').count(),4);
+  assert.equal(await grid.evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),columns);
+  assert.equal(await page.getByText('Consumo e orçamento indisponíveis.',{exact:true}).count(),0);
+  const observed=await grid.locator('[data-finance-observed]').textContent();
+  if(!scenario)assert.match(observed,/Aguardando/);
+  else if(scenario==='cost-0')assert.match(observed,/R\$\s0,00.*0%/);
+  else assert.match(observed,scenario==='cost-75'?/75%/:/125%/);
+  await grid.getByLabel('Valor estimado por tentativa em reais').fill('0.5');
+  assert.match(await grid.locator('[data-estimate]').textContent(),/Diária: R\$\s15,00.*Mensal: R\$\s30,00/);
+  assert.equal(await grid.getByLabel('Limite diário (UTC)').evaluate(el=>getComputedStyle(el).borderRadius),'8px');
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  if(process.env.RAYTECH_SCREENSHOTS)await grid.screenshot({path:join(process.env.RAYTECH_SCREENSHOTS,'monitor-'+label+'.png')});
+  await page.close();
+ }
+ const page=await browser.newPage();
+ await page.goto(lab.origin+'/app/');
+ await page.getByLabel('Cenário experimental').selectOption('cloud-attention');
+ await page.getByRole('button',{name:'Entrar com Google'}).click();
+ await page.locator('#headerToolsToggleBtn').click();
+ await page.getByText('Atenção · simulação',{exact:true}).waitFor();
+ if(process.env.RAYTECH_SCREENSHOTS)await page.locator('#productionCloudPanel').screenshot({path:join(process.env.RAYTECH_SCREENSHOTS,'nuvem-atencao.png')});
+ await page.close();
 });

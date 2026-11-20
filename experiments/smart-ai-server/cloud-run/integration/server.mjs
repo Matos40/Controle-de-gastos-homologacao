@@ -3,10 +3,11 @@ import {readFile} from 'node:fs/promises';
 import {Readable} from 'node:stream';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {fullAppAsset} from './full-app-assets.mjs';
+import {creditScenarios} from './credit-scenarios.mjs';
 import {createLab} from './lab.mjs';
 
 const assets=new Map(Object.entries({
- '/':'integration/index.html','/integration/native-invoice.mjs':'integration/native-invoice.mjs','/integration/review-store.mjs':'integration/review-store.mjs','/integration/full-app-ui.mjs':'integration/full-app-ui.mjs',
+ '/':'integration/index.html','/integration/credit-scenarios.mjs':'integration/credit-scenarios.mjs','/integration/native-invoice.mjs':'integration/native-invoice.mjs','/integration/review-store.mjs':'integration/review-store.mjs','/integration/full-app-ui.mjs':'integration/full-app-ui.mjs',
  '/integration/full-app-scripts.mjs':'integration/full-app-scripts.mjs','/integration/lab.css':'integration/lab.css',
  '/integration/lab-ui.mjs':'integration/lab-ui.mjs','/integration/mount.mjs':'integration/mount.mjs',
  '/integration/review.mjs':'integration/review.mjs','/ux/smart-ai.css':'ux/smart-ai.css',
@@ -18,7 +19,7 @@ export async function startLab({port=0,recovery=false,mode='reconciled',observed
  if(!['reconciled','divergent','incomplete','duplicates','failed','unavailable','suspended'].includes(mode))throw Error('INVALID_MODE');
  let origin,lab;
  const tokenLabs=new Map(),scenarios=new Map();
- const scenarioOptions={ 'free-1':{usedFree:1},'free-0':{usedFree:2},'premium-partial':{usedPremium:7},'premium-0':{usedPremium:15},
+ const scenarioOptions={...creditScenarios,'cloud-attention':{},
   unavailable:{mode:'unavailable'},administrative:{mode:'administrative'},suspended:{mode:'suspended',observedCents:750},
   'cost-0':{observedCents:0},'cost-15':{observedCents:150},'cost-25':{observedCents:250},
   'cost-50':{observedCents:500},'cost-75':{observedCents:750},'cost-100':{observedCents:1000},'cost-125':{observedCents:1250}};
@@ -43,6 +44,9 @@ export async function startLab({port=0,recovery=false,mode='reconciled',observed
     if(!recovery)return send(404,{error:'NOT_FOUND'});
     const data=await readFile(new URL('./recovery-invoice.mjs',import.meta.url));
     res.writeHead(200,{'content-type':'text/javascript'});return res.end(data);
+   }
+   if(req.method==='GET'&&new URL(req.url,origin).pathname==='/app'){
+    res.writeHead(302,{location:'/app/'+new URL(req.url,origin).search});return res.end();
    }
    if(req.method==='GET'&&req.url.startsWith('/app/')){
     const path=new URL(req.url,origin).pathname;
@@ -84,13 +88,14 @@ export async function startLab({port=0,recovery=false,mode='reconciled',observed
     const old=headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1];
     const active=action==='login'?await scenarioLab(scenario):tokenLabs.get(old)??lab;
     if(action==='logout'){active.logout(old);tokenLabs.delete(old);return send(200,{});}
-    const token=action==='login'?active.login(profile):action==='reauthenticate'&&old?active.login('owner',old):null;
+    const effectiveProfile=Object.hasOwn(creditScenarios,scenario)?creditScenarios[scenario].profile:profile;
+    const token=action==='login'?active.login(effectiveProfile):action==='reauthenticate'&&old?active.login('owner',old):null;
     if(token){
      if(old)tokenLabs.delete(old);
      if(tokenLabs.size>=1000)tokenLabs.delete(tokenLabs.keys().next().value);
      tokenLabs.set(token,active);
     }
-    return token?send(200,{token}):send(401,{error:'ACCESS_DENIED'});
+    return token?send(200,{token,...(action==='login'?{profile:effectiveProfile}:{})}):send(401,{error:'ACCESS_DENIED'});
    }
    const bearer=headers.get('authorization')?.slice(7);
    const result=await (tokenLabs.get(bearer)??lab).bridge(request);

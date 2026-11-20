@@ -62,6 +62,25 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch,
   </section>`;
  const el=name=>root.querySelector('[data-'+name+']');
  const status=el('status'),config=el('config'),search=el('search');
+ const compact=embedded&&neutralBudget;
+ let serviceControls;
+ if(compact){
+  const finance=el('finance').closest('article'),reactivate=el('reactivate'),alerts=el('alerts').closest('details');
+  const grid=document.createElement('div');grid.className='raytech-ai-monitor-grid';
+  finance.before(grid);
+  config.id='smart-ai-monitor-config';
+  const enabled=config.elements.enabled,enabledLabel=enabled.closest('label'),emergency=el('emergency');
+  enabled.setAttribute('form',config.id);
+  serviceControls=document.createElement('div');serviceControls.dataset.serviceControls='';
+  serviceControls.append(enabledLabel,emergency,reactivate,el('security'));
+  const estimateCard=document.createElement('article'),service=document.createElement('article');
+  estimateCard.append(el('cost').closest('label').previousElementSibling,el('cost').closest('label'),el('estimate'));
+  const limitsTitle=document.createElement('h2');limitsTitle.textContent='Limites operacionais';config.prepend(limitsTitle);
+  const serviceTitle=document.createElement('h2');serviceTitle.textContent='Controle do serviço';
+  service.append(serviceTitle,el('admission'),serviceControls);
+  grid.append(finance,config,estimateCard,service);
+  grid.after(alerts,el('audit-events'),el('audit'));
+ }
  let overview,busy=false;
  const unavailable='Os controles do Smart Admin AI estão indisponíveis.';
  async function request(action,parameters={},critical=false){
@@ -99,6 +118,14 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch,
  }
  function estimate(){
   const input=el('cost'),price=input.valueAsNumber;
+  if(compact){
+   const limits=overview?.settings?.budget;
+   el('estimate').textContent=limits&&input.value!==''&&Number.isFinite(price)&&price>=0?
+    'Diária: '+currency.format(price*limits.day)+' · Mensal: '+currency.format(price*limits.month)+
+    ' · Estimativa pelos limites configurados. Sem dados de faturamento real.':
+    'Diária: — · Mensal: —. Informe o valor por tentativa. A estimativa não representa faturamento real.';
+   return;
+  }
   el('estimate').textContent=overview&&input.value!==''&&Number.isFinite(price)&&price>=0?
    'Simulação mensal: '+currency.format(price*(overview.month.free.reserved+overview.month.premium.reserved))+
    ' · Valor informado × tentativas registradas. Sem dados de faturamento real.':
@@ -156,6 +183,7 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch,
    'Autorização no servidor · Autenticação recente de até cinco minutos para alterações.':'';
   el('reactivate').hidden=!(finance?.suspended&&overview.role==='owner');
   config.hidden=overview.role!=='owner';
+  if(serviceControls)serviceControls.hidden=overview.role!=='owner';
   config.elements.enabled.checked=settings.enabled;el('emergency').disabled=!settings.enabled;
   config.elements.day.value=settings.budget.day;
   config.elements.month.value=settings.budget.month;

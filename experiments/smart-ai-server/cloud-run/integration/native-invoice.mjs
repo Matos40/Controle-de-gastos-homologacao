@@ -14,14 +14,18 @@ export function bindNativeInvoice({modal,getIdToken,readCategories,confirm}){
  topClose.setAttribute('aria-label','Fechar leitura de fatura');
  const chooser=document.createElement('div');
  chooser.className='native-ai-modes';
- chooser.innerHTML='<strong>Smart AI</strong><p>Leitura integrada ao Raytech CG. Nenhuma configuração pessoal é necessária.</p>';
- content.before(chooser);
+
  const details=document.createElement('div');
  details.className='native-ai-details';
- details.innerHTML=`<div class="native-ai-summary" aria-live="polite">
- <span data-plan>Créditos disponíveis</span> <strong data-count>—</strong> <span data-cap></span><progress data-credit-progress aria-label="Créditos restantes" hidden></progress>
- <p data-renewal hidden></p><p data-operational hidden></p><p data-lock hidden>Créditos esgotados</p></div>
- <button type="button" data-refresh>Atualizar saldo</button><button type="button" data-upgrade hidden>Conhecer o Premium</button>`;
+ details.innerHTML=`<div class="native-ai-card-heading"><span class="native-ai-icon"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span>
+ <div><strong>Smart AI</strong><p>Inteligência artificial integrada ao Raytech CG.</p></div><span data-plan>Plano</span></div>
+ <div class="native-ai-summary" aria-live="polite"><span>Créditos disponíveis</span>
+ <div class="native-ai-credit-value"><strong data-count>—</strong> <span data-cap></span></div>
+ <progress data-credit-progress aria-label="Créditos restantes" hidden></progress>
+ <div class="native-ai-credit-meta"><span data-used></span><span data-renewal hidden></span></div>
+ <p data-operational></p><p data-lock hidden>Créditos esgotados</p></div>
+ <div class="native-ai-actions"><button type="button" data-refresh>Atualizar saldo</button><button type="button" data-upgrade hidden>Conhecer o Premium</button></div>`;
+ details.prepend(chooser);
  content.prepend(details);
  const result=document.createElement('div');
  result.innerHTML='<p data-filename class="text-xs text-slate-400"></p><p data-status role="status" class="text-sm text-slate-200"></p><button type="button" data-review hidden>Revisar lançamentos</button><div data-review-panel></div>';

@@ -1,3 +1,4 @@
+import {creditScenarios} from './credit-scenarios.mjs';
 import {bindNativeInvoice} from './native-invoice.mjs';
 import {mountSmartAdminAI} from '../ux/smart-admin-ai.mjs';
 import {mountAdmin} from '/app/js/productionV2/smartAdminView.mjs';
@@ -16,12 +17,17 @@ indicator.textContent='Ambiente isolado · use somente dados fictícios';
 role.before(indicator);
 const scenario=document.createElement('select');
 scenario.setAttribute('aria-label','Cenário experimental');
-for(const [value,label] of [['','Padrão · créditos completos, faturamento indisponível'],['free-1','Free com 1 crédito'],['free-0','Free sem créditos'],
- ['premium-partial','Premium parcialmente utilizado'],['premium-0','Premium sem créditos'],['unavailable','Serviço indisponível'],
+for(const [value,label] of [['','Padrão · créditos completos, faturamento indisponível'],...Object.entries(creditScenarios).map(([key,value])=>[key,value.label]),
+ ['cloud-attention','Sincronização · Atenção'],['unavailable','Serviço indisponível'],
  ['administrative','Suspensão administrativa'],['suspended','Suspensão financeira e reativação'],
  ['cost-0','Faturamento observado: zero'],['cost-15','Consumo 15%'],['cost-25','Consumo 25%'],['cost-50','Consumo 50%'],
  ['cost-75','Consumo 75%'],['cost-100','Consumo 100%'],['cost-125','Consumo 125%']])scenario.add(new Option(label,value));
 role.after(scenario);
+scenario.onchange=()=>{
+ const fixture=Object.hasOwn(creditScenarios,scenario.value)?creditScenarios[scenario.value]:null;
+ if(fixture)role.value=fixture.profile;
+ role.disabled=Boolean(fixture);
+};
 const storage=new Map();
 globalThis.raytechStorage={getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,String(value)),removeItem:key=>storage.delete(key)};
 let token,invoiceView,cleanupAdmin;
@@ -53,8 +59,9 @@ async function signIn(){
  try{await load;}catch{loginView.paint({phase:'workspace-blocked',message:'Não foi possível abrir a cópia experimental.'});}
 }
 async function activate(){
- const profile=role.value;
- ({token}=await request('login',{profile,scenario:scenario.value}));
+ const session=await request('login',{profile:role.value,scenario:scenario.value});
+ const profile=session.profile;
+ token=session.token;
  const privilege=await fetch('/v1/admin/ai',{method:'POST',cache:'no-store',
   headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:'{"action":"overview"}'});
  const adminRole=privilege.ok?(await privilege.json()).role:null;
@@ -82,7 +89,7 @@ async function activate(){
   const glyph=({Sincronizado:'synced',Sincronizando:'syncing',Offline:'offline',Desconectado:'disconnected','Atenção':'attention'})[state];
   for(const icon of get('productionCloudHeader').querySelectorAll('[data-cloud-glyph]'))icon.style.display=icon.dataset.cloudGlyph===glyph?'':'none';
  };
- renderCloud(navigator.onLine?'Desconectado':'Offline');
+ renderCloud(navigator.onLine?(scenario.value==='cloud-attention'?'Atenção':'Desconectado'):'Offline');
  const sync=get('productionCloudSyncNow');
  sync.hidden=false;sync.disabled=false;sync.onclick=()=>{
   if(!navigator.onLine){renderCloud('Offline');return;}
@@ -109,6 +116,9 @@ async function activate(){
    if(monitor&&!monitor.querySelector('[data-smart-admin-ai]')){
     const slot=document.createElement('section');slot.dataset.smartAdminAi='';
     monitor.querySelector('summary').after(slot);
+    if(!get('apiKeyModal'))for(const paragraph of monitor.querySelectorAll('p')){
+     if(paragraph.textContent==='Consumo e orçamento indisponíveis.')paragraph.remove();
+    }
     mountSmartAdminAI(slot,{getIdToken,reauthenticate,embedded:true,neutralBudget:!get('apiKeyModal'),
      unifiedSearch:get('apiKeyModal')?null:adminHost.querySelector('.admin-tools input')});
    }

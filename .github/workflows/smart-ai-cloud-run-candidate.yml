@@ -82,9 +82,9 @@ jobs:
           cp -r "$RUNNER_TEMP/raytech-app-vendor" "$RUNNER_TEMP/raytech-app/vendor"
           runtime="$RUNNER_TEMP/raytech-app/experiments/smart-ai-server/cloud-run/integration"
           rm "$runtime/recovery-invoice.mjs" "$runtime/mount.mjs" "$runtime/lab-ui.mjs" "$runtime/index.html" "$runtime/workspace.mjs"
-          (cd "$RUNNER_TEMP/raytech-app" && zip -qr "$GITHUB_WORKSPACE/raytech-smart-ai-0853.zip" .)
+          (cd "$RUNNER_TEMP/raytech-app" && zip -qr "$GITHUB_WORKSPACE/raytech-smart-ai-0854.zip" .)
       - uses: actions/upload-artifact@v4
         with:
-          name: raytech-smart-ai-0853-${{ github.sha }}
-          path: raytech-smart-ai-0853.zip
+          name: raytech-smart-ai-0854-${{ github.sha }}
+          path: raytech-smart-ai-0854.zip
           if-no-files-found: error
