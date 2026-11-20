@@ -403,3 +403,24 @@ test('metric recovery refunds once and corrupt metrics fail closed without quota
  assert.equal((await store.reserveUsage({uid:'v',requestId:id(521)})).status,503);
  assert.deepEqual(docs,before);
 });
+
+test('simulated bridge deadline and disconnect preserve the original reservation through settlement',async()=>{
+ const {createExtractionReconciliation}=await import('./integration/private-diagnostic.mjs');
+ const {db,docs}=mockDb(),store=createCommercialStore(db,{clock:()=>t});
+ const requestId=id(877),other=id(878),operation={uid:'u',requestId};
+ const disconnected=new AbortController();
+ const reservation=await store.reserveUsage(operation);
+ assert.equal(reservation.status,200);
+ const reconciler=createExtractionReconciliation(requestId);
+ const lookup=async key=>docs.get('raytechLabCommercialV350/u/attempts/'+key)?.status;
+ disconnected.abort(new DOMException('Client disconnected','AbortError'));
+ assert.equal(disconnected.signal.aborted,true);
+ assert.equal((await reconciler.check(requestId,lookup)).outcome,'pending');
+ assert.equal((await store.reserveUsage({uid:'u',requestId:other})).error,'ACTIVE_REQUEST');
+ assert.equal((await store.reserveUsage(operation)).error,'DUPLICATE_REQUEST');
+ await store.finishOutcome({...operation,status:'completed'});
+ assert.equal((await reconciler.check(requestId,lookup)).outcome,'completed');
+ assert.equal((await store.readCredits('u')).remaining,1);
+ assert.equal((await store.reserveUsage(operation)).error,'DUPLICATE_REQUEST');
+ assert.equal(await lookup(other),undefined);
+});
