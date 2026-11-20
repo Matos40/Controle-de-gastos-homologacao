@@ -57,7 +57,9 @@ export function geminiProvider(secret,transport=fetch,observe=()=>{},stream=fals
       totalTokens:data.usageMetadata?.totalTokenCount,thinkingTokens:data.usageMetadata?.thoughtsTokenCount});
     const candidate=data.candidates?.[0];
     if(candidate?.finishReason!=='STOP')throw Error('INVALID_PROVIDER_RESPONSE');
-    const items=JSON.parse(candidate.content.parts.filter(p=>!p.thought).map(p=>p.text??'').join(''));
+    let items;
+    try{items=JSON.parse(candidate.content.parts.filter(p=>!p.thought).map(p=>p.text??'').join(''));}
+    catch(error){if(contract)throw Error('INVALID_PROVIDER_RESPONSE',{cause:error});throw error;}
     if(contract){
       if(!items||typeof items!=='object'||Array.isArray(items))throw Error('INVALID_PROVIDER_RESPONSE');
       return items;

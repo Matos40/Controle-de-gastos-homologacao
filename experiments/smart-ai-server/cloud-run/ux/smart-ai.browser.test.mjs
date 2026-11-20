@@ -19,7 +19,10 @@ const html=`<!doctype html><html lang="pt-BR"><meta charset="utf-8">
  }else mountSmartAI(root,{
   getIdToken:async()=>location.search==='?premium'?'fixture-premium':'fixture-free',
   onUpgrade:()=>document.body.dataset.upgrade='yes',
-  onReview:value=>document.body.dataset.review=String(value.items.length),
+  onReview:value=>{
+   document.body.dataset.review=String(value.items.length);
+   if(value.reconciliation)document.body.dataset.reconciliation=value.reconciliation.status;
+  },
  });
  </script></html>`;
 
@@ -72,7 +75,7 @@ async function lab(){
   if(state.mode==='rate')return send(429,{error:'RATE_LIMIT'});
   if(state.mode==='unknown')return send(503,{error:'OUTCOME_UNAVAILABLE'});
   state.remaining--;
-  return send(200,{items:[{}],requiresReview:true});
+  return send(200,{items:[{}],requiresReview:true,...(state.reconciliation?{reconciliation:state.reconciliation}:{})});
  });
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  return {state,url:'http://127.0.0.1:'+server.address().port,
@@ -96,6 +99,7 @@ test('desktop Chromium: lock, Premium action, double-submit guard, refresh and r
   await page.getByRole('button',{name:'Conhecer o Premium'}).click();
   assert.equal(await page.locator('body').getAttribute('data-upgrade'),'yes');
   await select(page);state.mode='hold';
+  state.reconciliation={status:'DIVERGENT',statementTotalCents:3855,calculatedTotalCents:3955,warnings:['POSSIBLE_DUPLICATES']};
   await page.locator('[data-form]').evaluate(form=>{
    form.dispatchEvent(new SubmitEvent('submit',{cancelable:true}));
    form.dispatchEvent(new SubmitEvent('submit',{cancelable:true}));
@@ -107,8 +111,11 @@ test('desktop Chromium: lock, Premium action, double-submit guard, refresh and r
   state.release();state.mode='success';
   await waitText(page,'[data-count]','1');
   assert.equal(state.requests,1);
+  const reviewText=await page.locator('[data-status]').textContent();
+  assert.match(reviewText,/Total informado.*38,55.*Total calculado.*39,55.*possíveis duplicidades/);
   await page.getByRole('button',{name:'Revisar lançamentos'}).click();
   assert.equal(await page.locator('body').getAttribute('data-review'),'1');
+  assert.equal(await page.locator('body').getAttribute('data-reconciliation'),'DIVERGENT');
   await select(page);await page.getByRole('button',{name:'Ler fatura'}).click();
   await waitText(page,'[data-count]','0');
   assert.equal(await page.getByText('Créditos esgotados').isVisible(),true);

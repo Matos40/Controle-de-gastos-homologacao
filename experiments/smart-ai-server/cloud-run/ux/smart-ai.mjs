@@ -120,7 +120,15 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch})
         const reconciliation=data.reconciliation;
         const reviewMessages={DIVERGENT:'O total da fatura diverge da soma calculada. Revise os valores.',
           INCOMPLETE:'Faltam dados para reconciliar o total. Revise a fatura.'};
+        const money=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+        let totals='';
+        if(reconciliation?.status==='DIVERGENT'&&Number.isSafeInteger(reconciliation.statementTotalCents)&&
+           Number.isSafeInteger(reconciliation.calculatedTotalCents)){
+          totals=' Total informado '+money.format(reconciliation.statementTotalCents/100)+
+            ' · Total calculado '+money.format(reconciliation.calculatedTotalCents/100)+'.';
+        }
         status.textContent=(reviewMessages[reconciliation?.status]??'Leitura concluída. Confira os lançamentos antes de adicioná-los.')+
+          totals+
           (reconciliation?.warnings?.includes('POSSIBLE_DUPLICATES')?' Há possíveis duplicidades.':'');
       }
     }catch(error){status.textContent=messages[error.message]??unavailable;}
