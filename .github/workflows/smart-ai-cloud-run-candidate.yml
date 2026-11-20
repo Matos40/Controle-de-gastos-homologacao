@@ -46,3 +46,15 @@ jobs:
           done
           docker logs "$container"
           exit 1
+      - name: Export the tested container for isolated delivery
+        run: |
+          docker save smart-ai-candidate | gzip -n > smart-ai-candidate.tar.gz
+          sha256sum smart-ai-candidate.tar.gz > smart-ai-candidate.tar.gz.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smart-ai-candidate-${{ github.sha }}
+          path: |
+            smart-ai-candidate.tar.gz
+            smart-ai-candidate.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 3
