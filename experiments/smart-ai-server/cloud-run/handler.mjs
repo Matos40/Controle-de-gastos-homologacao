@@ -31,10 +31,10 @@ export async function readCreditBalance(request,{verifyToken,readCredits}) {
   try {
     const balance=await readCredits(uid);
     if(!balance)return reply(403,{error:'ACCESS_DENIED'});
-    const {plan,remaining,busy,month}=balance;
+    const {plan,remaining,busy,month,operational}=balance;
     const [year,number]=month.split('-').map(Number);
     const renewal=new Date(Date.UTC(year,number,1)).toISOString().slice(0,10);
-    return reply(200,{plan,remaining,busy,nextRenewalDate:plan==='premium'?renewal:null});
+    return reply(200,{plan,remaining,busy,nextRenewalDate:plan==='premium'?renewal:null,...(operational?{operational}:{})});
   } catch { return reply(503,{error:'USAGE_UNAVAILABLE'}); }
 }
 

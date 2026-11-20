@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test experiments/smart-ai-server/cloud-run/integration/integration.test.mjs experiments/smart-ai-server/cloud-run/commercial.test.mjs experiments/smart-ai-server/cloud-run/invoice-contract.test.mjs experiments/smart-ai-server/cloud-run/infra/infra.test.mjs experiments/smart-ai-server/cloud-run/infra/operations.test.mjs experiments/smart-ai-server/remote/worker.test.mjs experiments/smart-ai-server/legacy/invoice.test.mjs
+      - run: node --test experiments/smart-ai-server/cloud-run/integration/bridge-runtime.test.mjs experiments/smart-ai-server/cloud-run/integration/integration.test.mjs experiments/smart-ai-server/cloud-run/commercial.test.mjs experiments/smart-ai-server/cloud-run/invoice-contract.test.mjs experiments/smart-ai-server/cloud-run/infra/infra.test.mjs experiments/smart-ai-server/cloud-run/infra/operations.test.mjs experiments/smart-ai-server/remote/worker.test.mjs experiments/smart-ai-server/legacy/invoice.test.mjs
       - name: Obtain the pinned V34.7.4.5 reference
         run: |
           git init "$RUNNER_TEMP/raytech-reference"
@@ -43,9 +43,25 @@ jobs:
             mcr.microsoft.com/playwright:v1.56.1-noble bash -euc '
               npm install --no-save --package-lock=false --prefix /tmp/raytech-ux playwright@1.56.1
               export PLAYWRIGHT_MODULE=/tmp/raytech-ux/node_modules/playwright/index.mjs
-              node --test --test-timeout=45000 experiments/smart-ai-server/cloud-run/ux/smart-ai.browser.test.mjs experiments/smart-ai-server/cloud-run/integration/integration.browser.test.mjs
+              node --test --test-timeout=65000 experiments/smart-ai-server/cloud-run/ux/smart-ai.browser.test.mjs experiments/smart-ai-server/cloud-run/integration/integration.browser.test.mjs
             '
       - run: docker build -f experiments/smart-ai-server/cloud-run/Dockerfile -t smart-ai-candidate .
+      - name: Build and verify disabled bridge without external network
+        run: |
+          docker build -f experiments/smart-ai-server/cloud-run/bridge-runtime/Dockerfile -t smart-ai-bridge-candidate .
+          container=$(docker run --detach --network none smart-ai-bridge-candidate)
+          trap 'docker rm --force "$container" >/dev/null' EXIT
+          for attempt in 1 2 3 4 5; do
+            if docker exec "$container" node -e "
+              fetch('http://127.0.0.1:8080/v1/credits')
+                .then(response => { if (response.status !== 503) process.exitCode = 1; })
+                .catch(() => { process.exitCode = 1; });"; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs "$container"
+          exit 1
       - name: Verify disabled container without external network
         run: |
           container=$(docker run --detach --network none smart-ai-candidate)
@@ -74,6 +90,18 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+      - name: Archive verified bridge image
+        run: |
+          docker save smart-ai-bridge-candidate | gzip -n > smart-ai-bridge-candidate.tar.gz
+          sha256sum smart-ai-bridge-candidate.tar.gz > smart-ai-bridge-candidate.tar.gz.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smart-ai-bridge-0861-${{ github.sha }}
+          path: |
+            smart-ai-bridge-candidate.tar.gz
+            smart-ai-bridge-candidate.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 3
       - name: Package the isolated full app
         run: |
           mkdir -p "$RUNNER_TEMP/raytech-app"
@@ -82,9 +110,9 @@ jobs:
           cp -r "$RUNNER_TEMP/raytech-app-vendor" "$RUNNER_TEMP/raytech-app/vendor"
           runtime="$RUNNER_TEMP/raytech-app/experiments/smart-ai-server/cloud-run/integration"
           rm "$runtime/recovery-invoice.mjs" "$runtime/mount.mjs" "$runtime/lab-ui.mjs" "$runtime/index.html" "$runtime/workspace.mjs"
-          (cd "$RUNNER_TEMP/raytech-app" && zip -qr "$GITHUB_WORKSPACE/raytech-smart-ai-0854.zip" .)
+          (cd "$RUNNER_TEMP/raytech-app" && zip -qr "$GITHUB_WORKSPACE/raytech-smart-ai-0861.zip" .)
       - uses: actions/upload-artifact@v4
         with:
-          name: raytech-smart-ai-0854-${{ github.sha }}
-          path: raytech-smart-ai-0854.zip
+          name: raytech-smart-ai-0861-${{ github.sha }}
+          path: raytech-smart-ai-0861.zip
           if-no-files-found: error

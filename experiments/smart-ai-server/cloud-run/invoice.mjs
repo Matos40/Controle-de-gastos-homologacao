@@ -51,7 +51,7 @@ export async function extractInvoice(req,deps,{timeoutMs=TIMEOUT_MS,decodeFile=d
  if(deps.reserveUsage){
   let reservation;
   try{reservation=await deps.reserveUsage({uid:verifiedUid,requestId:req.headers?.['x-request-id']});}catch{reservation={status:503,error:'USAGE_UNAVAILABLE'};}
-  if(reservation?.status!==200){file.bytes.fill(0);const status=[400,403,409,429,503].includes(reservation?.status)?reservation.status:503;return fail(status,({400:'INVALID_REQUEST_ID',403:'ACCESS_DENIED',409:reservation?.error==='ACTIVE_REQUEST'?'ACTIVE_REQUEST':'DUPLICATE_REQUEST',429:['GLOBAL_BUDGET_EXCEEDED','RATE_LIMIT'].includes(reservation?.error)?reservation.error:'QUOTA_EXCEEDED',503:'USAGE_UNAVAILABLE'})[status]);}
+  if(reservation?.status!==200){file.bytes.fill(0);const status=[400,403,409,429,503].includes(reservation?.status)?reservation.status:503;return fail(status,({400:'INVALID_REQUEST_ID',403:'ACCESS_DENIED',409:reservation?.error==='ACTIVE_REQUEST'?'ACTIVE_REQUEST':'DUPLICATE_REQUEST',429:['GLOBAL_BUDGET_EXCEEDED','RATE_LIMIT'].includes(reservation?.error)?reservation.error:'QUOTA_EXCEEDED',503:reservation?.error==='FINANCE_SUSPENDED'?'FINANCE_SUSPENDED':'USAGE_UNAVAILABLE'})[status]);}
  }
  const controller=new AbortController();
  let timer;

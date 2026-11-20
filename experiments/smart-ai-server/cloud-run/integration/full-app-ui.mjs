@@ -1,3 +1,4 @@
+import {createSmartAiTransport} from './remote-transport.mjs';
 import {creditScenarios} from './credit-scenarios.mjs';
 import {bindNativeInvoice} from './native-invoice.mjs';
 import {mountSmartAdminAI} from '../ux/smart-admin-ai.mjs';
@@ -119,7 +120,7 @@ async function activate(){
     if(!get('apiKeyModal'))for(const paragraph of monitor.querySelectorAll('p')){
      if(paragraph.textContent==='Consumo e orçamento indisponíveis.')paragraph.remove();
     }
-    mountSmartAdminAI(slot,{getIdToken,reauthenticate,embedded:true,neutralBudget:!get('apiKeyModal'),
+    mountSmartAdminAI(slot,{getIdToken,reauthenticate,fetcher:createSmartAiTransport(),embedded:true,neutralBudget:!get('apiKeyModal'),
      unifiedSearch:get('apiKeyModal')?null:adminHost.querySelector('.admin-tools input')});
    }
    for(const detail of adminHost.querySelectorAll('dialog .v3467-ai:not([data-credits-mounted])')){

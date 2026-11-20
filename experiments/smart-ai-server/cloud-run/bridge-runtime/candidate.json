@@ -1,0 +1,26 @@
+{
+  "service": "raytech-smart-ai-bridge-exp",
+  "project": "raytech-3d",
+  "region": "us-central1",
+  "image": "__APPROVED_DIGEST__",
+  "identity": "raytech-smart-ai-bridge@raytech-3d.iam.gserviceaccount.com",
+  "ingress": "internal",
+  "invokerIamCheck": true,
+  "publicBindings": [],
+  "cpu": 1,
+  "memory": "512Mi",
+  "minInstances": 0,
+  "maxInstances": 1,
+  "concurrency": 1,
+  "httpTimeoutSeconds": 30,
+  "env": {
+    "SMART_AI_BRIDGE_ENABLED": "false",
+    "FIREBASE_PROJECT_ID": "gen-lang-client-0593667072",
+    "SMART_AI_OWNER_UID": "__VERIFIED_OWNER_UID__",
+    "SMART_AI_UI_ORIGIN": "__APPROVED_HTTPS_ORIGIN__"
+  },
+  "iamProposed": [
+    {"scope": "Cloud Run gateway raytech-smart-ai-gateway-exp", "role": "roles/run.invoker"},
+    {"scope": "Firebase experimental project gen-lang-client-0593667072", "customPermissionsCandidate": ["firebaseauth.users.get"]}
+  ]
+}

@@ -7,7 +7,7 @@ import {creditScenarios} from './credit-scenarios.mjs';
 import {createLab} from './lab.mjs';
 
 const assets=new Map(Object.entries({
- '/':'integration/index.html','/integration/credit-scenarios.mjs':'integration/credit-scenarios.mjs','/integration/native-invoice.mjs':'integration/native-invoice.mjs','/integration/review-store.mjs':'integration/review-store.mjs','/integration/full-app-ui.mjs':'integration/full-app-ui.mjs',
+ '/':'integration/index.html','/integration/remote-transport.mjs':'integration/remote-transport.mjs','/integration/credit-scenarios.mjs':'integration/credit-scenarios.mjs','/integration/native-invoice.mjs':'integration/native-invoice.mjs','/integration/review-store.mjs':'integration/review-store.mjs','/integration/full-app-ui.mjs':'integration/full-app-ui.mjs',
  '/integration/full-app-scripts.mjs':'integration/full-app-scripts.mjs','/integration/lab.css':'integration/lab.css',
  '/integration/lab-ui.mjs':'integration/lab-ui.mjs','/integration/mount.mjs':'integration/mount.mjs',
  '/integration/review.mjs':'integration/review.mjs','/ux/smart-ai.css':'ux/smart-ai.css',

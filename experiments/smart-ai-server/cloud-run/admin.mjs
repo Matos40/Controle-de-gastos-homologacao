@@ -19,7 +19,19 @@ function configView(old,budget){
  return {enabled:old.enabled??true,budget:old.budget===undefined?budget:validateBudget(old.budget),version:old.version??0};
 }
 
+function parseDirectory(body){
+ const {field,term,cursor}=body;
+ if(!['name','email','uid'].includes(field)||typeof term!=='string'||term.length>128)return null;
+ const key=field==='uid'?term:term.trim().normalize('NFKC').toLocaleLowerCase('pt-BR');
+ if(field==='uid'&&!/^[A-Za-z0-9_-]{3,128}$/.test(key)||
+    field==='name'&&(key.length<3||/[\u0000-\u001f\uf8ff]/.test(key))||
+    field==='email'&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(key))return null;
+ if(cursor!==null&&(!exact(cursor,['key','uid'])||!validUid(cursor.uid)||typeof cursor.key!=='string'||cursor.key.length>128||
+  (field==='email'?cursor.key!==key:!cursor.key.startsWith(key)||cursor.key>=key+'\uf8ff')))return null;
+ return {action:'directory',field,term:key,cursor};
+}
 function parse(body){
+ if(exact(body,['action','field','term','cursor'])&&body.action==='directory')return parseDirectory(body);
  if(exact(body,['action','confirmed','expectedVersion'])&&body.action==='reactivateFinance'&&
     body.confirmed===true&&Number.isSafeInteger(body.expectedVersion)&&body.expectedVersion>=0)return body;
  if(exact(body,['action'])&&body.action==='overview')return body;
@@ -55,7 +67,7 @@ export async function handleSmartAdmin(request,body,{db,verifyToken,ownerUid,clo
   return await db.runTransaction(async tx=>{
    const [profile,permission]=await tx.getAll(accountRef(uid),roleRef(uid));
    const now=clock(),role=permission.data();
-   const owner=validUid(ownerUid)&&uid===ownerUid&&role?.active===true&&role.role==='owner';
+   const owner=validUid(ownerUid)&&uid===ownerUid&&Boolean(planOf(uid,profile.data(),now))&&role?.active===true&&role.role==='owner';
    const admin=smartAiAdmin===true&&role?.active===true&&role.role==='admin'&&planOf(uid,profile.data(),now);
    if(!owner&&(!admin||change))return deny(403,'ACCESS_DENIED');
    if(change&&!recentlyAuthenticated(authTime,now))return deny(403,'REAUTH_REQUIRED');
@@ -66,6 +78,21 @@ export async function handleSmartAdmin(request,body,{db,verifyToken,ownerUid,clo
     tx.set(ref,after);
     tx.create(db.collection(audit).doc(changeId),{actorUid:uid,at:now,action:'reactivateFinance',before:before.version,after:after.version});
     return reply(200,{finance:financeView(after,now)});
+   }
+   if(action.action==='directory'){
+    const throttle=db.collection('raytechLabAdminDirectoryAccessV350').doc(uid);
+    const [snapshot]=await tx.getAll(throttle);
+    const bucket=Math.floor(now/60000),previous=snapshot.data();
+    const count=previous?.bucket===bucket?previous.count:0;
+    if(!Number.isSafeInteger(count)||count<0)throw Error('INVALID_RATE_STATE');
+    if(count>=6)return deny(429,'RATE_LIMIT');
+    const found=await tx.findDirectoryPage(action);
+    const fieldKey={name:'nameKey',email:'emailKey',uid:'uid'}[action.field];
+    const rows=found.slice(0,10).filter(row=>validUid(row.id)&&row.data().uid===row.id)
+     .map(row=>({uid:row.id,name:String(row.data().label??'').slice(0,120)}));
+    const last=found[9];
+    tx.set(throttle,{bucket,count:count+1,lastAt:now});
+    return reply(200,{rows,nextCursor:found.length>10?{key:last.data()[fieldKey],uid:last.id}:null});
    }
    if(action.action==='search'){
     const fields=['uid','blocked','plan','premiumUntil','name','displayName','googleProfile.displayName','googleProfile.name'];
@@ -97,6 +124,6 @@ export async function handleSmartAdmin(request,body,{db,verifyToken,ownerUid,clo
    return reply(200,{settings:config,role:owner?'owner':'admin',finance:financeView(financeState(finance.data()),now),
     security:{reauthSeconds:300,serverAuthorization:true},periods:{day:dayOf(now),month:monthOf(now)},
     day,month,attemptsUtc:budget.attempts,monthlyAverage:month.users?Math.round(100*complete/month.users)/100:null});
-  },{readOnly:!change});
+  },{readOnly:!change&&action.action!=='directory'});
  }catch{return error(503,'ADMIN_UNAVAILABLE');}
 }

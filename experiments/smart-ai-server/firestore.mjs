@@ -86,7 +86,23 @@ export function createRestStore(db, base, accessToken, signal, transport=fetch, 
             data:()=>unpack(document.fields??{}),
           }));
         }
-        const result=await run({getAll,findByIdPrefix,get:async r=>(await getAll(r))[0],
+        async function findDirectoryPage({field,term,cursor}){
+          const collection='raytechLabAdminDirectoryV350';
+          const fieldPath={name:'nameKey',email:'emailKey',uid:'uid'}[field];
+          if(writes.length||!fieldPath)throw Error('INVALID_QUERY');
+          const filter=(op,stringValue)=>({fieldFilter:{field:{fieldPath},op,value:{stringValue}}});
+          const structuredQuery={from:[{collectionId:collection}],select:{fields:[...new Set(['uid','label',fieldPath])].map(fieldPath=>({fieldPath}))},
+            where:field==='email'?filter('EQUAL',term):{compositeFilter:{op:'AND',filters:[
+             filter('GREATER_THAN_OR_EQUAL',term),filter('LESS_THAN',term+'\uf8ff')]}},
+            orderBy:[{field:{fieldPath},direction:'ASCENDING'},{field:{fieldPath:'__name__'},direction:'ASCENDING'}],
+            limit:11};
+          if(cursor)structuredQuery.startAt={before:false,values:[{stringValue:cursor.key},
+            {referenceValue:db+'/documents/'+collection+'/'+cursor.uid}]};
+          const rows=await call('runQuery',{transaction,structuredQuery});
+          return rows.filter(row=>row.document).map(({document})=>({id:document.name.split('/').at(-1),
+            data:()=>unpack(document.fields??{})}));
+        }
+        const result=await run({getAll,findByIdPrefix,findDirectoryPage,get:async r=>(await getAll(r))[0],
           set:(r,d)=>queue(r,d,'set'),update:(r,d)=>queue(r,d,'update'),create:(r,d)=>queue(r,d,'create')});
         if(writes.length){await call('commit',{transaction,writes});committed=true;}
         return result;

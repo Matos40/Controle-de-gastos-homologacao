@@ -1,4 +1,5 @@
 import {mountSmartAI} from '../ux/smart-ai.mjs';
+import {createSmartAiTransport} from './remote-transport.mjs';
 import {mountReview} from './review.mjs';
 
 export function bindNativeInvoice({modal,getIdToken,readCategories,confirm}){
@@ -47,9 +48,10 @@ export function bindNativeInvoice({modal,getIdToken,readCategories,confirm}){
   if(supported&&!isPdf){previewUrl=URL.createObjectURL(file);image.src=previewUrl;}
   get('ocrImageInfo').textContent=supported?file.name:'';
  }
+ const transport=createSmartAiTransport();
  const smart=mountSmartAI(modal,{native:true,getIdToken,onRender:renderNative,fetcher:(path,opts)=>{
   if(!navigator.onLine)throw Error('OFFLINE');
-  return fetch(path,opts);
+  return transport(path,opts);
  },onUpgrade:()=>{result.querySelector('[data-status]').textContent='Premium oferece 15 créditos mensais. Assinaturas estão desativadas neste ambiente.';},onReview:invoice=>{
   if(modal.classList.contains('hidden'))return;
   mountReview(review,invoice,{categories:readCategories(),confirm:rows=>confirm(invoice,rows),cancel:message=>{

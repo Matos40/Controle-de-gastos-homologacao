@@ -308,7 +308,7 @@ test('experimental PWA migrates only known obsolete caches and excludes invoices
  await page.evaluate(()=>navigator.serviceWorker.ready.then(()=>true));
  await page.waitForFunction(async()=>!(await caches.keys()).includes('raytech-smart-ai-0852-shell'));
  const result=await page.evaluate(async()=>{
-  const keys=await caches.keys(),cache=await caches.open('raytech-smart-ai-0854-2-shell');
+  const keys=await caches.keys(),cache=await caches.open('raytech-smart-ai-0861-shell');
   return {keys,paths:(await cache.keys()).map(request=>new URL(request.url).pathname)};
  });
  assert.ok(result.keys.includes('foreign-cache'));

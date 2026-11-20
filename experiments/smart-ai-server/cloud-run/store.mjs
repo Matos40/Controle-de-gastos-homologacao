@@ -50,7 +50,7 @@ export function createCommercialStore(db,{clock=Date.now,budget=LAB_CAP,requireF
    if(old.exists)return {status:409,error:'DUPLICATE_REQUEST'};
    const protection=financeView(financeState(finance.data()),now);
    if(protection.suspended||(requireFinance&&protection.observedCents===null)||config.data()?.enabled===false)
-    return {status:503,error:'USAGE_UNAVAILABLE'};
+    return {status:503,error:requireFinance&&protection.suspended?'FINANCE_SUSPENDED':'USAGE_UNAVAILABLE'};
    const decision=reserve(state.data(),now,plan,requestId);
    if(decision.status!==200)return decision;
    const configuredBudget=config.data()?.budget;
@@ -91,11 +91,17 @@ export function createCommercialStore(db,{clock=Date.now,budget=LAB_CAP,requireF
  async readCredits(uid,transaction){
   if(!validUid(uid))throw Error('ACCESS_DENIED');
   const read=async tx=>{
-   const [profile,state]=await tx.getAll(profileRef(uid),userRef(uid));
+   const [profile,state,config,finance]=await tx.getAll(profileRef(uid),userRef(uid),
+    ...(requireFinance?[configRef,financeRef(db)]:[]));
    const now=clock(),plan=planOf(uid,profile.data(),now);
    if(!plan)return null;
    const quota=state.data();
    const balance=view(quota,now,plan);
+   if(requireFinance){
+    const protection=financeView(financeState(finance.data()),now);
+    balance.operational=protection.suspended?'suspended':config.data()?.enabled===false?'administrative':
+     protection.observedCents===null?'unavailable':'available';
+   }
    if(!balance.busy)return {plan,...balance};
    if(!validRequestId(quota.pending))throw Error('INVALID_STATE');
    const [pending]=await tx.getAll(userRef(uid).collection('attempts').doc(quota.pending));

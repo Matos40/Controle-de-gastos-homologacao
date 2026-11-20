@@ -1,3 +1,4 @@
+import {cloudBridge,gatewayAudience} from '../integration/cloud-bridge.mjs';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {assertLocalEmulators} from '../../legacy/emulator-guard.mjs';
@@ -96,9 +97,27 @@ try{
  const credits=async()=>(await api('/v1/credits','fixture-reader')).data.remaining;
  const admin=body=>api('/v1/admin/ai','fixture-owner',body);
  const invoice={feature:'invoice-ai',mimeType:'application/pdf',data:fakeInvoice};
+ const bridged=cloudBridge({origin:ui,ownerUid:owner,verifyFirebase:async token=>{
+  if(token!=='fixture-reader')throw Error('REVOKED');
+  return {uid};
+ },identity:async()=> 'fixture.bridge.token',transport:(url,options)=>{
+  assert.ok(url.startsWith(gatewayAudience+'/v1/'));
+  assert.equal(options.headers.get('x-serverless-authorization'),'Bearer fixture.bridge.token');
+  options.headers.delete('x-serverless-authorization');
+  return fetch(base+new URL(url).pathname,options);
+ }});
+ const probe=(path,body)=>bridged(new Request(ui+path,{method:body?'POST':'GET',headers:{origin:ui,
+  authorization:'Bearer fixture-reader','content-type':'application/json','x-request-id':randomUUID()},
+  body:body?JSON.stringify(body):undefined}));
+ assert.equal((await (await probe('/v1/credits')).json()).remaining,2);
  assert.equal(await credits(),2);
  assert.equal((await api('/v1/credits','fixture-revoked')).status,401);
- assert.equal((await reader(invoice)).status,200);
+ const firstInvoice=await probe('/v1/invoices',invoice);
+ assert.equal(firstInvoice.status,200);
+ const parsed=await firstInvoice.json();
+ assert.equal(parsed.requiresReview,true);
+ assert.equal(parsed.reconciliation.differenceCents,0);
+ assert.equal(parsed.metrics,undefined);
  assert.equal(await credits(),1);
  const failed=await reader(invoice);
  assert.equal(failed.status,502);
@@ -108,6 +127,29 @@ try{
  assert.deepEqual(summary.month.free,{reserved:2,completed:1,failed:1,pending:0});
  assert.equal((await admin({action:'credits',uid})).data.remaining,1);
  assert.equal((await api('/v1/admin/ai','fixture-reader',{action:'overview'})).status,403);
+ const directory=db(AbortSignal.timeout(18000));
+ await directory.runTransaction(tx=>{
+  for(let i=0;i<12;i++){
+   const uid='directory-fixture-'+String(i).padStart(2,'0');
+   tx.set(directory.collection('raytechLabAdminDirectoryV350').doc(uid),
+    {uid,label:'Perfil '+i,nameKey:'perfil sintético',emailKey:uid+'@example.invalid'});
+  }
+ });
+ const first=await admin({action:'directory',field:'name',term:'Perfil sintético',cursor:null});
+ assert.equal(first.status,200);
+ assert.equal(first.data.rows.length,10);
+ const last=await admin({action:'directory',field:'name',term:'perfil sintético',cursor:first.data.nextCursor});
+ assert.equal(last.data.rows.length,2);
+ assert.equal(last.data.nextCursor,null);
+ assert.ok(last.data.rows.every(row=>!first.data.rows.some(previous=>previous.uid===row.uid)));
+ for(const [field,term] of [['email','directory-fixture-00@example.invalid'],['uid','directory-fixture-00']]){
+  const result=await admin({action:'directory',field,term,cursor:null});
+  assert.deepEqual(result.data.rows,[{uid:'directory-fixture-00',name:'Perfil 0'}]);
+ }
+ assert.equal((await api('/v1/admin/ai','fixture-reader',{action:'directory',field:'name',term:'perfil',cursor:null})).status,403);
+ for(let i=0;i<2;i++)assert.equal((await admin({action:'directory',field:'name',term:'perfil',cursor:null})).status,200);
+ assert.equal((await admin({action:'directory',field:'name',term:'perfil',cursor:null})).status,429);
+ console.log('Diretório sintético: nome, e-mail, UID, paginação, minimização e limite distribuído verificados.');
  const current=new Date(),pacific=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit'}).format(current);
  const event={subscription:'projects/raytech-3d/subscriptions/raytech-budget-push',message:{
   messageId:'507',publishTime:current.toISOString(),attributes:{schemaVersion:'1.0',billingAccountId:'synthetic-account',budgetId:'synthetic-budget'},
