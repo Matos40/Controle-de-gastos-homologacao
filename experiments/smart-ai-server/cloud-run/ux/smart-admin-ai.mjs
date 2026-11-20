@@ -33,7 +33,7 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
      <input id="ai-admin-prefix" required minlength="2" maxlength="128" pattern="[A-Za-z0-9_-]+">
      <button type="submit">Pesquisar</button></form>
     <ul data-users></ul><p data-credit aria-live="polite"></p>
-    <p data-admission></p>
+    <p data-admission></p><p data-audit></p>
     <article aria-label="Proteção financeira Smart AI">
      <h2>Proteção financeira Smart AI</h2>
      <p data-finance></p><p data-finance-observed></p><p data-security></p>
@@ -96,6 +96,8 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
   el('conversions').textContent='Primeiro uso Premium após uso Free no mês: '+number.format(overview.month.conversions);
   el('average').textContent='Média mensal de extrações por usuário com tentativa: '+
    (overview.monthlyAverage===null?'sem dados':number.format(overview.monthlyAverage));
+  el('audit').textContent=Number.isSafeInteger(overview.auditCount)?
+   'Auditoria simulada · '+number.format(overview.auditCount)+' alterações registradas':'';
   const {settings}=overview;
   const finance=overview.finance;
   el('admission').textContent=settings.enabled&&!finance?.suspended?'Novas leituras habilitadas.':'Novas leituras suspensas. Solicitações em andamento podem concluir.';

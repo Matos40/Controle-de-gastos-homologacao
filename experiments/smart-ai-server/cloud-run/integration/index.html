@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raytech CG · V35.0 experimental</title>
+<link rel="stylesheet" href="/ux/smart-ai.css">
+<link rel="stylesheet" href="/integration/lab.css">
+<main>
+ <section class="raytech-ai">
+  <h1>Raytech CG</h1>
+  <p>V35.0 · Smart AI experimental</p>
+  <p>Ambiente isolado. Use somente faturas e perfis fictícios.</p>
+  <label>Perfil de teste
+   <select id="profile"><option value="free">Free</option><option value="premium">Premium</option>
+   <option value="admin">Admin</option><option value="owner">Owner</option></select>
+  </label>
+  <button id="sign-in" type="button">Entrar no laboratório</button>
+  <button id="sign-out" type="button" hidden>Sair</button>
+  <p id="session-status" role="status"></p>
+ </section>
+ <div id="workspace"></div>
+ <dialog id="api-key">
+  <h2>Chave API</h2><p>Configuração simulada. A modalidade existente continua disponível no aplicativo oficial.</p>
+  <form method="dialog"><button>Fechar</button></form>
+ </dialog>
+</main>
+<script type="module" src="/integration/lab-ui.mjs"></script>
+</html>

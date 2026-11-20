@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test experiments/smart-ai-server/cloud-run/commercial.test.mjs experiments/smart-ai-server/cloud-run/invoice-contract.test.mjs experiments/smart-ai-server/cloud-run/infra/infra.test.mjs experiments/smart-ai-server/cloud-run/infra/operations.test.mjs experiments/smart-ai-server/remote/worker.test.mjs experiments/smart-ai-server/legacy/invoice.test.mjs
+      - run: node --test experiments/smart-ai-server/cloud-run/integration/integration.test.mjs experiments/smart-ai-server/cloud-run/commercial.test.mjs experiments/smart-ai-server/cloud-run/invoice-contract.test.mjs experiments/smart-ai-server/cloud-run/infra/infra.test.mjs experiments/smart-ai-server/cloud-run/infra/operations.test.mjs experiments/smart-ai-server/remote/worker.test.mjs experiments/smart-ai-server/legacy/invoice.test.mjs
       - name: Test synthetic Smart AI UX in desktop and mobile engines
         timeout-minutes: 5
         run: |
@@ -28,7 +28,7 @@ jobs:
             mcr.microsoft.com/playwright:v1.56.1-noble bash -euc '
               npm install --no-save --package-lock=false --prefix /tmp/raytech-ux playwright@1.56.1
               export PLAYWRIGHT_MODULE=/tmp/raytech-ux/node_modules/playwright/index.mjs
-              node --test --test-timeout=45000 experiments/smart-ai-server/cloud-run/ux/smart-ai.browser.test.mjs
+              node --test --test-timeout=45000 experiments/smart-ai-server/cloud-run/ux/smart-ai.browser.test.mjs experiments/smart-ai-server/cloud-run/integration/integration.browser.test.mjs
             '
       - run: docker build -f experiments/smart-ai-server/cloud-run/Dockerfile -t smart-ai-candidate .
       - name: Verify disabled container without external network
@@ -58,3 +58,11 @@ jobs:
             smart-ai-candidate.tar.gz.sha256
           if-no-files-found: error
           retention-days: 3
+
+      - name: Package the loopback-only Smart AI lab
+        run: git archive --format=zip --output=raytech-smart-ai-084.zip HEAD experiments/smart-ai-server
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raytech-smart-ai-084-${{ github.sha }}
+          path: raytech-smart-ai-084.zip
+          if-no-files-found: error

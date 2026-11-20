@@ -1,6 +1,11 @@
 const maxBytes=10*1024*1024;
 const types=['application/pdf','image/png','image/jpeg','image/webp'];
 const messages={
+  OFFLINE:'Sem conexão. Reconecte-se e atualize o saldo antes de ler.',
+  FINANCE_SUSPENDED:'Leituras suspensas temporariamente pela proteção financeira.',
+  PROCESSING_FAILED:'Não foi possível processar a fatura. Confira o arquivo.',
+  EXPERIMENT_UNAVAILABLE:'O Smart AI está temporariamente indisponível.',
+  GLOBAL_BUDGET_EXCEEDED:'O limite de leituras do serviço foi atingido. Tente mais tarde.',
   RATE_LIMIT:'Limite de tentativas por minuto atingido. Aguarde um minuto e tente novamente.',
   QUOTA_EXCEEDED:'Seus créditos Smart AI acabaram.',
   ACTIVE_REQUEST:'Já existe uma fatura em processamento. Atualize o saldo em instantes.',
@@ -30,7 +35,7 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch})
       </header>
       <div class="raytech-ai__balance" aria-live="polite">
         <div><span data-plan>Créditos disponíveis</span><strong data-count>—</strong></div>
-        <p data-renewal hidden></p>
+        <p data-renewal hidden></p><p data-operational hidden></p>
         <p data-lock hidden>🔒 Créditos esgotados</p>
       </div>
       <button data-upgrade type="button" class="raytech-ai__quiet" hidden>Conhecer o Premium</button>
@@ -51,13 +56,18 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch})
     const exhausted=balance?.remaining===0;
     el('count').textContent=balance ? String(balance.remaining) : '—';
     el('plan').textContent=balance ? 'Créditos '+(balance.plan==='free'?'Free':'Premium') : 'Créditos disponíveis';
+    const operational=el('operational');
+    operational.hidden=!balance?.operational;
+    operational.textContent=balance?.operational==='available'?'Disponível':
+      balance?.operational==='suspended'?messages.FINANCE_SUSPENDED:unavailable;
+    const blocked=Boolean(balance?.operational&&balance.operational!=='available');
     const renewal=el('renewal');
     renewal.hidden=balance?.plan!=='premium';
     renewal.textContent=renewal.hidden?'':'Próxima renovação em '+balance.nextRenewalDate.split('-').reverse().join('/');
     el('lock').hidden=!exhausted;
     el('upgrade').hidden=balance?.plan!=='free'||typeof onUpgrade!=='function';
-    input.disabled=busy||Boolean(exhausted);
-    el('send').disabled=busy||refreshing||!balance||exhausted||balance.busy||!input.files.length;
+    input.disabled=busy||blocked||Boolean(exhausted);
+    el('send').disabled=busy||refreshing||blocked||!balance||exhausted||balance.busy||!input.files.length;
     el('send').textContent=busy?'Processando…':'Ler fatura';
     form.setAttribute('aria-busy',String(busy));
     el('refresh').disabled=busy||refreshing;
@@ -99,7 +109,7 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch})
   review.addEventListener('click',()=>onReview?.(result));
   form.addEventListener('submit',async event=>{
     event.preventDefault();
-    if(busy||refreshing||!balance||balance.busy||!balance.remaining)return;
+    if(busy||refreshing||!balance||balance.busy||!balance.remaining||(balance.operational&&balance.operational!=='available'))return;
     const file=input.files[0];
     if(!file||!types.includes(file.type)||!file.size){status.textContent=messages.INVALID_FILE;return;}
     if(file.size>maxBytes){status.textContent=messages.FILE_TOO_LARGE;return;}
@@ -131,8 +141,8 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch})
           totals+
           (reconciliation?.warnings?.includes('POSSIBLE_DUPLICATES')?' Há possíveis duplicidades.':'');
       }
-    }catch(error){status.textContent=messages[error.message]??unavailable;}
+    }catch(error){status.textContent=messages[error.message]??'Falha de comunicação. Atualize o saldo antes de repetir a leitura.';}
     finally{await refresh({announce:false});busy=false;render();}
   });
-  return {refresh,ready:refresh()};
+  return {refresh,ready:refresh(),discardReview(){result=undefined;review.hidden=true;}};
 }

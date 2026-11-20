@@ -1,0 +1,10 @@
+html { color-scheme: dark; background: #020617; }
+main { margin: 1rem auto; }
+.raytech-ai { margin-block: .8rem; }
+.raytech-ai label { display: block; }
+.raytech-ai input:not([type=checkbox]), .raytech-ai select { max-inline-size: 100%; }
+[data-entries] { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%, 15rem),1fr)); gap: .5rem; }
+[data-entries] fieldset { min-inline-size: 0; border: 1px solid #334155; border-radius: .5rem; }
+[data-entries] label:not(:first-of-type) input { display: block; inline-size: 100%; }
+dialog { max-inline-size: min(28rem, 85vw); color: #e2e8f0; background: #0f172a; border: 1px solid #334155; border-radius: 1rem; }
+dialog::backdrop { background: #020617b0; }
