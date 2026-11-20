@@ -56,6 +56,7 @@ async function lab(){
    {plan:'premium',remaining:15,busy:false,nextRenewalDate:'2027-01-01'}:
    {plan:'free',remaining:state.remaining,busy:false,nextRenewalDate:null});
   if(url.pathname!=='/v1/invoices'||req.method!=='POST'){res.writeHead(404).end();return;}
+  if(!state.settings.enabled)return send(503,{error:'USAGE_UNAVAILABLE'});
   const chunks=[];
   for await(const chunk of req)chunks.push(chunk);
   const {feature,mimeType,data}=JSON.parse(Buffer.concat(chunks));
@@ -173,5 +174,13 @@ test('Smart Admin: mobile Owner controls, desktop Admin read-only, search, credi
   await waitText(desktop,'[data-admission]','suspensas');
   assert.equal(await desktop.locator('[data-config]').isVisible(),false);
   assert.match(await desktop.locator('[data-month]').textContent(),/Créditos restituídos/);
+  const reader=await browser.newPage(devices['Pixel 7']);
+  await reader.goto(url);
+  await waitText(reader,'[data-count]','2');
+  await select(reader);
+  await reader.getByRole('button',{name:'Ler fatura'}).click();
+  await waitText(reader,'[data-status]','indisponível');
+  assert.equal(await reader.locator('[data-count]').textContent(),'2');
+  assert.equal(state.requests,0);
  }finally{await browser?.close();await close();}
 });

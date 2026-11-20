@@ -1,0 +1,20 @@
+{
+  "applyAuthorized": false,
+  "resource": "cloud_run_revision",
+  "service": "raytech-smart-ai-exp",
+  "cloudRunMetrics": [
+    "run.googleapis.com/request_latencies",
+    "run.googleapis.com/container/cpu/utilizations",
+    "run.googleapis.com/container/memory/utilizations",
+    "run.googleapis.com/request_count",
+    "run.googleapis.com/container/instance_count"
+  ],
+  "applicationLogFilter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"raytech-smart-ai-exp\" AND jsonPayload.event=\"smart_ai_request\"",
+  "fields": [
+    "route", "httpStatus", "durationMs", "processCpuMicros", "rssBytes",
+    "subrequests", "requestedFirestoreReads", "confirmedFirestoreWrites", "firestoreQueries",
+    "inputTokens", "outputTokens", "totalTokens", "thinkingTokens", "latencyMs"
+  ],
+  "proposedThresholds": {"p95LatencyMs":25000,"memoryUtilization":0.8,"cpuUtilization":0.8,"fiveMinuteServerErrorRatio":0.1},
+  "invoiceContentLogging": false
+}

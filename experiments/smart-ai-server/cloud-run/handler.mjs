@@ -6,8 +6,10 @@ import {extractInvoice, MAX_BYTES, validateInvoiceBytes} from './invoice.mjs';
 import {validRequestId} from '../legacy/usage.mjs';
 import {createCommercialStore} from './store.mjs';
 import {createFirebaseVerifier} from '../remote/auth.mjs';
-import {createGoogleAccessToken} from '../remote/google-access.mjs';
 import {handleSmartAdmin} from './admin.mjs';
+import {createRuntimeAccess} from './runtime.mjs';
+import {trustedOrigin} from './cors.mjs';
+import {startObservation} from './telemetry.mjs';
 
 const requestCap = 4 * Math.ceil(MAX_BYTES / 3) + 1024;
 const experimentProject = 'gen-lang-client-0593667072';
@@ -93,9 +95,9 @@ export async function boundedBinary(request, mimeType, signal) {
   }
 }
 
-export function createCloudRunHandler(transport = fetch) {
+export function createCloudRunHandler(transport = fetch,{connect,writeTelemetry=event=>console.log(JSON.stringify(event))}={}) {
   const verifyFirebase = createFirebaseVerifier(experimentProject);
-  let googleAccessToken;
+  let runtimeAccess;
   return {async fetch(request, env) {
     const url = new URL(request.url);
     const credits=url.pathname==='/v1/credits';
@@ -105,7 +107,7 @@ export function createCloudRunHandler(transport = fetch) {
     }
     if (request.method !== (credits?'GET':'POST')) return reply(405, {error:'METHOD_NOT_ALLOWED'});
     const origin=request.headers.get('origin');
-    if (origin!==null && (origin==='null'||origin!==env.SMART_AI_UI_ORIGIN))return reply(403,{error:'ACCESS_DENIED'});
+    if (origin!==null && !trustedOrigin(origin,env.SMART_AI_UI_ORIGIN))return reply(403,{error:'ACCESS_DENIED'});
     if (env.FIREBASE_PROJECT_ID !== experimentProject ||
         env.FIRESTORE_EMULATOR_HOST || env.FIREBASE_AUTH_EMULATOR_HOST) {
       return reply(503, {error:'EXPERIMENT_UNAVAILABLE'});
@@ -122,30 +124,42 @@ export function createCloudRunHandler(transport = fetch) {
     }
     const deadline = AbortSignal.any([AbortSignal.timeout(30000), request.signal]);
     const start = Date.now();
-    const counts = {subrequests:0, requestedFirestoreReads:0, confirmedFirestoreWrites:0};
+    const counts = {subrequests:0, requestedFirestoreReads:0, confirmedFirestoreWrites:0,firestoreQueries:0};
+    const observe=env.SMART_AI_TELEMETRY==='true'?startObservation(url.pathname,writeTelemetry):()=>{};
+    let providerMetrics;
+    const send=(status,body)=>{observe(status,{...counts,...providerMetrics});return reply(status,body);};
     const counted = async (target, options) => {
       if (++counts.subrequests > 60) throw Error('EXPERIMENT_SUBREQUEST_LIMIT');
       if (target.endsWith(':batchGet')) counts.requestedFirestoreReads += JSON.parse(options.body).documents.length;
+      if (target.endsWith(':runQuery')) counts.firestoreQueries++;
       const response = await transport(target, options);
       if (response.ok && target.endsWith(':commit')) counts.confirmedFirestoreWrites += JSON.parse(options.body).writes.length;
       return response;
     };
     try {
-      googleAccessToken ??= createGoogleAccessToken(experimentProject, env.FIREBASE_WORKER_CREDENTIAL);
-      const access = () => googleAccessToken(counted, deadline);
       const dbName = 'projects/' + experimentProject + '/databases/(default)';
-      const db = createRestStore(dbName, 'https://firestore.googleapis.com/v1/' + dbName + '/documents',
-        access, deadline, counted,{abortedRetries:3});
-      const verifyToken = token => verifyFirebase(token, access, counted, deadline);
+      let db,verifyToken;
+      if(connect){({db,verifyToken}=connect(deadline,counted));}
+      else{
+        runtimeAccess ??= createRuntimeAccess(env.SMART_AI_RUNTIME_IDENTITY);
+        const access=()=>runtimeAccess(counted,deadline);
+        db=createRestStore(dbName,'https://firestore.googleapis.com/v1/'+dbName+'/documents',
+          access,deadline,counted,{abortedRetries:3});
+        verifyToken=token=>verifyFirebase(token,access,counted,deadline);
+      }
       if(admin){
         let body;
         try{body=await boundedJson(request,deadline,4096);}
-        catch(error){return reply(error.message==='FILE_TOO_LARGE'?413:400,{error:'INVALID_REQUEST'});}
+        catch(error){return send(error.message==='FILE_TOO_LARGE'?413:400,{error:'INVALID_REQUEST'});}
         const result=await handleSmartAdmin(request,body,{db,verifyToken});
-        return reply(result.status,result.body);
+        return send(result.status,result.body);
       }
       const {readCredits,reserveUsage,finishOutcome}=createCommercialStore(db);
-      if(credits)return readCreditBalance(request,{verifyToken,readCredits});
+      if(credits){
+        const response=await readCreditBalance(request,{verifyToken,readCredits});
+        observe(response.status,counts);
+        return response;
+      }
       const readPermissions = uid => db.runTransaction(async tx => {
         const [account, role] = await tx.getAll(
           db.collection('raytechV345Accounts').doc(uid), db.collection('raytechV345Roles').doc(uid));
@@ -153,7 +167,7 @@ export function createCloudRunHandler(transport = fetch) {
       }, {readOnly:true});
       const auth = await authorizePremium({method:'POST', headers, body:{feature:FEATURE}},
         {verifyToken, readPermissions});
-      if (auth.status !== 200) return reply(auth.status, {error:'ACCESS_DENIED'});
+      if (auth.status !== 200) return send(auth.status, {error:'ACCESS_DENIED'});
       let body;
       try {
         body = binary
@@ -161,11 +175,10 @@ export function createCloudRunHandler(transport = fetch) {
           : await boundedJson(request, deadline);
       }
       catch (error) {
-        if (deadline.aborted) return reply(504, {error:'TIMEOUT'});
+        if (deadline.aborted) return send(504, {error:'TIMEOUT'});
         return error.message === 'FILE_TOO_LARGE'
-          ? reply(413, {error:'FILE_TOO_LARGE'}) : reply(400, {error:'INVALID_FILE'});
+          ? send(413, {error:'FILE_TOO_LARGE'}) : send(400, {error:'INVALID_FILE'});
       }
-      let providerMetrics;
       const provider = geminiProvider(env.RAYTECH_GEMINI_API_KEY, counted,
         metrics => { providerMetrics = metrics; }, binary);
       let result;
@@ -181,9 +194,9 @@ export function createCloudRunHandler(transport = fetch) {
         result.body.simulated = false;
         result.body.metrics = {...counts, ...providerMetrics, wallMs:Date.now() - start};
       }
-      return reply(result.status, result.body);
+      return send(result.status, result.body);
     } catch {
-      return deadline.aborted ? reply(504, {error:'TIMEOUT'}) : reply(503, {error:'EXPERIMENT_UNAVAILABLE'});
+      return deadline.aborted ? send(504, {error:'TIMEOUT'}) : send(503, {error:'EXPERIMENT_UNAVAILABLE'});
     }
   }};
 }

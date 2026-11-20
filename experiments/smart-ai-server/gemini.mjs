@@ -52,12 +52,13 @@ export function geminiProvider(secret,transport=fetch,observe=()=>{},stream=fals
     });
     if(!result.ok)throw Error('PROVIDER_UNAVAILABLE');
     const data=await result.json();
+    observe({latencyMs:Date.now()-start,inputTokens:data.usageMetadata?.promptTokenCount,
+      outputTokens:data.usageMetadata?.candidatesTokenCount,
+      totalTokens:data.usageMetadata?.totalTokenCount,thinkingTokens:data.usageMetadata?.thoughtsTokenCount});
     const candidate=data.candidates?.[0];
     if(candidate?.finishReason!=='STOP')throw Error('INVALID_PROVIDER_RESPONSE');
     const items=JSON.parse(candidate.content.parts.filter(p=>!p.thought).map(p=>p.text??'').join(''));
     if(!Array.isArray(items)||items.length>100)throw Error('INVALID_PROVIDER_RESPONSE');
-    observe({latencyMs:Date.now()-start,inputTokens:data.usageMetadata?.promptTokenCount,
-      outputTokens:data.usageMetadata?.candidatesTokenCount});
     return items;
   };
 }
