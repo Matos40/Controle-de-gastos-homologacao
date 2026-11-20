@@ -69,3 +69,8 @@ dialog::backdrop { background: #020617b0; }
 .raytech-ai-monitor-grid [data-service-controls] label { display:block; }
 .raytech-ai-monitor-grid [data-service-controls] input[type=checkbox] { width:1rem; height:1rem; }
 @media (max-width:640px){ .raytech-ai-monitor-grid { grid-template-columns:minmax(0,1fr); } }
+
+#ocrModal .native-ai-modes:empty { display:none; }
+.raytech-ai-monitor-grid button:not([hidden]) {
+ justify-self:start; inline-size:max-content!important; max-inline-size:100%; white-space:normal;
+}

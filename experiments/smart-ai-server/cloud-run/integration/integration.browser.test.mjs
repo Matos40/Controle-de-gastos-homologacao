@@ -308,7 +308,7 @@ test('experimental PWA migrates only known obsolete caches and excludes invoices
  await page.evaluate(()=>navigator.serviceWorker.ready.then(()=>true));
  await page.waitForFunction(async()=>!(await caches.keys()).includes('raytech-smart-ai-0852-shell'));
  const result=await page.evaluate(async()=>{
-  const keys=await caches.keys(),cache=await caches.open('raytech-smart-ai-0854-shell');
+  const keys=await caches.keys(),cache=await caches.open('raytech-smart-ai-0854-2-shell');
   return {keys,paths:(await cache.keys()).map(request=>new URL(request.url).pathname)};
  });
  assert.ok(result.keys.includes('foreign-cache'));
@@ -430,6 +430,8 @@ test('compact monitor shows four responsive cards and separates unavailable, zer
   await grid.getByLabel('Valor estimado por tentativa em reais').fill('0.5');
   assert.match(await grid.locator('[data-estimate]').textContent(),/Diária: R\$\s15,00.*Mensal: R\$\s30,00/);
   assert.equal(await grid.getByLabel('Limite diário (UTC)').evaluate(el=>getComputedStyle(el).borderRadius),'8px');
+  const save=grid.getByRole('button',{name:'Salvar configuração'});
+  assert.ok(await save.evaluate(button=>button.offsetWidth<button.closest('form').clientWidth-24));
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   if(process.env.RAYTECH_SCREENSHOTS)await grid.screenshot({path:join(process.env.RAYTECH_SCREENSHOTS,'monitor-'+label+'.png')});
   await page.close();

@@ -72,7 +72,9 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch,
   const enabled=config.elements.enabled,enabledLabel=enabled.closest('label'),emergency=el('emergency');
   enabled.setAttribute('form',config.id);
   serviceControls=document.createElement('div');serviceControls.dataset.serviceControls='';
-  serviceControls.append(enabledLabel,emergency,reactivate,el('security'));
+  const preference=document.createElement('small');
+  preference.textContent='Preferência administrativa. A proteção financeira continua em vigor.';
+  serviceControls.append(enabledLabel,preference,emergency,reactivate,el('security'));
   const estimateCard=document.createElement('article'),service=document.createElement('article');
   estimateCard.append(el('cost').closest('label').previousElementSibling,el('cost').closest('label'),el('estimate'));
   const limitsTitle=document.createElement('h2');limitsTitle.textContent='Limites operacionais';config.prepend(limitsTitle);

@@ -44,7 +44,7 @@ export async function fullAppAsset(path,vendorRoot,reference=false,recovery=fals
   return {type:types.html,data:html};
  }
  if(key==='sw.js'){
-  const cache=recovery?'raytech-smart-ai-recovery-shell':'raytech-smart-ai-0854-shell';
+  const cache=recovery?'raytech-smart-ai-recovery-shell':'raytech-smart-ai-0854-2-shell';
   const base=['/app/','/app/manifest.webmanifest',...Array.from(allowed,path=>'/app/'+path),
    ...Array.from(vendor,path=>'/app/vendor/'+path).filter(path=>!allowed.has(path.slice(5))),'/integration/full-app-ui.mjs',
    '/integration/full-app-scripts.mjs','/integration/credit-scenarios.mjs','/integration/review-store.mjs','/integration/native-invoice.mjs','/integration/review.mjs','/integration/lab.css',
@@ -53,8 +53,8 @@ export async function fullAppAsset(path,vendorRoot,reference=false,recovery=fals
    const cacheName=${JSON.stringify(cache)},paths=${JSON.stringify(base)};
    self.addEventListener('install',event=>event.waitUntil(caches.open(cacheName).then(cache=>cache.addAll(paths))));
    self.addEventListener('activate',event=>{
-    if(cacheName==='raytech-smart-ai-0854-shell'){
-     event.waitUntil(Promise.all(['raytech-smart-ai-0851-shell','raytech-smart-ai-0852-shell','raytech-smart-ai-0853-shell'].map(name=>caches.delete(name))));
+    if(cacheName==='raytech-smart-ai-0854-2-shell'){
+     event.waitUntil(Promise.all(['raytech-smart-ai-0851-shell','raytech-smart-ai-0852-shell','raytech-smart-ai-0853-shell','raytech-smart-ai-0854-shell'].map(name=>caches.delete(name))));
     }
    });
    self.addEventListener('fetch',event=>{
