@@ -60,9 +60,9 @@ jobs:
           retention-days: 3
 
       - name: Package the loopback-only Smart AI lab
-        run: git archive --format=zip --output=raytech-smart-ai-084.zip HEAD experiments/smart-ai-server
+        run: git archive --format=zip --output=raytech-smart-ai-085.zip HEAD experiments/smart-ai-server
       - uses: actions/upload-artifact@v4
         with:
-          name: raytech-smart-ai-084-${{ github.sha }}
-          path: raytech-smart-ai-084.zip
+          name: raytech-smart-ai-085-${{ github.sha }}
+          path: raytech-smart-ai-085.zip
           if-no-files-found: error

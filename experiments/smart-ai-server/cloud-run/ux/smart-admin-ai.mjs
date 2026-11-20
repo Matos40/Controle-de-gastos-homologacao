@@ -114,7 +114,7 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
    'Auditoria simulada · '+number.format(overview.auditCount)+' alterações registradas':'';
   const {settings}=overview;
   const finance=overview.finance;
-  el('admission').textContent=finance?.suspended?'Suspensão financeira automática.':!settings.enabled?'Suspensão administrativa manual.':'Novas leituras habilitadas.';
+  el('admission').textContent=finance?.suspended?'Suspensão financeira automática.':!settings.enabled?'Novas leituras suspensas pela administração.':'Novas leituras habilitadas.';
   if(finance){
    el('finance').textContent=(finance.suspended?'Suspensa pelo limite financeiro':'Proteção financeira ativa')+
     ' · Orçamento mensal '+currency.format(finance.budgetCents/100);
