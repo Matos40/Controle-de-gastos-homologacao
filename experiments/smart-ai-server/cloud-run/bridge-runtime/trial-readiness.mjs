@@ -24,7 +24,7 @@ export function createTrialGate({store,runId,requestId,absoluteDeadline,clock=Da
   throw Error('TRIAL_STATE_CONFLICT');
  }
  function advance(from,to,details={},signal){
-  return change(s=>s.phase===from&&clock()<absoluteDeadline?{phase:to,...details}:null,signal);
+  return change(s=>s.phase===from&&(clock()<absoluteDeadline||['reversing','reversed'].includes(to))?{phase:to,...details}:null,signal);
  }
  return {
   read,
@@ -129,4 +129,21 @@ export async function runControlledClient({gate,executionId,identify,checkPrivat
  try{result=await bounded(s=>extract(permit.requestId,s),execution);}
  finally{await bounded(s=>gate.report(executionId,result,s),signal);}
  return true;
+}
+
+// Explicit, operator-authorized recovery after the absolute deadline. Never
+// reopen admission; a failed read leaves the durable gate closed.
+export async function recoverClosedTrial({gate,ops,signal}={}){
+ if(!signal||typeof gate?.block!=='function')throw Error('RECOVERY_SIGNAL_REQUIRED');
+ signal.throwIfAborted();
+ const current=await gate.block(signal)??await gate.read(signal);
+ if(current.phase==='reversed')return current;
+ if(!await ops.blockAdmissions(signal))throw Error('ADMISSION_BLOCK_UNCONFIRMED');
+ if(current.admitted){
+  if(!await ops.drainDispatch(current,signal))throw Error('DISPATCH_DRAIN_UNCONFIRMED');
+  if(!await ops.reconcile(current.requestId,signal))throw Error('RECONCILIATION_UNCONFIRMED');
+ }
+ if(current.phase!=='reversing'&&!await gate.reversing(signal))throw Error('REVERSAL_NOT_CONFIRMED');
+ if(!await ops.restore(signal))throw Error('RESTORATION_UNCONFIRMED');
+ return gate.reversed(signal);
 }
