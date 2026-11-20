@@ -1,6 +1,7 @@
 import {Buffer} from 'node:buffer';
 import {createRestStore} from '../firestore.mjs';
 import {geminiProvider} from '../gemini.mjs';
+import {invoiceInstructions,invoiceSchema} from './invoice-contract.mjs';
 import {authorizePremium, FEATURE} from './policy.mjs';
 import {extractInvoice, MAX_BYTES, validateInvoiceBytes} from './invoice.mjs';
 import {validRequestId} from '../legacy/usage.mjs';
@@ -216,11 +217,11 @@ export function createCloudRunHandler(transport = fetch,{connect,verifyPush=crea
           ? send(413, {error:'FILE_TOO_LARGE'}) : send(400, {error:'INVALID_FILE'});
       }
       const provider = geminiProvider(env.RAYTECH_GEMINI_API_KEY, counted,
-        metrics => { providerMetrics = metrics; }, binary);
+        metrics => { providerMetrics = metrics; }, binary, {schema:invoiceSchema,instructions:invoiceInstructions});
       let result;
       try {
         result = await extractInvoice({method:'POST',headers,body},{
-          verifyToken, readPermissions, reserveUsage, finishOutcome,
+          verifyToken, readPermissions, reserveUsage, finishOutcome,invoiceContractVersion:2,
           provider:file => provider({...file,signal:AbortSignal.any([file.signal, deadline])}),
         }, {timeoutMs:27000, decodeFile:binary ? file => validateInvoiceBytes(file.mimeType,file.bytes) : undefined});
       } finally {

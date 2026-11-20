@@ -49,9 +49,10 @@ const transport=async(url,options)=>{
  assert.equal(JSON.parse(options.body).contents[0].parts[0].inlineData.data,fakeInvoice);
  providerCalls++;
  if(providerCalls===2)return new Response(null,{status:503});
- const row={title:'Compra fictícia',date:'2026-11-07',installmentValue:12,isInstallment:false,
-  currentInstallment:1,installments:1,totalAmount:12};
- return Response.json({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify([row])}]}}],
+ const row={kind:'PURCHASE',title:'Compra fictícia',date:'2026-11-07',amountCents:1200,
+  currentInstallment:null,installments:null};
+ const statement={entries:[row],statementTotalCents:1200,priorBalanceCents:null,priorPaymentsCents:null,balanceBasis:'ACTIVITY_ONLY'};
+ return Response.json({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(statement)}]}}],
   usageMetadata:{promptTokenCount:610,candidatesTokenCount:90,totalTokenCount:710,thoughtsTokenCount:10}});
 };
 const handler=createCloudRunHandler(transport,{

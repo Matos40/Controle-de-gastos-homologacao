@@ -1,5 +1,6 @@
 import {Buffer} from 'node:buffer';
 import {authorizePremium,FEATURE} from './policy.mjs';
+import {reconcileInvoice,reviewItems} from './invoice-contract.mjs';
 export const MAX_BYTES=10*1024*1024;
 export const MAX_ITEMS=1000;
 export const TIMEOUT_MS=15000;
@@ -63,14 +64,19 @@ export async function extractInvoice(req,deps,{timeoutMs=TIMEOUT_MS,decodeFile=d
    Promise.resolve().then(()=>deps.provider({...file,signal:controller.signal})),
    new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Error('TIMEOUT'));},timeoutMs);})
   ]);
-  const items=validateResult(result);
+  const invoice=Array.isArray(result)?undefined:reconcileInvoice(result);
+  const items=invoice?reviewItems(invoice.entries):validateResult(result);
   // Re-check account before delivering results; a downgrade during processing is denied.
   const final=await authorize();
   if(final.status!==200)return failed(final.status,'ACCESS_DENIED');
   resultStatus='completed';
   try{await finish('completed');}catch{return fail(503,'OUTCOME_UNAVAILABLE');}
-  return {status:200,body:{items,requiresReview:true,simulated:true}};
- }catch(e){return failed(controller.signal.aborted?504:502,controller.signal.aborted?'TIMEOUT':'PROCESSING_FAILED');}
+  return {status:200,body:{items,...invoice,requiresReview:true,simulated:true}};
+ }catch(e){
+  const response=failed(controller.signal.aborted?504:502,controller.signal.aborted?'TIMEOUT':'PROCESSING_FAILED');
+  if(e.message==='INVALID_PROVIDER_RESPONSE'&&deps.invoiceContractVersion===2)response.body.reconciliation={status:'INVALID'};
+  return response;
+ }
  finally{
   clearTimeout(timer);controller.abort();file.bytes.fill(0);
   if(failure&&resultStatus==='failed'&&deps.reserveUsage&&deps.finishOutcome){

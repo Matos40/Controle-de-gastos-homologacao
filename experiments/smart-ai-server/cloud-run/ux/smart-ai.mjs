@@ -117,7 +117,11 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch})
       }else{
         result=data;review.hidden=typeof onReview!=='function';
         input.value='';selectedFile=undefined;requestId=undefined;
-        status.textContent='Leitura concluída. Confira os lançamentos antes de adicioná-los.';
+        const reconciliation=data.reconciliation;
+        const reviewMessages={DIVERGENT:'O total da fatura diverge da soma calculada. Revise os valores.',
+          INCOMPLETE:'Faltam dados para reconciliar o total. Revise a fatura.'};
+        status.textContent=(reviewMessages[reconciliation?.status]??'Leitura concluída. Confira os lançamentos antes de adicioná-los.')+
+          (reconciliation?.warnings?.includes('POSSIBLE_DUPLICATES')?' Há possíveis duplicidades.':'');
       }
     }catch(error){status.textContent=messages[error.message]??unavailable;}
     finally{await refresh({announce:false});busy=false;render();}
