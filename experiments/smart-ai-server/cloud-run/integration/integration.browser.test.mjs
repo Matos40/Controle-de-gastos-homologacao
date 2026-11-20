@@ -16,7 +16,7 @@ const enter=async(page,profile='free')=>{
 for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1280,height:900}}],
  ['Android',chromium,devices['Pixel 7']],['iOS',webkit,devices['iPhone 13']]]){
  test('laboratório '+name+' — modalidades, revisão, isolamento e logout',async t=>{
-  const lab=await startLab(),browser=await engine.launch();
+  const lab=await startLab({recovery:true}),browser=await engine.launch();
   t.after(async()=>{await browser.close();await lab.close();});
   const context=await browser.newContext(device),page=await context.newPage();
   const outside=[];
@@ -66,7 +66,7 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1280,hei
 }
 
 test('Smart Admin do laboratório — reautenticação do Owner e auditoria em memória',async t=>{
- const lab=await startLab({mode:'suspended'}),browser=await chromium.launch();
+ const lab=await startLab({mode:'suspended',recovery:true}),browser=await chromium.launch();
  t.after(async()=>{await browser.close();await lab.close();});
  const page=await browser.newPage();
  await page.goto(lab.origin);
@@ -86,7 +86,7 @@ test('orçamento no painel — níveis, consumo superior a 100% e ausência de o
  t.after(()=>browser.close());
  for(const [cents,level,percent] of [[null,null,null],[100,'normal',10],[250,'attention',25],
   [500,'alert',50],[750,'preventive',75],[1250,'critical',125]]){
-  const lab=await startLab({observedCents:cents});
+  const lab=await startLab({observedCents:cents,recovery:true});
   const page=await browser.newPage();
   try{
    await page.goto(lab.origin);
@@ -110,7 +110,7 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1280,hei
  ['Android',chromium,devices['Pixel 7']],['iOS',webkit,devices['iPhone 13']]]){
  test('aplicativo completo '+name+' — dashboard, importação e catálogo original',async t=>{
   assert.ok(process.env.RAYTECH_APP_VENDOR,'RAYTECH_APP_VENDOR deve indicar dependências locais aprovadas');
-  const lab=await startLab({observedCents:500}),browser=await engine.launch();
+  const lab=await startLab({observedCents:500,recovery:true}),browser=await engine.launch();
   t.after(async()=>{await browser.close();await lab.close();});
   const page=await browser.newPage(device);page.setDefaultTimeout(8000);
   const requests=[];
@@ -158,7 +158,7 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1280,hei
   if(name==='desktop'){
    await page.getByRole('button',{name:'Exibir detalhes'}).first().click();
    const detail=page.locator('#smartAdminHost dialog[open]');
-   await detail.getByText(/créditos disponíveis.*cotas da Chave API separadas/).waitFor();
+   await detail.getByText(/créditos disponíveis.*cotas legadas separadas/).waitFor();
    await capture('detalhes');
   }
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
@@ -168,7 +168,7 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1280,hei
 }
 
 test('native workspace keeps role checks on the server and restores invoice navigation',async t=>{
- const lab=await startLab(),browser=await chromium.launch();
+ const lab=await startLab({recovery:true}),browser=await chromium.launch();
  t.after(async()=>{await browser.close();await lab.close();});
  const session=async(profile,query='')=>{
   const page=await browser.newPage({viewport:{width:1280,height:900}});
@@ -234,7 +234,7 @@ test('native workspace keeps role checks on the server and restores invoice navi
 
 for(const [label,size] of [['desktop',{width:1280,height:900}],['mobile',{width:390,height:844}]]){
  test('equivalência de cabeçalho '+label+' com a V34.7.4.5 fixada',async t=>{
-  const lab=await startLab(),browser=await chromium.launch();
+  const lab=await startLab({recovery:true}),browser=await chromium.launch();
   t.after(async()=>{await browser.close();await lab.close();});
   const pictures=[];
   for(const reference of [true,false]){
@@ -258,3 +258,99 @@ for(const [label,size] of [['desktop',{width:1280,height:900}],['mobile',{width:
   assert.deepEqual(pictures[0],pictures[1]);
  });
 }
+
+test('server-only distribution excludes personal reader and rejects local privilege changes',async t=>{
+ const lab=await startLab(),browser=await chromium.launch();
+ t.after(async()=>{await browser.close();await lab.close();});
+ const page=await browser.newPage();
+ const html=await page.request.get(lab.origin+'/app/');
+ assert.match(html.headers()['content-security-policy'],/connect-src 'self'/);
+ assert.doesNotMatch(await html.text(),/geminiApiKeyInput|premiumApiKeyButton|apiKeyModal|processInvoiceWithGemini|aistudio\.google/);
+ for(const path of ['/integration/recovery-invoice.mjs','/integration/lab-ui.mjs','/integration/mount.mjs','/app/js/services/geminiService.js']){
+  assert.equal((await page.request.get(lab.origin+path)).status(),404);
+ }
+ assert.doesNotMatch(await (await page.request.get(lab.origin+'/app/sw.js')).text(),/recovery-invoice|geminiService/);
+ await page.goto(lab.origin+'/app/');
+ await page.getByLabel('Cenário experimental').selectOption('free-0');
+ await page.getByRole('button',{name:'Entrar com Google'}).click();
+ await page.locator('#smartAccountApp').waitFor();
+ await page.locator('#headerToolsToggleBtn').click();
+ await page.locator('#premiumInvoiceButton').click();
+ const modal=page.locator('#ocrModal');
+ await modal.getByText('Créditos esgotados',{exact:true}).waitFor();
+ assert.equal(await modal.locator('[data-file]').isDisabled(),true);
+ assert.equal(await modal.locator('[data-send]').isDisabled(),true);
+ assert.equal(await modal.getByText('Disponível',{exact:true}).isVisible(),false);
+ assert.equal(await modal.getByRole('button',{name:'Smart AI',exact:true}).count(),0);
+ assert.equal(await modal.getByRole('button',{name:'Chave API',exact:true}).count(),0);
+ await page.evaluate(()=>{localStorage.setItem('legacyReader','true');document.body.append(document.createElement('button'));});
+ assert.equal(await page.evaluate(()=>typeof globalThis.openApiKeyModal),'undefined');
+ assert.equal((await page.request.post(lab.origin+'/v1/invoices',{data:{}})).status(),401);
+ const login=await page.request.post(lab.origin+'/lab/session',{headers:{origin:lab.origin},data:{action:'login',profile:'free',scenario:'free-0'}});
+ const {token}=await login.json();
+ const denied=await page.request.post(lab.origin+'/v1/invoices',{headers:{authorization:'Bearer '+token,'x-request-id':'00000000-0000-4000-8000-000000000091'},
+  data:{feature:'invoice-ai',mimeType:file.mimeType,data:file.buffer.toString('base64')}});
+ assert.equal(denied.status(),429);
+ if(process.env.RAYTECH_SCREENSHOTS)await modal.screenshot({path:join(process.env.RAYTECH_SCREENSHOTS,'server-only-free-esgotado.png')});
+});
+
+test('experimental PWA migrates only known obsolete caches and excludes invoices and sessions',async t=>{
+ const lab=await startLab(),browser=await chromium.launch();
+ t.after(async()=>{await browser.close();await lab.close();});
+ const context=await browser.newContext(),page=await context.newPage();
+ await page.goto(lab.origin+'/app/manifest.webmanifest');
+ await page.evaluate(async()=>{
+  await caches.open('foreign-cache');
+  const obsolete=await caches.open('raytech-smart-ai-0852-shell');
+  await obsolete.put('/app/js/services/geminiService.js',new Response('synthetic'));
+ });
+ await page.goto(lab.origin+'/app/');
+ await page.evaluate(()=>navigator.serviceWorker.ready.then(()=>true));
+ await page.waitForFunction(async()=>!(await caches.keys()).includes('raytech-smart-ai-0852-shell'));
+ const result=await page.evaluate(async()=>{
+  const keys=await caches.keys(),cache=await caches.open('raytech-smart-ai-0853-shell');
+  return {keys,paths:(await cache.keys()).map(request=>new URL(request.url).pathname)};
+ });
+ assert.ok(result.keys.includes('foreign-cache'));
+ assert.ok(result.paths.includes('/app/'));
+ assert.ok(!result.paths.some(path=>/geminiService|recovery|\/lab\/|\/v1\//.test(path)));
+ await page.goto(lab.origin+'/app/?online=1');
+ await context.setOffline(true);
+ const response=await page.goto(lab.origin+'/app/?offline=1');
+ assert.ok(response.fromServiceWorker());
+});
+
+test('server-only Premium exhaustion preserves renewal and the neutral finance indicator',async t=>{
+ const lab=await startLab(),browser=await chromium.launch();
+ t.after(async()=>{await browser.close();await lab.close();});
+ const page=await browser.newPage();
+ const start=async(profile,scenario)=>{
+  await page.goto(lab.origin+'/app/');
+  await page.getByLabel('Perfil experimental').selectOption(profile);
+  await page.getByLabel('Cenário experimental').selectOption(scenario);
+  await page.getByRole('button',{name:'Entrar com Google'}).click();
+  await page.locator('#smartAccountApp').waitFor();
+ };
+ await start('premium','premium-0');
+ await page.locator('#headerToolsToggleBtn').click();
+ await page.locator('#premiumInvoiceButton').click();
+ const modal=page.locator('#ocrModal');
+ await modal.getByText('Créditos esgotados',{exact:true}).waitFor();
+ await modal.getByText(/Próxima renovação em/).waitFor();
+ assert.equal(await modal.locator('[data-file]').isDisabled(),true);
+ if(process.env.RAYTECH_SCREENSHOTS)await modal.screenshot({path:join(process.env.RAYTECH_SCREENSHOTS,'server-only-premium-esgotado.png')});
+ await start('owner','');
+ await page.locator('.v345-account summary').click();
+ await page.locator('#smartAdminOpen').click();
+ await page.getByText('Smart AI Monitor',{exact:true}).click();
+ await page.getByText('Aguardando atualização do faturamento',{exact:true}).waitFor();
+ const budget=page.locator('[data-budget-meter]');
+ assert.ok(await budget.locator('progress[data-level=unavailable]').isVisible());
+ assert.match(await budget.textContent(),/Percentual indisponível/);
+ assert.equal(await page.locator('[data-search]').isVisible(),false);
+ const unified=page.locator('#smartAdminHost .admin-tools input');
+ await unified.fill('premium@example.invalid');
+ await unified.press('Enter');
+ await page.getByRole('button',{name:/Perfil fictício premium/}).waitFor();
+ if(process.env.RAYTECH_SCREENSHOTS)await budget.screenshot({path:join(process.env.RAYTECH_SCREENSHOTS,'server-only-orcamento-neutro.png')});
+});

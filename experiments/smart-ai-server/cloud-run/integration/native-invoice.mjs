@@ -1,7 +1,7 @@
 import {mountSmartAI} from '../ux/smart-ai.mjs';
 import {mountReview} from './review.mjs';
 
-export function bindNativeInvoice({modal,apiKey,getIdToken,readCategories,confirm}){
+export function bindNativeInvoice({modal,getIdToken,readCategories,confirm}){
  const get=id=>document.getElementById(id),getNode=(id,key)=>{const node=get(id);node.setAttribute('data-'+key,'');return node;};
  const input=getNode('invoiceFileInput','file'),send=getNode('ocrProcessBtn','send'),zone=get('ocrDropZone');
  const content=zone.parentElement;
@@ -14,12 +14,12 @@ export function bindNativeInvoice({modal,apiKey,getIdToken,readCategories,confir
  topClose.setAttribute('aria-label','Fechar leitura de fatura');
  const chooser=document.createElement('div');
  chooser.className='native-ai-modes';
- chooser.innerHTML='<button type="button" data-native-smart>Smart AI</button><button type="button" data-native-key>Chave API</button>';
+ chooser.innerHTML='<strong>Smart AI</strong><p>Leitura integrada ao Raytech CG. Nenhuma configuração pessoal é necessária.</p>';
  content.before(chooser);
  const details=document.createElement('div');
  details.className='native-ai-details';
  details.innerHTML=`<div class="native-ai-summary" aria-live="polite">
- <span data-plan>Créditos disponíveis</span> <strong data-count>—</strong>
+ <span data-plan>Créditos disponíveis</span> <strong data-count>—</strong> <span data-cap></span><progress data-credit-progress aria-label="Créditos restantes" hidden></progress>
  <p data-renewal hidden></p><p data-operational hidden></p><p data-lock hidden>Créditos esgotados</p></div>
  <button type="button" data-refresh>Atualizar saldo</button><button type="button" data-upgrade hidden>Conhecer o Premium</button>`;
  content.prepend(details);
@@ -27,7 +27,7 @@ export function bindNativeInvoice({modal,apiKey,getIdToken,readCategories,confir
  result.innerHTML='<p data-filename class="text-xs text-slate-400"></p><p data-status role="status" class="text-sm text-slate-200"></p><button type="button" data-review hidden>Revisar lançamentos</button><div data-review-panel></div>';
  content.append(result);
  const review=result.querySelector('[data-review-panel]');
- let opener,returnToInvoice=false,previewFile,previewUrl;
+ let opener,previewFile,previewUrl;
  const preview=get('ocrPreviewContainer'),pdf=get('ocrPdfPreview'),image=get('ocrImagePreview');
  function renderNative({file,busy}){
   get('ocrLoading').classList.toggle('hidden',!busy);
@@ -67,26 +67,7 @@ export function bindNativeInvoice({modal,apiKey,getIdToken,readCategories,confir
   modal.classList.remove('hidden');content.hidden=false;
   void smart.refresh();topClose.focus();
  }
- const keyInput=get('geminiApiKeyInput');
- keyInput.disabled=true;keyInput.placeholder='Configuração simulada';
- const link=apiKey.querySelector('a[href]');
- if(link){link.removeAttribute('href');link.removeAttribute('target');}
- const text=document.createElement('p');text.className='text-xs text-amber-300';
- text.textContent='Ambiente experimental. Nenhuma chave é solicitada ou usada.';
- keyInput.before(text);
- function openKey(){
-  returnToInvoice=visible();
-  if(returnToInvoice&&!close({restoreFocus:false})){returnToInvoice=false;return;}
-  apiKey.classList.remove('hidden');apiKey.querySelector('button')?.focus();
- }
- function closeKey(){
-  apiKey.classList.add('hidden');
-  if(returnToInvoice){returnToInvoice=false;open();}
- }
- Object.assign(globalThis,{openOcrModal:open,closeOcrModal:()=>close(),openApiKeyModal:openKey,
-  closeApiKeyModal:closeKey,saveApiKey:closeKey});
- chooser.querySelector('[data-native-smart]').onclick=()=>{content.hidden=false;void smart.refresh();input.focus();};
- chooser.querySelector('[data-native-key]').onclick=openKey;
+ Object.assign(globalThis,{openOcrModal:open,closeOcrModal:()=>close()});
  for(const eventName of ['dragenter','dragover','drop'])zone.addEventListener(eventName,event=>{
   event.preventDefault();
   if(eventName==='drop'&&!input.disabled)smart.select(event.dataTransfer?.files[0]);
@@ -98,9 +79,8 @@ export function bindNativeInvoice({modal,apiKey,getIdToken,readCategories,confir
  });
  document.addEventListener('keydown',event=>{
   if(event.key!=='Escape')return;
-  if(!apiKey.classList.contains('hidden')){event.preventDefault();closeKey();}
-  else if(visible()){event.preventDefault();close();}
+  if(visible()){event.preventDefault();close();}
  });
  window.addEventListener('offline',()=>{if(visible())void smart.refresh();});
- return {clear(){review.replaceChildren();smart.reset();}};
+ return {open,close,chooser,content,clear(){review.replaceChildren();smart.reset();}};
 }

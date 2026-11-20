@@ -26,7 +26,7 @@ if(native){
  }
 }
 const types={html:'text/html',css:'text/css',mjs:'text/javascript',js:'text/javascript',png:'image/png',woff:'font/woff',woff2:'font/woff2',ttf:'font/ttf',webmanifest:'application/manifest+json'};
-export async function fullAppAsset(path,vendorRoot,reference=false){
+export async function fullAppAsset(path,vendorRoot,reference=false,recovery=false){
  if(!vendorRoot)return;
  let key=path.slice('/app/'.length);
  if(!key){
@@ -37,26 +37,34 @@ export async function fullAppAsset(path,vendorRoot,reference=false){
    .replace('</head>',(native?'':'<link rel="stylesheet" href="./vendor/tailwind.css">')+
     '<link rel="stylesheet" href="/ux/smart-ai.css"><link rel="stylesheet" href="/integration/lab.css"></head>')
    .replace('</body>','<script src="./vendor/xlsx.full.min.js"></script><script src="./vendor/chart.umd.js"></script><script type="module" src="/integration/full-app-ui.mjs"></script></body>');
+  if(!recovery)html=stripPersonalReader(html);
+  else html=html.replace('<script type="module" src="/integration/full-app-ui.mjs">','<script type="module" src="/integration/recovery-invoice.mjs"></script><script type="module" src="/integration/full-app-ui.mjs">');
   if(native)html=html.replace('</body>','<script type="module" src="./js/ui/drawer-viewport.mjs"></script></body>');
   if(!reference)html=html.replace(/v34\.7\.4\.5/gi,'V35.0');
   return {type:types.html,data:html};
  }
  if(key==='sw.js'){
-  const cache='raytech-smart-ai-0852-shell';
+  const cache=recovery?'raytech-smart-ai-recovery-shell':'raytech-smart-ai-0853-shell';
   const base=['/app/','/app/manifest.webmanifest',...Array.from(allowed,path=>'/app/'+path),
    ...Array.from(vendor,path=>'/app/vendor/'+path).filter(path=>!allowed.has(path.slice(5))),'/integration/full-app-ui.mjs',
-   '/integration/full-app-scripts.mjs','/integration/review-store.mjs','/integration/native-invoice.mjs','/integration/mount.mjs','/integration/review.mjs','/integration/lab.css',
-   '/ux/smart-ai.mjs','/ux/smart-ai.css','/ux/smart-admin-ai.mjs','/ux/budget.mjs'];
+   '/integration/full-app-scripts.mjs','/integration/review-store.mjs','/integration/native-invoice.mjs','/integration/review.mjs','/integration/lab.css',
+   ...(recovery?['/integration/recovery-invoice.mjs']:[]),'/ux/smart-ai.mjs','/ux/smart-ai.css','/ux/smart-admin-ai.mjs','/ux/budget.mjs'];
   return {type:types.js,data:`
    const cacheName=${JSON.stringify(cache)},paths=${JSON.stringify(base)};
    self.addEventListener('install',event=>event.waitUntil(caches.open(cacheName).then(cache=>cache.addAll(paths))));
+   self.addEventListener('activate',event=>{
+    if(cacheName==='raytech-smart-ai-0853-shell'){
+     event.waitUntil(Promise.all(['raytech-smart-ai-0851-shell','raytech-smart-ai-0852-shell'].map(name=>caches.delete(name))));
+    }
+   });
    self.addEventListener('fetch',event=>{
     const url=new URL(event.request.url);
     if(event.request.method==='GET'&&url.origin===self.location.origin&&paths.includes(url.pathname)){
-     event.respondWith(fetch(event.request).catch(async()=>{
+     if(url.searchParams.has('reference'))return;
+     event.respondWith((async()=>{
       const cached=await caches.match(url.pathname,{cacheName});
-      return cached??Response.error();
-     }));
+      return cached??new Response('Recursos locais indisponíveis. Reconecte para preparar o aplicativo.',{status:503});
+     })());
     }
    });
   `};
@@ -67,5 +75,13 @@ export async function fullAppAsset(path,vendorRoot,reference=false){
  })};
  const file=allowed.has(key)?new URL(key,officialRoot):key.startsWith('vendor/')&&vendor.has(key.slice(7))?join(vendorRoot,key.slice(7)):null;
  if(file)return {type:types[key.split('.').at(-1)],data:await readFile(file)};
+}
+export function stripPersonalReader(html){
+ return html.replace(/<!-- Modal Chave da API Gemini -->[\s\S]*?(?=<!-- Modal IA Leitor)/i,'')
+  .replace(/<button\b[^>]*id="premiumApiKeyButton"[\s\S]*?<\/button>/i,'')
+  .replace(/<p\b[^>]*id="ocrPdfPrivacy"[\s\S]*?<\/p>/i,'')
+  .replace(/\s+onclick="processInvoiceWithGemini\(\)"/g,'')
+  .replace('Extraia os gastos de imagens e PDFs com IA e configure sua chave Gemini no plano Premium.',
+   'Extraia os gastos de imagens e PDFs com o Smart AI integrado ao Raytech CG.');
 }
 export const officialCopyPaths=['index.html',...allowed];

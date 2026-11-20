@@ -37,3 +37,8 @@ dialog::backdrop { background: #020617b0; }
 }
 #ocrDropZone:has(input:disabled) { opacity:.55; cursor:not-allowed; }
 #smartAdminHost .v3467-monitor [data-smart-admin-ai] .raytech-ai { padding:.8rem; max-width:none; border:0; background:transparent; }
+
+#ocrModal [data-credit-progress] { --fill:#a78bfa; margin-block:.3rem; }
+#smartAdminHost [data-level=unavailable] { --fill:transparent; }
+#smartAdminHost [data-emergency] { color:#fecaca; background:#3f1421; border:1px solid #be3856; }
+#smartAdminHost [data-emergency]:disabled { opacity:.55; }

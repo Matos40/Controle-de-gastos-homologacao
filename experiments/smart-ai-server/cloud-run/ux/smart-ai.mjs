@@ -55,6 +55,12 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch,n
 
   function render(){
     const exhausted=balance?.remaining===0;
+    if(native){
+     const cap=balance?.plan==='premium'?15:2;
+     el('cap').textContent=balance?'de '+cap:'';
+     const meter=el('credit-progress');meter.hidden=!balance;
+     if(balance){meter.max=cap;meter.value=balance.remaining;}
+    }
     el('count').textContent=balance ? String(balance.remaining) : '—';
     el('plan').textContent=balance ? 'Créditos '+(balance.plan==='free'?'Free':'Premium') : 'Créditos disponíveis';
     const operational=el('operational');

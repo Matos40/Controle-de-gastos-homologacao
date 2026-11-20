@@ -14,6 +14,14 @@ login.querySelector('[data-login-enter]').before(role);
 const indicator=document.createElement('p');
 indicator.textContent='Ambiente isolado · use somente dados fictícios';
 role.before(indicator);
+const scenario=document.createElement('select');
+scenario.setAttribute('aria-label','Cenário experimental');
+for(const [value,label] of [['','Padrão · créditos completos, faturamento indisponível'],['free-1','Free com 1 crédito'],['free-0','Free sem créditos'],
+ ['premium-partial','Premium parcialmente utilizado'],['premium-0','Premium sem créditos'],['unavailable','Serviço indisponível'],
+ ['administrative','Suspensão administrativa'],['suspended','Suspensão financeira e reativação'],
+ ['cost-0','Faturamento observado: zero'],['cost-15','Consumo 15%'],['cost-25','Consumo 25%'],['cost-50','Consumo 50%'],
+ ['cost-75','Consumo 75%'],['cost-100','Consumo 100%'],['cost-125','Consumo 125%']])scenario.add(new Option(label,value));
+role.after(scenario);
 const storage=new Map();
 globalThis.raytechStorage={getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,String(value)),removeItem:key=>storage.delete(key)};
 let token,invoiceView,cleanupAdmin;
@@ -46,7 +54,7 @@ async function signIn(){
 }
 async function activate(){
  const profile=role.value;
- ({token}=await request('login',{profile}));
+ ({token}=await request('login',{profile,scenario:scenario.value}));
  const privilege=await fetch('/v1/admin/ai',{method:'POST',cache:'no-store',
   headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:'{"action":"overview"}'});
  const adminRole=privilege.ok?(await privilege.json()).role:null;
@@ -61,15 +69,36 @@ async function activate(){
  if(get('v345Avatar'))get('v345Avatar').textContent=adminRole==='owner'?'OF':'AF';
  if(get('v345Identity'))get('v345Identity').textContent=(adminRole==='owner'?'Owner':'Admin')+' fictício';
  if(get('v345Logout'))get('v345Logout').onclick=signOut;
- if(get('productionCloudProfile'))get('productionCloudProfile').hidden=false;
+ const cloud=get('productionCloudProfile');
+ if(cloud){cloud.hidden=false;cloud.classList.add('flex');}
+ if(get('productionCloudB2'))get('productionCloudB2').hidden=false;
+ if(get('productionCloudPlanLabel'))get('productionCloudPlanLabel').textContent=profile==='premium'?'Premium':'Free';
+ if(get('productionCloudPremiumGreeting'))get('productionCloudPremiumGreeting').hidden=profile!=='premium';
+ const renderCloud=state=>{
+  const label=get('productionCloudConnection');
+  label.textContent=state+' · simulação';
+  get('productionCloudHeader').setAttribute('aria-label','Nuvem: '+state+' · simulação');
+  get('productionCloudLastSync').textContent=state==='Sincronizado'?'Última sincronização: '+new Date().toLocaleTimeString('pt-BR')+' · Nuvem V2 · revisão fictícia 1':'Última sincronização: —';
+  const glyph=({Sincronizado:'synced',Sincronizando:'syncing',Offline:'offline',Desconectado:'disconnected','Atenção':'attention'})[state];
+  for(const icon of get('productionCloudHeader').querySelectorAll('[data-cloud-glyph]'))icon.style.display=icon.dataset.cloudGlyph===glyph?'':'none';
+ };
+ renderCloud(navigator.onLine?'Desconectado':'Offline');
+ const sync=get('productionCloudSyncNow');
+ sync.hidden=false;sync.disabled=false;sync.onclick=()=>{
+  if(!navigator.onLine){renderCloud('Offline');return;}
+  renderCloud('Sincronizando');setTimeout(()=>renderCloud(navigator.onLine?'Sincronizado':'Offline'),350);
+ };
+ window.addEventListener('offline',()=>renderCloud('Offline'));
+ window.addEventListener('online',()=>renderCloud('Desconectado'));
  if(get('productionCloudGuest'))get('productionCloudGuest').hidden=true;
  if(get('productionCloudName'))get('productionCloudName').textContent='Perfil fictício '+profile;
  if(get('productionCloudInitial'))get('productionCloudInitial').textContent=profile.slice(0,1).toUpperCase();
  globalThis.raytechInvoiceState=()=>({visible:true,premium:true,reason:''});
- invoiceView=bindNativeInvoice({modal,apiKey:get('apiKeyModal'),getIdToken,
+ invoiceView=bindNativeInvoice({modal,getIdToken,
   readCategories:()=>Object.entries(CATEGORIES).map(([id,{label,icon}])=>({id,label:icon+' '+label})),
   confirm:(invoice,rows)=>confirmations.confirm(invoice,rows),
  });
+ globalThis.raytechRecoveryBind?.(invoiceView);
  if(['owner','admin'].includes(adminRole)){
   const accounts=['free','premium','admin','owner'].map(name=>({uid:'lab-'+name,name:'Perfil fictício '+name,
    role:['admin','owner'].includes(name)?name:'user',plan:name==='premium'?'premium':'free',blocked:false}));
@@ -80,7 +109,8 @@ async function activate(){
    if(monitor&&!monitor.querySelector('[data-smart-admin-ai]')){
     const slot=document.createElement('section');slot.dataset.smartAdminAi='';
     monitor.querySelector('summary').after(slot);
-    mountSmartAdminAI(slot,{getIdToken,reauthenticate,embedded:true});
+    mountSmartAdminAI(slot,{getIdToken,reauthenticate,embedded:true,neutralBudget:!get('apiKeyModal'),
+     unifiedSearch:get('apiKeyModal')?null:adminHost.querySelector('.admin-tools input')});
    }
    for(const detail of adminHost.querySelectorAll('dialog .v3467-ai:not([data-credits-mounted])')){
     detail.dataset.creditsMounted='';
@@ -91,7 +121,7 @@ async function activate(){
      body:JSON.stringify({action:'credits',uid})})).then(async reply=>{
       if(!reply.ok)throw Error('ACCESS_DENIED');
       const data=await reply.json();
-      line.textContent='Smart AI · '+data.remaining+' créditos disponíveis · '+(data.plan==='premium'?'Premium':'Free')+' · cotas da Chave API separadas';
+      line.textContent='Smart AI · '+data.remaining+' créditos disponíveis · '+(data.plan==='premium'?'Premium':'Free')+' · cotas legadas separadas';
      }).catch(()=>{line.textContent='Créditos Smart AI indisponíveis.';});
    }
   });

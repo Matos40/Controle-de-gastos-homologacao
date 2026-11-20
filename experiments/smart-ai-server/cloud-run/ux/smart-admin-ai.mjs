@@ -20,7 +20,7 @@ export function googleOwnerReauthentication(auth,provider,reauthenticateWithPopu
  };
 }
 
-export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch,embedded=false}){
+export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch,embedded=false,unifiedSearch=null,neutralBudget=false}){
  root.innerHTML=`
   <section class="raytech-ai raytech-ai-admin" aria-label="Smart Admin AI">
    <header class="raytech-ai__header">${embedded?'<h3>Consumo e proteção Smart AI</h3>':'<h1>Smart Admin AI</h1>'}<button type="button" data-reload>Atualizar indicadores</button></header>
@@ -136,9 +136,14 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch,
     (overview.simulated?'Faturamento simulado: ':'Faturamento observado: ')+currency.format(finance.observedCents/100)+' · '+
     number.format(100*finance.observedCents/finance.budgetCents)+'% · Atualizado em '+new Date(finance.updatedAt).toLocaleString('pt-BR');
    const level=budgetLevel(finance.observedCents,finance.budgetCents),meter=el('budget-meter');
-   meter.hidden=!level;
+   meter.hidden=!level&&!neutralBudget;
+   if(!level&&neutralBudget){
+    const progress=meter.querySelector('progress');progress.value=0;progress.dataset.level='unavailable';
+    progress.setAttribute('aria-valuetext','Consumo indisponível');
+    el('budget-level').textContent='Percentual indisponível';
+   }
    if(level){
-    const progress=meter.querySelector('progress');progress.value=level.width;progress.dataset.level=level.level;
+    const progress=meter.querySelector('progress');progress.value=level.width;progress.dataset.level=level.level;progress.removeAttribute('aria-valuetext');
     el('budget-level').textContent=level.label+' · '+number.format(level.percent)+'%';
    }
    el('alerts').replaceChildren(...finance.alerts.slice().reverse().map(alert=>{
@@ -202,6 +207,16 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch,
   event.preventDefault();query=search.querySelector('input').value.trim();cursor=null;el('more').hidden=true;searchPage(false);
  });
  el('more').onclick=()=>{if(cursor)searchPage(true);};
+ if(unifiedSearch){
+  search.hidden=true;
+  unifiedSearch.placeholder='Buscar por nome, e-mail ou UID';
+  unifiedSearch.addEventListener('keydown',event=>{
+   if(event.key!=='Enter')return;
+   event.preventDefault();
+   query=unifiedSearch.value.trim();cursor=null;el('more').hidden=true;
+   if(query.length>=2){root.closest('details').open=true;searchPage(false);}
+  });
+ }
  el('emergency').onclick=()=>{
   if(overview?.role!=='owner'||!overview.settings.enabled)return;
   config.elements.enabled.checked=false;

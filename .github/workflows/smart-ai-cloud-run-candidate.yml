@@ -80,9 +80,11 @@ jobs:
           git archive HEAD experiments/smart-ai-server | tar -x -C "$RUNNER_TEMP/raytech-app"
           RAYTECH_OFFICIAL_SNAPSHOT="$RUNNER_TEMP/raytech-reference" node experiments/smart-ai-server/cloud-run/integration/package-full-app.mjs "$RUNNER_TEMP/raytech-app"
           cp -r "$RUNNER_TEMP/raytech-app-vendor" "$RUNNER_TEMP/raytech-app/vendor"
-          (cd "$RUNNER_TEMP/raytech-app" && zip -qr "$GITHUB_WORKSPACE/raytech-smart-ai-0852.zip" .)
+          runtime="$RUNNER_TEMP/raytech-app/experiments/smart-ai-server/cloud-run/integration"
+          rm "$runtime/recovery-invoice.mjs" "$runtime/mount.mjs" "$runtime/lab-ui.mjs" "$runtime/index.html" "$runtime/workspace.mjs"
+          (cd "$RUNNER_TEMP/raytech-app" && zip -qr "$GITHUB_WORKSPACE/raytech-smart-ai-0853.zip" .)
       - uses: actions/upload-artifact@v4
         with:
-          name: raytech-smart-ai-0852-${{ github.sha }}
-          path: raytech-smart-ai-0852.zip
+          name: raytech-smart-ai-0853-${{ github.sha }}
+          path: raytech-smart-ai-0853.zip
           if-no-files-found: error

@@ -1,3 +1,4 @@
+import {COLLECTION,monthOf} from '../quota.mjs';
 import {randomUUID} from 'node:crypto';
 import {createCommercialStore} from '../store.mjs';
 import {readCreditBalance} from '../handler.mjs';
@@ -40,12 +41,16 @@ function memoryDb(){
  return {docs,db};
 }
 
-export function createLab({origin,mode='reconciled',observedCents=mode==='suspended'?750:null,clock=Date.now}){
+export function createLab({origin,mode='reconciled',observedCents=mode==='suspended'?750:null,clock=Date.now,usedFree=0,usedPremium=0}){
  const {docs,db}=memoryDb(),sessions=new Map(),queries=new Map(),securityEvents=[],emergencyVersions=new Set();
  for(const [role,uid] of Object.entries(profiles)){
   docs.set('raytechV345Accounts/'+uid,{uid,blocked:false,plan:role==='premium'?'premium':'free',name:'Perfil fictício '+role});
   if(['admin','owner'].includes(role))docs.set('raytechV345Roles/'+uid,{role,active:true});
  }
+ for(const [role,uid] of Object.entries(profiles)){
+  docs.set(COLLECTION+'/'+uid,{free:usedFree,premium:usedPremium,month:monthOf(clock()),lastAt:0,older:0,newer:0,pending:null});
+ }
+ if(mode==='administrative')docs.set('raytechLabCommercialGlobalV350/config',{enabled:false,version:0});
  const store=createCommercialStore(db,{clock});
  const verifyFirebase=async token=>{
   const identity=sessions.get(token);
