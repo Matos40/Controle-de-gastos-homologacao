@@ -53,7 +53,7 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
       <label>Limite diário (UTC)<input name="day" type="number" min="1" max="30" required></label>
       <label>Limite mensal (UTC)<input name="month" type="number" min="1" max="60" required></label>
      </div>
-     <button type="submit">Salvar configuração</button> <button type="button" data-emergency>Suspender novas leituras</button>
+     <button type="submit">Salvar configuração</button> <button type="button" data-emergency>Suspender novas leituras</button><button type="submit" data-emergency-submit hidden></button>
     </form>
     <h2>Estimativa de custos</h2>
     <label>Valor estimado por tentativa em reais<input data-cost type="number" min="0" step="0.0001" inputmode="decimal"></label>
@@ -115,7 +115,7 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
    'Auditoria simulada · '+number.format(overview.auditCount)+' alterações registradas':'';
   const audit=el('audit-events');
   audit.hidden=!overview.audit?.length;
-  const actions={reactivateFinance:'Reativação financeira',configure:'Alteração de limites',suspend:'Suspensão administrativa',finance:'Suspensão financeira',search:'Consulta administrativa',admin:'Operação administrativa'};
+  const actions={reactivateFinance:'Reativação financeira',configure:'Alteração de limites',suspend:'Suspensão administrativa',emergency:'Suspensão emergencial',finance:'Suspensão financeira',search:'Consulta administrativa',admin:'Operação administrativa'};
   const describe=value=>value&&typeof value==='object'?
    (value.enabled?'Ativo':'Suspenso')+' · '+(value.budget?.day??'—')+'/dia · '+(value.budget?.month??'—')+'/mês':
    typeof value==='number'?'Revisão '+value:value??'—';
@@ -205,15 +205,16 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
  el('emergency').onclick=()=>{
   if(overview?.role!=='owner'||!overview.settings.enabled)return;
   config.elements.enabled.checked=false;
-  config.requestSubmit();
+  config.requestSubmit(el('emergency-submit'));
  };
  config.addEventListener('submit',event=>{
   event.preventDefault();
   if(overview?.role!=='owner')return;
+  const action=overview.simulated&&event.submitter===el('emergency-submit')?'emergencySuspend':'configure';
   void run(async()=>{
    const settings={enabled:config.elements.enabled.checked,day:config.elements.day.valueAsNumber,
     month:config.elements.month.valueAsNumber,expectedVersion:overview.settings.version};
-   try{await request('configure',settings,true);}
+   try{await request(action,settings,true);}
    catch(error){if(error.message==='VERSION_CONFLICT')await load();throw error;}
    await load();return 'Configuração salva.';
   });

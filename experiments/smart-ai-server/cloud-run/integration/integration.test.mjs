@@ -176,3 +176,15 @@ test('simulated confirmation snapshots the extraction and selected edits separat
  assert.equal(store.read()[0].rows[0].amountCents,1890);
  store.clear();assert.deepEqual(store.read(),[]);
 });
+
+test('financial audit survives reactivation and distinguishes emergency suspension',async()=>{
+ const lab=createLab({origin,mode:'suspended'});await lab.ready;
+ const old=lab.login('owner'),fresh=lab.login('owner',old);
+ const post=body=>call(lab,fresh,'/v1/admin/ai',body);
+ assert.equal((await post({action:'reactivateFinance',confirmed:true,expectedVersion:1})).status,200);
+ assert.equal((await post({action:'emergencySuspend',enabled:false,day:30,month:60,expectedVersion:0})).status,200);
+ const state=await (await post({action:'overview'})).json();
+ assert.equal(state.finance.suspended,false);
+ assert.equal(state.settings.enabled,false);
+ assert.deepEqual(new Set(state.audit.map(event=>event.action)),new Set(['finance','reactivateFinance','emergency']));
+});

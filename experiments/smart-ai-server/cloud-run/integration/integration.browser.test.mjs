@@ -110,7 +110,7 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1280,hei
  ['Android',chromium,devices['Pixel 7']],['iOS',webkit,devices['iPhone 13']]]){
  test('aplicativo completo '+name+' — dashboard, importação e catálogo original',async t=>{
   assert.ok(process.env.RAYTECH_APP_VENDOR,'RAYTECH_APP_VENDOR deve indicar dependências locais aprovadas');
-  const lab=await startLab(),browser=await engine.launch();
+  const lab=await startLab({observedCents:500}),browser=await engine.launch();
   t.after(async()=>{await browser.close();await lab.close();});
   const page=await browser.newPage(device);page.setDefaultTimeout(8000);
   const requests=[];
@@ -150,6 +150,7 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1280,hei
   await smart.getByRole('button',{name:/Perfil fictício owner/}).waitFor();
   await smart.getByRole('button',{name:'Atualizar indicadores'}).click();
   await smart.getByText('Auditoria administrativa',{exact:true}).click();
+  await smart.locator('progress[data-level=alert]').waitFor();
   await capture('admin');
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   assert.deepEqual(requests,[]);

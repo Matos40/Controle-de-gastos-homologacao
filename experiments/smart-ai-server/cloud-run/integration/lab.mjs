@@ -41,7 +41,7 @@ function memoryDb(){
 }
 
 export function createLab({origin,mode='reconciled',observedCents=mode==='suspended'?750:null,clock=Date.now}){
- const {docs,db}=memoryDb(),sessions=new Map(),queries=new Map(),securityEvents=[];
+ const {docs,db}=memoryDb(),sessions=new Map(),queries=new Map(),securityEvents=[],emergencyVersions=new Set();
  for(const [role,uid] of Object.entries(profiles)){
   docs.set('raytechV345Accounts/'+uid,{uid,blocked:false,plan:role==='premium'?'premium':'free',name:'Perfil fictício '+role});
   if(['admin','owner'].includes(role))docs.set('raytechV345Roles/'+uid,{role,active:true});
@@ -102,12 +102,13 @@ export function createLab({origin,mode='reconciled',observedCents=mode==='suspen
     if(securityEvents.length>100)securityEvents.shift();
     return send(200,{rows,nextCursor});
    }
-   const result=await handleSmartAdmin(request,body,adminContext);
+   const emergency=body?.action==='emergencySuspend'&&body.enabled===false;
+   const result=await handleSmartAdmin(request,emergency?{...body,action:'configure'}:body,adminContext);
+   if(emergency&&result.status===200)emergencyVersions.add(result.body.settings.version);
    if(result.status===200&&body.action==='overview'){
     const audit=[...docs.entries()].filter(([key])=>key.startsWith('raytechLabSmartAiAdminAuditV350/'));
     result.body.auditCount=audit.length;
-    const events=[...audit.map(([,event])=>({...event,result:'accepted',action:event.action??(event.after?.enabled===false?'suspend':'configure')})),...securityEvents];
-    if(finance().suspended)events.push({actorUid:null,at:finance().publishedAt,action:'finance',result:'accepted',before:'Em operação',after:'Suspenso',reason:'Limite financeiro observado'});
+    const events=[...audit.map(([,event])=>({...event,result:'accepted',action:event.action??(emergencyVersions.has(event.after?.version)?'emergency':event.after?.enabled===false?'suspend':'configure')})),...securityEvents];
     result.body.audit=events.sort((a,b)=>b.at-a.at).slice(0,20).map(({actorUid,...event})=>{
      const role=Object.keys(profiles).find(key=>profiles[key]===actorUid);
      return {...event,actor:role?'Perfil fictício '+role:'Finance Guard',role:role??'Sistema'};
@@ -131,10 +132,18 @@ export function createLab({origin,mode='reconciled',observedCents=mode==='suspen
   });
   return send(result.status,result.body);
  }
- const observe=(cents,id=randomUUID())=>recordBudgetPush(db,{
-  period:new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit'}).format(clock()),
-  publishedAt:clock(),observedCents:cents,current:true,id,
- });
+ async function observe(cents,id=randomUUID()){
+  const ref=financeRef(db);
+  const before=financeState(docs.get(ref.name));
+  const at=clock(),period=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit'}).format(at);
+  const applied=await recordBudgetPush(db,{period,publishedAt:at,observedCents:cents,current:true,id});
+  if(applied&&!before.suspended&&financeState(docs.get(ref.name)).suspended){
+   securityEvents.push({actorUid:null,at,action:'finance',result:'accepted',
+    before:'Em operação',after:'Suspenso',reason:'Limite financeiro observado'});
+   if(securityEvents.length>100)securityEvents.shift();
+  }
+  return applied;
+ }
  return {login,logout:token=>sessions.delete(token),bridge:createBridge({verifyFirebase,invoke,origin,clock}),
   observe,ready:observedCents===null?Promise.resolve():observe(observedCents)};
 }
