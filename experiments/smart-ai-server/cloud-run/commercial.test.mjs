@@ -92,3 +92,24 @@ test('HTTP server disabled by default and isolated adapter forwards JSON',async(
  try{const r=await fetch('http://127.0.0.1:'+enabled.address().port+'/v1/invoices',{method:'POST',body:'{"synthetic":true}'});assert.deepEqual(await r.json(),{synthetic:true});}
  finally{await new Promise(r=>enabled.close(r));}
 });
+
+test('expired undelivered reservation recovered once; late success rejected',async()=>{
+ const {db}=mockDb();let now=t;
+ const s=createCommercialStore(db,{clock:()=>now,budget:{day:10,month:10,perAttempt:1}});
+ const a={uid:'u',requestId:id(31)};
+ assert.equal((await s.reserveUsage(a)).status,200);
+ now+=119999;
+ assert.equal(await s.recoverExpired('u'),false);
+ now++;
+ assert.equal(await s.recoverExpired('u'),true);
+ assert.equal(await s.recoverExpired('u'),false);
+ assert.equal((await s.readCredits('u')).remaining,2);
+ await assert.rejects(s.finishOutcome({...a,status:'completed'}));
+ assert.equal((await s.reserveUsage(a)).status,409);
+ const b={uid:'u',requestId:id(32)};
+ assert.equal((await s.reserveUsage(b)).status,200);
+ await s.finishOutcome({...b,status:'completed'});
+ now+=120001;
+ assert.equal(await s.recoverExpired('u'),false);
+ assert.equal((await s.readCredits('u')).remaining,1);
+});
