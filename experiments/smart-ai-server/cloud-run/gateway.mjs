@@ -6,6 +6,7 @@ import {corsFor} from './cors.mjs';
 import {MAX_BYTES} from './invoice.mjs';
 import {invalidLimiter} from './security-guard.mjs';
 import {BACKEND_AUDIENCE,COMPUTE_PROJECT_NUMBER,FIREBASE_PROJECT} from './projects.mjs';
+import {mountDiagnostic} from './integration/diagnostic-runtime.mjs';
 
 const methods={'/v1/credits':'GET','/v1/invoices':'POST','/v1/admin/ai':'POST'};
 const metadata='http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity';
@@ -32,7 +33,10 @@ export function makeGateway({env=process.env,transport=fetch,
  const configured=env.SMART_AI_GATEWAY_ENABLED==='true';
  const invalid=invalidLimiter();
  const audience=configured?backendAudience(env.SMART_AI_COMPUTE_PROJECT_NUMBER):null;
+ const diagnostic=mountDiagnostic('gateway',env,{transport,identity});
  return createServer({requestTimeout:35000,headersTimeout:10000,maxHeaderSize:16384},async(req,res)=>{
+  try{if(await diagnostic(req,res))return;}
+  catch{if(!res.headersSent)res.writeHead(503,{'cache-control':'no-store'});res.end();return;}
   const cors=corsFor(req,env.SMART_AI_UI_ORIGIN);
   const fail=(status,error)=>{
    if([400,401,403,404,405,413,415].includes(status)&&invalid.record()===30)security({event:'smart_ai_security',code:'GATEWAY_INVALID_RATE'});

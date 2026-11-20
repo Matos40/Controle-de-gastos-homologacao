@@ -3,15 +3,19 @@ import {Readable} from 'node:stream';
 import {pathToFileURL} from 'node:url';
 import {cloudBridge,firebaseAdminVerifier} from '../integration/cloud-bridge.mjs';
 import {FIREBASE_PROJECT} from '../projects.mjs';
+import {requestIdentity} from '../gateway.mjs';
+import {mountDiagnostic} from '../integration/diagnostic-runtime.mjs';
 
 const methods={'/v1/credits':'GET','/v1/invoices':'POST','/v1/admin/ai':'POST'};
 const allowedHeaders=new Set(['authorization','content-type','x-request-id']);
-export function makeBridgeServer({handler,origin}={}){
- return createServer({requestTimeout:30000,headersTimeout:5000,maxHeaderSize:12288},async(req,res)=>{
+export function makeBridgeServer({handler,origin,env=process.env,diagnosticTransport=fetch}={}){
+ const diagnostic=mountDiagnostic('bridge',env,{transport:diagnosticTransport,identity:requestIdentity});
+ return createServer({requestTimeout:30000,headersTimeout:5000,maxHeaderSize:24576},async(req,res)=>{
   res.setHeader('cache-control','no-store');
   res.setHeader('x-content-type-options','nosniff');
   res.setHeader('vary','Origin');
   const reject=(status,error)=>{res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify({error}));};
+  try{if(await diagnostic(req,res))return;}catch{return reject(503,'DIAGNOSTIC_UNAVAILABLE');}
   if(!handler)return reject(503,'EXPERIMENT_UNAVAILABLE');
   if(!Object.hasOwn(methods,req.url))return reject(404,'NOT_FOUND');
   if(req.headers.origin!==origin)return reject(403,'ACCESS_DENIED');

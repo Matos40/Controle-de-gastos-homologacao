@@ -40,7 +40,7 @@ const syntheticReply={status:'ok',mode:'diagnostic',provider:'none'};
 const result=(status,body)=>Response.json(body,{status,headers:{'cache-control':'no-store'}});
 
 // The caller is supplied by the authenticated transport, never by request headers.
-// This candidate is intentionally not mounted by any service entry point.
+// The HTTP adapter supplies the caller only after verifying its signed service token.
 export function createPrivateDiagnostic({
  enabled=false,expectedCaller,verifyFirebase,forward,
 }={}){

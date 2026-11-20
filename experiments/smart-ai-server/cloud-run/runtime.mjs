@@ -3,6 +3,10 @@ const metadata='http://metadata.google.internal/computeMetadata/v1/instance/serv
 
 export function createRuntimeAccess(expectedIdentity){
  if(expectedIdentity!==RUNTIME_IDENTITY)throw Error('INVALID_RUNTIME_IDENTITY');
+ return createMetadataAccess(expectedIdentity);
+}
+
+export function createMetadataAccess(expectedIdentity){
  let checked=false,cached;
  return async(transport,signal)=>{
   const now=Math.floor(Date.now()/1000);

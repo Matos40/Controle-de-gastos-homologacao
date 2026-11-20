@@ -4,17 +4,20 @@ import {Readable} from 'node:stream';
 import {pathToFileURL} from 'node:url';
 import {createCloudRunHandler} from './handler.mjs';
 import {corsFor} from './cors.mjs';
+import {mountDiagnostic} from './integration/diagnostic-runtime.mjs';
 const assets={
  '/smart-ai/smart-ai.mjs':['smart-ai.mjs','text/javascript; charset=utf-8'],
  '/smart-ai/budget.mjs':['budget.mjs','text/javascript; charset=utf-8'],
  '/smart-ai/smart-ai.css':['smart-ai.css','text/css; charset=utf-8'],
  '/smart-ai/smart-admin-ai.mjs':['smart-admin-ai.mjs','text/javascript; charset=utf-8'],
 };
-export function makeServer({handler=createCloudRunHandler(),env=process.env}={}){
+export function makeServer({handler=createCloudRunHandler(),env=process.env,diagnosticTransport=fetch}={}){
+ const diagnostic=mountDiagnostic('backend',env,{transport:diagnosticTransport});
  return createServer({requestTimeout:35000,headersTimeout:10000,maxHeaderSize:16384},async(req,res)=>{
   const abort=new AbortController();
   res.on('close',()=>{if(!res.writableFinished)abort.abort();});
   try{
+   if(await diagnostic(req,res))return;
    const finance=req.url==='/internal/budget-push';
    if(finance?env.SMART_AI_FINANCE_PUSH_ENABLED!=='true':env.SMART_AI_EXPERIMENT_ENABLED!=='true'){
     res.writeHead(503,{'cache-control':'no-store'});res.end();return;

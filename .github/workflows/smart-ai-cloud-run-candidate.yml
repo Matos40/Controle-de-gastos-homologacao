@@ -21,6 +21,7 @@ jobs:
         with:
           node-version: '22'
       - run: node --test experiments/smart-ai-server/cloud-run/integration/private-diagnostic.test.mjs experiments/smart-ai-server/cloud-run/integration/bridge-runtime.test.mjs experiments/smart-ai-server/cloud-run/integration/integration.test.mjs experiments/smart-ai-server/cloud-run/commercial.test.mjs experiments/smart-ai-server/cloud-run/invoice-contract.test.mjs experiments/smart-ai-server/cloud-run/infra/infra.test.mjs experiments/smart-ai-server/cloud-run/infra/operations.test.mjs experiments/smart-ai-server/remote/worker.test.mjs experiments/smart-ai-server/legacy/invoice.test.mjs
+      - run: node --test experiments/smart-ai-server/cloud-run/integration/diagnostic-runtime.test.mjs
       - name: Obtain the pinned V34.7.4.5 reference
         run: |
           git init "$RUNNER_TEMP/raytech-reference"
@@ -54,6 +55,8 @@ jobs:
           for attempt in 1 2 3 4 5; do
             if docker exec "$container" node -e "
               fetch('http://127.0.0.1:8080/v1/credits')
+                .then(response => { if (response.status !== 503) throw Error('credits unexpectedly enabled'); })
+                .then(() => fetch('http://127.0.0.1:8080/internal/smart-ai/diagnostic'))
                 .then(response => { if (response.status !== 503) process.exitCode = 1; })
                 .catch(() => { process.exitCode = 1; });"; then
               exit 0
@@ -69,6 +72,23 @@ jobs:
           for attempt in 1 2 3 4 5; do
             if docker exec "$container" node -e "
               fetch('http://127.0.0.1:8080/v1/invoices', {method: 'POST'})
+                .then(response => { if (response.status !== 503) throw Error('invoices unexpectedly enabled'); })
+                .then(() => fetch('http://127.0.0.1:8080/internal/smart-ai/diagnostic'))
+                .then(response => { if (response.status !== 503) process.exitCode = 1; })
+                .catch(() => { process.exitCode = 1; });"; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs "$container"
+          exit 1
+      - name: Verify disabled gateway without external network
+        run: |
+          container=$(docker run --detach --network none smart-ai-candidate node /app/experiments/smart-ai-server/cloud-run/gateway.mjs)
+          trap 'docker rm --force "$container" >/dev/null' EXIT
+          for attempt in 1 2 3 4 5; do
+            if docker exec "$container" node -e "
+              fetch('http://127.0.0.1:8080/internal/smart-ai/diagnostic')
                 .then(response => { if (response.status !== 503) process.exitCode = 1; })
                 .catch(() => { process.exitCode = 1; });"; then
               exit 0
@@ -81,12 +101,16 @@ jobs:
         run: |
           docker save smart-ai-candidate | gzip -n > smart-ai-candidate.tar.gz
           sha256sum smart-ai-candidate.tar.gz > smart-ai-candidate.tar.gz.sha256
+          digest=$(tar -xOf smart-ai-candidate.tar.gz index.json | jq -er '.manifests | select(length == 1) | .[0].digest')
+          test "$digest" = "sha256:$(tar -xOf smart-ai-candidate.tar.gz "blobs/sha256/${digest#sha256:}" | sha256sum | cut -d ' ' -f 1)"
+          printf '%s\n' "$digest" > smart-ai-candidate.oci-digest
       - uses: actions/upload-artifact@v4
         with:
           name: smart-ai-candidate-${{ github.sha }}
           path: |
             smart-ai-candidate.tar.gz
             smart-ai-candidate.tar.gz.sha256
+            smart-ai-candidate.oci-digest
           if-no-files-found: error
           retention-days: 3
 
@@ -94,12 +118,16 @@ jobs:
         run: |
           docker save smart-ai-bridge-candidate | gzip -n > smart-ai-bridge-candidate.tar.gz
           sha256sum smart-ai-bridge-candidate.tar.gz > smart-ai-bridge-candidate.tar.gz.sha256
+          digest=$(tar -xOf smart-ai-bridge-candidate.tar.gz index.json | jq -er '.manifests | select(length == 1) | .[0].digest')
+          test "$digest" = "sha256:$(tar -xOf smart-ai-bridge-candidate.tar.gz "blobs/sha256/${digest#sha256:}" | sha256sum | cut -d ' ' -f 1)"
+          printf '%s\n' "$digest" > smart-ai-bridge-candidate.oci-digest
       - uses: actions/upload-artifact@v4
         with:
           name: smart-ai-bridge-0861-${{ github.sha }}
           path: |
             smart-ai-bridge-candidate.tar.gz
             smart-ai-bridge-candidate.tar.gz.sha256
+            smart-ai-bridge-candidate.oci-digest
           if-no-files-found: error
           retention-days: 3
       - name: Package the isolated full app
