@@ -12,7 +12,7 @@ role.setAttribute('aria-label','Perfil experimental');
 for(const value of ['free','premium','admin','owner'])role.add(new Option(value,value));
 login.querySelector('[data-login-enter]').before(role);
 const indicator=document.createElement('p');
-indicator.textContent='Ambiente isolado Ãƒâ€šÃ‚Â· use somente dados fictÃƒÆ’Ã‚Â­cios';
+indicator.textContent='Ambiente isolado · use somente dados fictícios';
 role.before(indicator);
 const storage=new Map();
 globalThis.raytechStorage={getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,String(value)),removeItem:key=>storage.delete(key)};
@@ -26,7 +26,7 @@ const request=async(action,body={})=>{
  return reply.json();
 };
 const reauthenticate=async()=>{
- if(!confirm('Simular uma nova autenticaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o do Owner fictÃƒÆ’Ã‚Â­cio?'))throw Error('REAUTH_REQUIRED');
+ if(!confirm('Simular uma nova autenticação do Owner fictício?'))throw Error('REAUTH_REQUIRED');
  const current=token,result=await request('reauthenticate');
  if(token!==current)throw Error('REAUTH_REQUIRED');
  token=result.token;return token;
@@ -42,7 +42,7 @@ function signOut(){
 async function signIn(){
  if(load)return;
  load=activate();
- try{await load;}catch{loginView.paint({phase:'workspace-blocked',message:'NÃƒÆ’Ã‚Â£o foi possÃƒÆ’Ã‚Â­vel abrir a cÃƒÆ’Ã‚Â³pia experimental.'});}
+ try{await load;}catch{loginView.paint({phase:'workspace-blocked',message:'Não foi possível abrir a cópia experimental.'});}
 }
 async function activate(){
  const profile=role.value;
@@ -59,11 +59,11 @@ async function activate(){
  const headerProfile=app.querySelector('.v345-account');
  if(headerProfile)headerProfile.hidden=!['owner','admin'].includes(adminRole);
  if(get('v345Avatar'))get('v345Avatar').textContent=adminRole==='owner'?'OF':'AF';
- if(get('v345Identity'))get('v345Identity').textContent=(adminRole==='owner'?'Owner':'Admin')+' fictÃƒÂ­cio';
+ if(get('v345Identity'))get('v345Identity').textContent=(adminRole==='owner'?'Owner':'Admin')+' fictício';
  if(get('v345Logout'))get('v345Logout').onclick=signOut;
  if(get('productionCloudProfile'))get('productionCloudProfile').hidden=false;
  if(get('productionCloudGuest'))get('productionCloudGuest').hidden=true;
- if(get('productionCloudName'))get('productionCloudName').textContent='Perfil fictÃƒÂ­cio '+profile;
+ if(get('productionCloudName'))get('productionCloudName').textContent='Perfil fictício '+profile;
  if(get('productionCloudInitial'))get('productionCloudInitial').textContent=profile.slice(0,1).toUpperCase();
  globalThis.raytechInvoiceState=()=>({visible:true,premium:true,reason:''});
  invoiceView=bindNativeInvoice({modal,apiKey:get('apiKeyModal'),getIdToken,
@@ -71,7 +71,7 @@ async function activate(){
   confirm:(invoice,rows)=>confirmations.confirm(invoice,rows),
  });
  if(['owner','admin'].includes(adminRole)){
-  const accounts=['free','premium','admin','owner'].map(name=>({uid:'lab-'+name,name:'Perfil fictÃƒÆ’Ã‚Â­cio '+name,
+  const accounts=['free','premium','admin','owner'].map(name=>({uid:'lab-'+name,name:'Perfil fictício '+name,
    role:['admin','owner'].includes(name)?name:'user',plan:name==='premium'?'premium':'free',blocked:false}));
   cleanupAdmin=mountAdmin({api:{role:async()=>adminRole,list:async()=>accounts,audit:async()=>[],monitor:async()=>({unavailable:true})},
    role:adminRole,uid:'lab-'+profile});
@@ -86,21 +86,19 @@ async function activate(){
     detail.dataset.creditsMounted='';
     const uid=detail.closest('dialog').querySelector('.admin-detail-uid code')?.textContent;
     if(!uid)continue;
-    const line=document.createElement('p');line.textContent='CrÃƒÂ©ditos Smart AI Ã‚Â· ConsultandoÃ¢â‚¬Â¦';detail.append(line);
+    const line=document.createElement('p');line.textContent='Créditos Smart AI · Consultando…';detail.append(line);
     void getIdToken().then(value=>fetch('/v1/admin/ai',{method:'POST',cache:'no-store',headers:{authorization:'Bearer '+value,'content-type':'application/json'},
      body:JSON.stringify({action:'credits',uid})})).then(async reply=>{
       if(!reply.ok)throw Error('ACCESS_DENIED');
       const data=await reply.json();
-      line.textContent='Smart AI Ã‚Â· '+data.remaining+' crÃƒÂ©ditos disponÃƒÂ­veis Ã‚Â· '+(data.plan==='premium'?'Premium':'Free')+' Ã‚Â· cotas da Chave API separadas';
-     }).catch(()=>{line.textContent='CrÃƒÂ©ditos Smart AI indisponÃƒÂ­veis.';});
+      line.textContent='Smart AI · '+data.remaining+' créditos disponíveis · '+(data.plan==='premium'?'Premium':'Free')+' · cotas da Chave API separadas';
+     }).catch(()=>{line.textContent='Créditos Smart AI indisponíveis.';});
    }
   });
   observer.observe(adminHost,{childList:true,subtree:true});
  }
  get('productionCloudLogout').disabled=false;
  get('productionCloudLogout').onclick=signOut;
- const headerLogout=document.createElement('button');headerLogout.className='admin-action';headerLogout.textContent='Sair do laboratÃƒÆ’Ã‚Â³rio';headerLogout.onclick=signOut;
- app.prepend(headerLogout);
  get('incomeBaseHelpToggle')?.addEventListener('click',event=>{
   const help=get('incomeBaseHelp');help.hidden=!help.hidden;
   event.currentTarget.setAttribute('aria-expanded',String(!help.hidden));

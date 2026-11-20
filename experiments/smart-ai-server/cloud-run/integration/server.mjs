@@ -79,5 +79,5 @@ export async function startLab({port=0,mode='reconciled',observedCents,vendorRoo
 }
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url){
  const {origin}=await startLab({port:8784,mode:process.argv[2]});
- console.log('LaboratÃ³rio Smart AI Â· '+origin);
+ console.log('Laboratório Smart AI · '+origin);
 }

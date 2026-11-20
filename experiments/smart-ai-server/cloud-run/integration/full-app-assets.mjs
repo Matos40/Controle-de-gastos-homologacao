@@ -62,7 +62,7 @@ export async function fullAppAsset(path,vendorRoot,reference=false){
   `};
  }
  if(key==='manifest.webmanifest')return {type:types.webmanifest,data:JSON.stringify({
-  id:'/app/',name:'Raytech CG Ã‚Â· Experimental',short_name:'Raytech CG Lab',start_url:'/app/',scope:'/app/',display:'standalone',
+  id:'/app/',name:'Raytech CG · Experimental',short_name:'Raytech CG Lab',start_url:'/app/',scope:'/app/',display:'standalone',
   icons:[192,512].map(size=>({src:'raytech-icon-'+size+'.png',sizes:size+'x'+size,type:'image/png'})),
  })};
  const file=allowed.has(key)?new URL(key,officialRoot):key.startsWith('vendor/')&&vendor.has(key.slice(7))?join(vendorRoot,key.slice(7)):null;
