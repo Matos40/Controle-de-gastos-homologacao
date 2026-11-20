@@ -4,6 +4,10 @@ on:
     branches: [feature/smart-ai-server-v350-poc]
     paths:
       - 'experiments/smart-ai-server/cloud-run/**'
+      - 'experiments/smart-ai-server/legacy/**'
+      - 'experiments/smart-ai-server/remote/**'
+      - 'experiments/smart-ai-server/firestore.mjs'
+      - 'experiments/smart-ai-server/gemini.mjs'
       - '.github/workflows/smart-ai-cloud-run-candidate.yml'
 permissions:
   contents: read
@@ -16,5 +20,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test experiments/smart-ai-server/cloud-run/commercial.test.mjs
+      - run: node --test experiments/smart-ai-server/cloud-run/commercial.test.mjs experiments/smart-ai-server/remote/worker.test.mjs experiments/smart-ai-server/legacy/invoice.test.mjs
       - run: docker build -f experiments/smart-ai-server/cloud-run/Dockerfile -t smart-ai-candidate .
+      - name: Verify disabled container without external network
+        run: |
+          container=$(docker run --detach --network none smart-ai-candidate)
+          trap 'docker rm --force "$container" >/dev/null' EXIT
+          for attempt in 1 2 3 4 5; do
+            if docker exec "$container" node -e "
+              fetch('http://127.0.0.1:8080/v1/invoices', {method: 'POST'})
+                .then(response => { if (response.status !== 503) process.exitCode = 1; })
+                .catch(() => { process.exitCode = 1; });"; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs "$container"
+          exit 1

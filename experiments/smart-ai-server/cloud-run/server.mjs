@@ -1,5 +1,6 @@
 import {createServer} from 'node:http';
 import {Readable} from 'node:stream';
+import {pathToFileURL} from 'node:url';
 import {createCloudRunHandler} from './handler.mjs';
 export function makeServer({handler=createCloudRunHandler(),env=process.env}={}){
  return createServer({requestTimeout:35000,headersTimeout:10000,maxHeaderSize:16384},async(req,res)=>{
@@ -19,7 +20,7 @@ export function makeServer({handler=createCloudRunHandler(),env=process.env}={})
   }catch{if(!res.headersSent)res.writeHead(503,{'cache-control':'no-store'});res.end();}
  });
 }
-if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href){
+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const port=Number(process.env.PORT??8080);
  if(!Number.isInteger(port)||port<1||port>65535)throw Error('INVALID_PORT');
  makeServer().listen(port,'0.0.0.0');

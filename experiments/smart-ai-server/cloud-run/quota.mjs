@@ -4,6 +4,8 @@ export const validUid=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(x);
 export function planOf(uid,account,now){
  if(!validUid(uid)||!account||account.uid!==uid||account.blocked!==false||!['free','premium'].includes(account.plan))return null;
  if(account.plan==='premium'){
+  // Existing trusted profiles express entitlement through plan alone.
+  if(!Object.hasOwn(account,'premiumUntil'))return 'premium';
   if(!Number.isSafeInteger(account.premiumUntil)||account.premiumUntil<0)return null;
   if(account.premiumUntil>now)return 'premium';
  }

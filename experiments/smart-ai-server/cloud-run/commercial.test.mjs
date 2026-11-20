@@ -17,6 +17,23 @@ test('free account eligibility and expiration',()=>{
  assert.equal(planOf('u',{...account(),blocked:true},t),null);
  assert.equal(planOf('other',account(),t),null);
 });
+test('existing Premium profile works without an expiry and retains Free history on cancellation',async()=>{
+ const {db,docs}=mockDb();let now=t;
+ const s=createCommercialStore(db,{clock:()=>now});
+ const first={uid:'u',requestId:id(101)};
+ assert.equal((await s.reserveUsage(first)).status,200);
+ await s.finishOutcome({...first,status:'completed'});
+ docs.set('raytechV345Accounts/u',{uid:'u',blocked:false,plan:'premium'});
+ assert.equal((await s.readCredits('u')).remaining,15);
+ const second={uid:'u',requestId:id(102)};
+ assert.equal((await s.reserveUsage(second)).status,200);
+ await s.finishOutcome({...second,status:'completed'});
+ assert.equal((await s.readCredits('u')).remaining,14);
+ docs.set('raytechV345Accounts/u',{uid:'u',blocked:false,plan:'free'});
+ now+=60001;
+ assert.equal((await s.readCredits('u')).remaining,1);
+ assert.equal(planOf('u',{uid:'u',blocked:false,plan:'premium',premiumUntil:null},now),null);
+});
 test('Free two credits persist across month; premium independent',()=>{
  let s=done(undefined,'free',1,t);
  s=done(s,'free',2,t+60001);
@@ -94,16 +111,18 @@ test('HTTP server disabled by default and isolated adapter forwards JSON',async(
 });
 
 test('expired undelivered reservation recovered once; late success rejected',async()=>{
- const {db}=mockDb();let now=t;
+ const {db,docs}=mockDb();let now=t;
  const s=createCommercialStore(db,{clock:()=>now,budget:{day:10,month:10,perAttempt:1}});
  const a={uid:'u',requestId:id(31)};
  assert.equal((await s.reserveUsage(a)).status,200);
  now+=119999;
  assert.equal(await s.recoverExpired('u'),false);
  now++;
- assert.equal(await s.recoverExpired('u'),true);
- assert.equal(await s.recoverExpired('u'),false);
+ assert.deepEqual(await Promise.all([s.recoverExpired('u'),s.recoverExpired('u')]),[true,false]);
  assert.equal((await s.readCredits('u')).remaining,2);
+ assert.equal(docs.get('raytechLabCommercialGlobalV350/budget').month.attempts,1);
+ const audit=docs.get('raytechLabCommercialAuditV350/user_u_'+monthOf(t));
+ assert.deepEqual(audit,{reserved:1,completed:0,failed:1,pending:0});
  await assert.rejects(s.finishOutcome({...a,status:'completed'}));
  assert.equal((await s.reserveUsage(a)).status,409);
  const b={uid:'u',requestId:id(32)};
