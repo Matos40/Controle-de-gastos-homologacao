@@ -6,6 +6,7 @@ import {createCloudRunHandler} from './handler.mjs';
 const assets={
  '/smart-ai/smart-ai.mjs':['smart-ai.mjs','text/javascript; charset=utf-8'],
  '/smart-ai/smart-ai.css':['smart-ai.css','text/css; charset=utf-8'],
+ '/smart-ai/smart-admin-ai.mjs':['smart-admin-ai.mjs','text/javascript; charset=utf-8'],
 };
 export function makeServer({handler=createCloudRunHandler(),env=process.env}={}){
  return createServer({requestTimeout:35000,headersTimeout:10000,maxHeaderSize:16384},async(req,res)=>{
@@ -21,7 +22,7 @@ export function makeServer({handler=createCloudRunHandler(),env=process.env}={})
     res.writeHead(200,{'content-type':type,'cache-control':'no-store','x-content-type-options':'nosniff'});
     res.end(content);return;
    }
-   const routes={'/v1/invoices':'POST','/v1/credits':'GET'};
+   const routes={'/v1/invoices':'POST','/v1/credits':'GET','/v1/admin/ai':'POST'};
    if(!Object.hasOwn(routes,req.url)||req.method!==routes[req.url]){
     res.writeHead(Object.hasOwn(routes,req.url)?405:404);res.end();return;
    }

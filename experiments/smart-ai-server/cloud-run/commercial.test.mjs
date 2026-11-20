@@ -6,6 +6,7 @@ import {makeServer} from './server.mjs';
 import {createRestStore} from '../firestore.mjs';
 import {readCreditBalance} from './handler.mjs';
 import {extractInvoice} from './invoice.mjs';
+import {handleSmartAdmin} from './admin.mjs';
 const t=Date.parse('2026-11-30T23:59:00-03:00');
 const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 const account=(plan='free')=>({uid:'u',blocked:false,plan,premiumUntil:t+10000000});
@@ -78,7 +79,9 @@ function mockDb(){
   const work=tail.then(async()=>{
    const writes=[];
    const snap=r=>({exists:docs.has(r.name),data:()=>structuredClone(docs.get(r.name))});
-   const result=await fn({getAll:async(...refs)=>refs.map(snap),set:(r,d)=>writes.push([r.name,d]),create:(r,d)=>{if(docs.has(r.name))throw Error('EXISTS');writes.push([r.name,d]);},update:(r,d)=>writes.push([r.name,{...docs.get(r.name),...d}])});
+   const findByIdPrefix=async(collection,prefix)=>[...docs.keys()].filter(key=>key.startsWith(collection+'/'+prefix))
+    .sort().slice(0,20).map(name=>({id:name.split('/').at(-1),...snap({name})}));
+   const result=await fn({getAll:async(...refs)=>refs.map(snap),findByIdPrefix,set:(r,d)=>writes.push([r.name,d]),create:(r,d)=>{if(docs.has(r.name))throw Error('EXISTS');writes.push([r.name,d]);},update:(r,d)=>writes.push([r.name,{...docs.get(r.name),...d}])});
    for(const [key,val] of writes)docs.set(key,structuredClone(val));
    return result;
   });tail=work.catch(()=>{});return work;
@@ -207,4 +210,105 @@ test('extraction acknowledges a refund only after the settlement succeeds',async
   assert.equal(result.status,502);
   assert.equal(result.body.creditRefunded,!blocked||undefined);
  }
+});
+
+function adminFixture(){
+ const {db,docs}=mockDb();
+ for(const actor of ['owner','admin','inactive','blocked']){
+  docs.set('raytechV345Accounts/'+actor,{uid:actor,blocked:actor==='blocked',plan:'free'});
+  docs.set('raytechV345Roles/'+actor,{role:actor==='admin'?'admin':'owner',active:actor!=='inactive'});
+ }
+ let now=t-120000;
+ const clock=()=>now;
+ const api=(token,body)=>handleSmartAdmin(new Request('https://fixture.invalid/v1/admin/ai',{
+  headers:token?{authorization:'Bearer '+token}:{},
+ }),body,{db,clock,verifyToken:async value=>{
+  if(value==='revoked')throw Error('REVOKED');
+  return {uid:value};
+ }});
+ return {db,docs,api,store:createCommercialStore(db,{clock}),advance:ms=>{now+=ms;}};
+}
+
+test('Smart Admin authorizes active operators on every request and reserves writes for Owner',async()=>{
+ const {api,docs}=adminFixture();
+ const overview={action:'overview'};
+ assert.equal((await api(null,overview)).status,401);
+ assert.equal((await api('revoked',overview)).status,401);
+ for(const user of ['u','inactive','blocked'])assert.equal((await api(user,overview)).status,403);
+ assert.equal((await api('owner',overview)).body.role,'owner');
+ assert.equal((await api('admin',overview)).body.role,'admin');
+ const change={action:'configure',enabled:false,day:10,month:20,expectedVersion:0};
+ assert.equal((await api('admin',change)).status,403);
+ assert.equal((await api('owner',{...change,day:31})).status,400);
+ assert.equal((await api('owner',{...change,actorUid:'admin'})).status,400);
+ docs.delete('raytechV345Roles/owner');
+ assert.equal((await api('owner',change)).status,403);
+ assert.equal(docs.has('raytechLabCommercialGlobalV350/config'),false);
+});
+
+test('Owner configuration is atomic, versioned and suspends admission while settlement continues',async()=>{
+ const {api,store,docs}=adminFixture();
+ const request={uid:'u',requestId:id(500)};
+ assert.equal((await store.reserveUsage(request)).status,200);
+ const change={action:'configure',enabled:false,day:10,month:20,expectedVersion:0};
+ const results=await Promise.all([api('owner',change),api('owner',change)]);
+ assert.deepEqual(results.map(x=>x.status).sort(),[200,409]);
+ assert.equal((await store.reserveUsage({uid:'v',requestId:id(501)})).status,503);
+ await store.finishOutcome({...request,status:'completed'});
+ const [entry]=[...docs].filter(([key])=>key.startsWith('raytechLabSmartAiAdminAuditV350/'));
+ assert.equal([...docs.keys()].filter(key=>key.startsWith('raytechLabSmartAiAdminAuditV350/')).length,1);
+ assert.equal(entry[1].actorUid,'owner');
+ assert.equal(entry[1].before.enabled,true);
+ assert.equal(entry[1].after.enabled,false);
+ assert.equal(entry[1].after.version,1);
+ const summary=(await api('owner',{action:'overview'})).body;
+ assert.equal(summary.month.free.completed,1);
+ assert.equal(summary.settings.enabled,false);
+ assert.equal((await api('owner',{...change,enabled:true,day:1,expectedVersion:1})).status,200);
+ assert.equal((await store.reserveUsage({uid:'v',requestId:id(502)})).error,'GLOBAL_BUDGET_EXCEEDED');
+});
+
+test('Admin searches bounded UID prefix and reads separate balances and factual plan metrics',async()=>{
+ const {api,store,docs,advance}=adminFixture();
+ docs.set('raytechV345Accounts/test-search',{uid:'test-search',blocked:false,plan:'free',name:'Conta fictícia',private:'excluded'});
+ const search=(await api('admin',{action:'search',prefix:'test-'})).body.rows;
+ assert.deepEqual(search,[{uid:'test-search',name:'Conta fictícia',plan:'free',blocked:false}]);
+ assert.equal((await api('admin',{action:'search',prefix:'t'})).status,400);
+ const attempt={uid:'u',requestId:id(510)};
+ assert.equal((await store.reserveUsage(attempt)).status,200);
+ await store.finishOutcome({...attempt,status:'completed'});
+ docs.set('raytechV345Accounts/u',{uid:'u',plan:'premium',blocked:false});
+ advance(60001);
+ const premium={uid:'u',requestId:id(511)};
+ assert.equal((await store.reserveUsage(premium)).status,200);
+ const pending=(await api('admin',{action:'overview'})).body.month;
+ assert.equal(pending.free.completed,1);
+ assert.equal(pending.premium.pending,1);
+ assert.equal(pending.conversions,1);
+ await store.finishOutcome({...premium,status:'failed'});
+ await store.finishOutcome({...premium,status:'failed'});
+ const result=(await api('admin',{action:'overview'})).body;
+ assert.equal(result.day.premium.failed,1);
+ assert.equal(result.month.premium.pending,0);
+ assert.equal(result.monthlyAverage,1);
+ assert.equal((await api('admin',{action:'credits',uid:'u'})).body.remaining,15);
+ assert.equal((await api('admin',{action:'credits',uid:'v'})).body.remaining,2);
+ assert.equal((await api('v',{action:'credits',uid:'u'})).status,403);
+});
+
+test('metric recovery refunds once and corrupt metrics fail closed without quota writes',async()=>{
+ const {api,store,docs,advance}=adminFixture();
+ const attempt={uid:'u',requestId:id(520)};
+ assert.equal((await store.reserveUsage(attempt)).status,200);
+ advance(120000);
+ assert.deepEqual(await Promise.all([store.recoverExpired('u'),store.recoverExpired('u')]),[true,false]);
+ assert.deepEqual((await api('admin',{action:'overview'})).body.month.free,
+  {reserved:1,completed:0,failed:1,pending:0});
+ const key='raytechLabSmartAiMetricsV350/month_'+monthOf(t);
+ const metric=docs.get(key);
+ docs.set(key,{...metric,free:{...metric.free,failed:2}});
+ const before=structuredClone(docs);
+ assert.equal((await api('owner',{action:'overview'})).status,503);
+ assert.equal((await store.reserveUsage({uid:'v',requestId:id(521)})).status,503);
+ assert.deepEqual(docs,before);
 });

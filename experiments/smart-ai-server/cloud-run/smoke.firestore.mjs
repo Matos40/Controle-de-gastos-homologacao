@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {createCommercialStore,RECOVERY_GRACE_MS} from './store.mjs';
 import {createRestStore} from '../firestore.mjs';
 import {assertLocalEmulators} from '../legacy/emulator-guard.mjs';
+import {handleSmartAdmin} from './admin.mjs';
 assertLocalEmulators();
 const db=createRestStore("projects/demo-raytech-v340/databases/(default)","http://127.0.0.1:18080/v1/projects/demo-raytech-v340/databases/(default)/documents",async()=>"owner",AbortSignal.timeout(90000),fetch,{abortedRetries:3});
 const uid='synthetic-'+randomUUID(), now0=Date.parse('2026-11-30T23:59:59-03:00');
@@ -25,4 +26,20 @@ const c={uid,requestId:randomUUID()};
 assert.equal((await s.reserveUsage(c)).status,200);
 await s.finishOutcome({...c,status:'completed'});
 assert.equal((await s.readCredits(uid)).remaining,14);
+await db.runTransaction(async tx=>{
+ tx.set(db.collection('raytechV345Roles').doc(uid),{role:'owner',active:true});
+});
+const admin=body=>handleSmartAdmin(new Request('https://fixture.invalid/v1/admin/ai',{
+ headers:{authorization:'Bearer fixture'},
+}),body,{db,clock:()=>now,verifyToken:async()=>({uid})});
+const search=await admin({action:'search',prefix:uid.slice(0,16)});
+assert.equal(search.status,200);
+assert.ok(search.body.rows.some(row=>row.uid===uid));
+const results=await Promise.all([1,2].map(()=>admin({action:'configure',expectedVersion:0,enabled:false,day:12,month:24})));
+assert.deepEqual(results.map(result=>result.status).sort(),[200,409]);
+assert.equal((await s.reserveUsage({uid,requestId:randomUUID()})).status,503);
+const summary=await admin({action:'overview'});
+assert.equal(summary.body.settings.enabled,false);
+assert.equal(summary.body.month.premium.completed,1);
+console.log('Firestore emulator: audited Owner concurrency, UID range search, admission switch and metrics verified.');
 console.log('Firestore emulator: concurrent reservation, recovery, replay, next-month and settlement verified.');

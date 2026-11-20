@@ -1,0 +1,129 @@
+const counts=[
+ ['reserved','Leituras admitidas'],['completed','Extrações concluídas'],
+ ['failed','Falhas'],['pending','Reservas pendentes'],['failed','Créditos restituídos'],
+];
+const number=new Intl.NumberFormat('pt-BR');
+const currency=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+const messages={ACCESS_DENIED:'Acesso reservado à administração.',
+ VERSION_CONFLICT:'As configurações foram alteradas em outra sessão. Revise os valores atualizados.',
+ NOT_FOUND:'O perfil não tem saldo disponível para consulta.',INVALID_REQUEST:'Confira os valores informados.'};
+
+export function mountSmartAdminAI(root,{getIdToken,fetcher=fetch}){
+ root.innerHTML=`
+  <section class="raytech-ai raytech-ai-admin" aria-label="Smart Admin AI">
+   <header class="raytech-ai__header"><h1>Smart Admin AI</h1><button type="button" data-reload>Atualizar indicadores</button></header>
+   <p role="status" aria-live="polite" data-status></p>
+   <div data-content hidden>
+    <div class="raytech-ai-admin__metrics">
+     <article><h2>Hoje</h2><dl data-day></dl></article>
+     <article><h2>Este mês</h2><dl data-month></dl></article>
+    </div>
+    <p data-conversions></p><p data-average></p>
+    <form data-search><label for="ai-admin-prefix">Pesquisar por início do UID</label>
+     <input id="ai-admin-prefix" required minlength="2" maxlength="128" pattern="[A-Za-z0-9_-]+">
+     <button type="submit">Pesquisar</button></form>
+    <ul data-users></ul><p data-credit aria-live="polite"></p>
+    <p data-admission></p>
+    <form data-config hidden>
+     <label><input name="enabled" type="checkbox"> Aceitar novas leituras de IA</label>
+     <div class="raytech-ai-admin__metrics">
+      <label>Limite diário (UTC)<input name="day" type="number" min="1" max="30" required></label>
+      <label>Limite mensal (UTC)<input name="month" type="number" min="1" max="60" required></label>
+     </div>
+     <button type="submit">Salvar configuração</button>
+    </form>
+    <h2>Estimativa de custos</h2>
+    <label>Valor estimado por tentativa em reais<input data-cost type="number" min="0" step="0.0001" inputmode="decimal"></label>
+    <p data-estimate>Informe um valor para simular. A estimativa não representa faturamento real.</p>
+   </div>
+  </section>`;
+ const el=name=>root.querySelector('[data-'+name+']');
+ const status=el('status'),config=el('config'),search=el('search');
+ let overview,busy=false;
+ const unavailable='Os controles do Smart Admin AI estão indisponíveis.';
+ async function request(action,parameters={}){
+  const token=await getIdToken();
+  if(!token)throw Error('ACCESS_DENIED');
+  const response=await fetcher('/v1/admin/ai',{method:'POST',cache:'no-store',
+   headers:{authorization:'Bearer '+token,'content-type':'application/json'},
+   body:JSON.stringify({action,...parameters})});
+  const data=await response.json();
+  if(!response.ok)throw Error(data.error);
+  return data;
+ }
+ const setStatus=text=>{status.textContent=text;};
+ function renderMetrics(target,period){
+  target.replaceChildren(...counts.flatMap(([key,label])=>{
+   const term=document.createElement('dt'),detail=document.createElement('dd');
+   term.textContent=label;
+   detail.textContent=number.format(period.free[key]+period.premium[key])+
+    ' · Free '+number.format(period.free[key])+' · Premium '+number.format(period.premium[key]);
+   return [term,detail];
+  }));
+ }
+ function estimate(){
+  const input=el('cost'),price=input.valueAsNumber;
+  el('estimate').textContent=overview&&input.value!==''&&Number.isFinite(price)&&price>=0?
+   'Simulação mensal: '+currency.format(price*(overview.month.free.reserved+overview.month.premium.reserved))+
+   ' · Valor informado × tentativas registradas. Sem dados de faturamento real.':
+   'Informe um valor para simular. A estimativa não representa faturamento real.';
+ }
+ async function load(){
+  overview=await request('overview');
+  el('content').hidden=false;
+  renderMetrics(el('day'),overview.day);renderMetrics(el('month'),overview.month);
+  el('conversions').textContent='Primeiro uso Premium após uso Free no mês: '+number.format(overview.month.conversions);
+  el('average').textContent='Média mensal de extrações por usuário com tentativa: '+
+   (overview.monthlyAverage===null?'sem dados':number.format(overview.monthlyAverage));
+  const {settings}=overview;
+  el('admission').textContent=settings.enabled?'Novas leituras habilitadas.':'Novas leituras suspensas. Solicitações em andamento podem concluir.';
+  config.hidden=overview.role!=='owner';
+  config.elements.enabled.checked=settings.enabled;
+  config.elements.day.value=settings.budget.day;
+  config.elements.month.value=settings.budget.month;
+  estimate();
+ }
+ async function run(task){
+  if(busy)return;
+  busy=true;root.setAttribute('aria-busy','true');setStatus('Carregando…');
+  try{setStatus(await task()??'');}
+  catch(error){
+   if(error.message==='ACCESS_DENIED'){el('content').hidden=true;el('users').replaceChildren();el('credit').textContent='';}
+   setStatus(messages[error.message]??unavailable);
+  }
+  finally{busy=false;root.setAttribute('aria-busy','false');}
+ }
+ el('reload').addEventListener('click',()=>void run(load));
+ el('cost').addEventListener('input',estimate);
+ search.addEventListener('submit',event=>{
+  event.preventDefault();
+  void run(async()=>{
+   el('users').replaceChildren();el('credit').textContent='';
+   const {rows}=await request('search',{prefix:search.querySelector('input').value.trim()});
+   for(const row of rows){
+    const item=document.createElement('li'),button=document.createElement('button');
+    button.type='button';button.textContent=(row.name?row.name+' · ':'')+row.uid;
+    button.addEventListener('click',()=>void run(async()=>{
+     el('credit').textContent='';
+     const credit=await request('credits',{uid:row.uid});
+     el('credit').textContent=row.uid+' · '+(credit.plan==='premium'?'Premium':'Free')+
+      ' · '+number.format(credit.remaining)+' créditos disponíveis'+(credit.busy?' · Em processamento':'');
+    }));
+    item.append(button);el('users').append(item);
+   }
+   if(!rows.length)return 'Nenhum usuário encontrado.';
+  });
+ });
+ config.addEventListener('submit',event=>{
+  event.preventDefault();
+  if(overview?.role!=='owner')return;
+  void run(async()=>{
+   const settings={enabled:config.elements.enabled.checked,day:config.elements.day.valueAsNumber,
+    month:config.elements.month.valueAsNumber,expectedVersion:overview.settings.version};
+   try{await request('configure',settings);}
+   catch(error){if(error.message==='VERSION_CONFLICT')await load();throw error;}
+   await load();return 'Configuração salva.';
+  });
+ });
+ return {ready:run(load),refresh:()=>run(load)};
+}

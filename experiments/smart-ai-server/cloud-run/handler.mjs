@@ -7,6 +7,7 @@ import {validRequestId} from '../legacy/usage.mjs';
 import {createCommercialStore} from './store.mjs';
 import {createFirebaseVerifier} from '../remote/auth.mjs';
 import {createGoogleAccessToken} from '../remote/google-access.mjs';
+import {handleSmartAdmin} from './admin.mjs';
 
 const requestCap = 4 * Math.ceil(MAX_BYTES / 3) + 1024;
 const experimentProject = 'gen-lang-client-0593667072';
@@ -32,9 +33,9 @@ export async function readCreditBalance(request,{verifyToken,readCredits}) {
   } catch { return reply(503,{error:'USAGE_UNAVAILABLE'}); }
 }
 
-async function boundedJson(request, signal) {
+async function boundedJson(request, signal, limit=requestCap) {
   const declared = request.headers.get('content-length');
-  if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > requestCap)) {
+  if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > limit)) {
     throw Error('FILE_TOO_LARGE');
   }
   const reader = request.body?.getReader();
@@ -49,7 +50,7 @@ async function boundedJson(request, signal) {
       const {done, value} = await reader.read();
       if (done) break;
       length += value.byteLength;
-      if (length > requestCap) throw Error('FILE_TOO_LARGE');
+      if (length > limit) throw Error('FILE_TOO_LARGE');
       chunks.push(value);
     }
     signal.throwIfAborted();
@@ -98,7 +99,8 @@ export function createCloudRunHandler(transport = fetch) {
   return {async fetch(request, env) {
     const url = new URL(request.url);
     const credits=url.pathname==='/v1/credits';
-    if (url.protocol !== 'https:' || (!credits&&url.pathname !== '/v1/invoices') || url.search) {
+    const admin=url.pathname==='/v1/admin/ai';
+    if (url.protocol !== 'https:' || (!credits&&!admin&&url.pathname !== '/v1/invoices') || url.search) {
       return reply(404, {error:'NOT_FOUND'});
     }
     if (request.method !== (credits?'GET':'POST')) return reply(405, {error:'METHOD_NOT_ALLOWED'});
@@ -112,7 +114,7 @@ export function createCloudRunHandler(transport = fetch) {
       authorization:request.headers.get('authorization'),
       'x-request-id':request.headers.get('x-request-id'),
     };
-    if (!credits&&!validRequestId(headers['x-request-id'])) return reply(400, {error:'INVALID_REQUEST_ID'});
+    if (!credits&&!admin&&!validRequestId(headers['x-request-id'])) return reply(400, {error:'INVALID_REQUEST_ID'});
     const contentType = request.headers.get('content-type') ?? '';
     const binary = false; // JSON transport only for initial Cloud Run candidate.
     if (!credits && !binary && !/^application\/json(?:;|$)/i.test(contentType)) {
@@ -135,6 +137,13 @@ export function createCloudRunHandler(transport = fetch) {
       const db = createRestStore(dbName, 'https://firestore.googleapis.com/v1/' + dbName + '/documents',
         access, deadline, counted,{abortedRetries:3});
       const verifyToken = token => verifyFirebase(token, access, counted, deadline);
+      if(admin){
+        let body;
+        try{body=await boundedJson(request,deadline,4096);}
+        catch(error){return reply(error.message==='FILE_TOO_LARGE'?413:400,{error:'INVALID_REQUEST'});}
+        const result=await handleSmartAdmin(request,body,{db,verifyToken});
+        return reply(result.status,result.body);
+      }
       const {readCredits,reserveUsage,finishOutcome}=createCommercialStore(db);
       if(credits)return readCreditBalance(request,{verifyToken,readCredits});
       const readPermissions = uid => db.runTransaction(async tx => {

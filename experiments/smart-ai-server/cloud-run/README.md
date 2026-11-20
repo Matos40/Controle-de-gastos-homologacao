@@ -26,7 +26,7 @@ For N new Free accounts, P active Premium accounts, typical demand <= 2N+3P succ
 ## Remaining gates
 - Existing trusted Premium profiles are eligible without `premiumUntil`. When supplied, the server requires a valid timestamp and returns an expired account to its original Free balance. Subscription changes and account provisioning remain external to this candidate.
 - On the next reservation for the same UID, expired pending work is recovered atomically after a two-minute grace period. Recovery preserves the consumed rate and global attempt budget, records a failed outcome, and rejects a late settlement. An explicit Firestore `ABORTED` conflict is retried with bounded jitter. Ambiguous commit failures are not retried.
-- No live Firestore transaction tests, remote integration, Smart Admin metrics interface or production rollout yet.
+- No live Firestore transaction tests, remote integration or production rollout yet.
 - Current handler reuses restricted experimental Firebase project and legacy service credential adapter; ADC/identity setup, secure secret injection, IAM, CORS and client authentication integration require validation before enablement. No secrets included.
 - Final authorization checks valid current account; original reserved plan is used for settlement. Review tier changes mid-request and policy compatibility before release.
 - Candidate uses JSON transport; binary input is deliberately not accepted at this stage.
@@ -48,3 +48,13 @@ mountSmartAI(container, {
 ```
 
 The browser tests mount the component over loopback with synthetic tokens and responses. They exercise a desktop Chromium viewport, an Android Chromium viewport and an iOS WebKit viewport. No official session or remote Firebase data is used.
+
+## Smart Admin AI candidate
+
+Mount `mountSmartAdminAI(container, {getIdToken})` from `/smart-ai/smart-admin-ai.mjs` inside the isolated administrative host using its verified Firebase session and the shared Smart AI stylesheet. `POST /v1/admin/ai` rechecks token revocation, account and role on each call. Active Owner and Admin can see aggregates and search up to 20 matching UID prefixes. Individual credit reads are performed in the authorized read transaction. Only Owner can change admission or global limits.
+
+The switch and limits are updated with an expected version and an append-only audit entry in one transaction. The switch is checked when reserving a new attempt. Settlements and recovery of existing attempts remain available. Daily and monthly limits use UTC and can be configured within the current lab ceiling of 30 and 60 attempts respectively. No billing is connected.
+
+Dashboard periods use America/Bahia and count reservations by original day, month and plan. The average is completed extractions divided by distinct users with at least one registered attempt in that month. A conversion is the first observed Premium attempt after the same UID consumed a Free credit. This measures adoption observed by the reader, not subscriptions or revenue. Refunds count terminal failed attempts that released a credit. New aggregates start with instrumented attempts and do not infer historical plan splits or backfill them. Existing commercial records are retained. The monetary simulator multiplies recorded monthly attempts by a value entered by the operator and leaves the estimate blank until a value is provided. No raw invoice or extraction content is stored by the new metrics or audit.
+
+UID prefix search uses a bounded Firestore query and additionally needs the experimental service identity to have `datastore.entities.list` before any later remote integration. The local emulator and synthetic CI validate this candidate without changing cloud IAM.

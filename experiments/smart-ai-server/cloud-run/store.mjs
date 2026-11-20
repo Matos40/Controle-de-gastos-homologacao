@@ -2,17 +2,20 @@ import {COLLECTION,validUid,planOf,reserve,finish,monthOf,view} from './quota.mj
 import {validRequestId} from '../legacy/usage.mjs';
 import {reserveBudget,validateBudget} from '../legacy/global-budget.mjs';
 import {transition} from '../legacy/outcome.mjs';
+import {prepareMetrics,ADMIN_METRICS} from './admin-metrics.mjs';
 export const RECOVERY_GRACE_MS=120000;
-const accounts='raytechV345Accounts';
-const globalCollection='raytechLabCommercialGlobalV350';
+export const COMMERCIAL_ACCOUNTS='raytechV345Accounts';
+export const COMMERCIAL_GLOBAL='raytechLabCommercialGlobalV350';
+export const LAB_CAP={day:30,month:60,perAttempt:1};
 const auditCollection='raytechLabCommercialAuditV350';
 const refs=(db,uid,at)=>['global','user_'+uid].map(scope=>db.collection(auditCollection).doc(scope+'_'+monthOf(at)));
-export function createCommercialStore(db,{clock=Date.now,budget={day:30,month:60,perAttempt:1}}={}){
+export function createCommercialStore(db,{clock=Date.now,budget=LAB_CAP}={}){
  const cap=validateBudget(budget);
  const userRef=uid=>db.collection(COLLECTION).doc(uid);
- const profileRef=uid=>db.collection(accounts).doc(uid);
- const budgetRef=db.collection(globalCollection).doc('budget');
- const configRef=db.collection(globalCollection).doc('config');
+ const profileRef=uid=>db.collection(COMMERCIAL_ACCOUNTS).doc(uid);
+ const budgetRef=db.collection(COMMERCIAL_GLOBAL).doc('budget');
+ const configRef=db.collection(COMMERCIAL_GLOBAL).doc('config');
+ const writeMetrics=(tx,rows)=>rows.forEach(({ref,value})=>tx.set(ref,value));
  async function recoverExpired(uid){
   if(!validUid(uid))throw Error('INVALID_UID');
   const user=userRef(uid);
@@ -27,8 +30,10 @@ export function createCommercialStore(db,{clock=Date.now,budget={day:30,month:60
    const next=finish(s,a,s.pending,'failed',now);
    const ar=refs(db,uid,a.reservedAt),snap=await tx.getAll(...ar);
    const counters=snap.map(x=>transition(x.data(),'failed'));
+   const metrics=a.adminMetrics===1?await prepareMetrics(tx,db,a.reservedAt,a.plan,'failed'):[];
    tx.set(user,next);tx.update(attempt,{status:'failed',finishedAt:now,recovery:'expired-undelivered'});
    ar.forEach((r,i)=>tx.set(r,counters[i]));
+   writeMetrics(tx,metrics);
    return true;
   });
  }
@@ -45,13 +50,23 @@ export function createCommercialStore(db,{clock=Date.now,budget={day:30,month:60
    if(config.data()?.enabled===false)return {status:503,error:'USAGE_UNAVAILABLE'};
    const decision=reserve(state.data(),now,plan,requestId);
    if(decision.status!==200)return decision;
-   const globalDecision=reserveBudget(global.data(),now,config.exists?validateBudget(config.data().budget):cap);
+   const configuredBudget=config.data()?.budget;
+   const globalDecision=reserveBudget(global.data(),now,configuredBudget===undefined?cap:validateBudget(configuredBudget));
    if(globalDecision.status!==200)return globalDecision;
    const ar=refs(db,uid,now),snap=await tx.getAll(...ar);
    const counters=snap.map(x=>transition(x.data(),'reserve'));
-   tx.set(user,decision.next);tx.create(attempt,{plan,month:monthOf(now),reservedAt:now,status:'pending'});
+   const marker=db.collection(ADMIN_METRICS).doc('conversion_'+uid);
+   const usage=db.collection(ADMIN_METRICS).doc('user_'+uid+'_'+monthOf(now));
+   const conversionCandidate=plan==='premium'&&(state.data()?.free??0)>0;
+   const [monthlyUser,conversionMark]=await tx.getAll(usage,...(conversionCandidate?[marker]:[]));
+   const conversion=conversionCandidate&&!conversionMark.exists;
+   const metrics=await prepareMetrics(tx,db,now,plan,'reserve',{newUser:!monthlyUser.exists,conversion});
+   tx.set(user,decision.next);tx.create(attempt,{plan,month:monthOf(now),reservedAt:now,status:'pending',adminMetrics:1});
    tx.set(budgetRef,globalDecision.next);
    ar.forEach((r,i)=>tx.set(r,counters[i]));
+   if(!monthlyUser.exists)tx.create(usage,{firstAt:now});
+   if(conversion)tx.create(marker,{firstAt:now});
+   writeMetrics(tx,metrics);
    return {status:200};
   });}catch{return {status:503,error:'USAGE_UNAVAILABLE'};}
  },
@@ -64,13 +79,15 @@ export function createCommercialStore(db,{clock=Date.now,budget={day:30,month:60
    if(!next)return;
    const ar=refs(db,uid,a.reservedAt),snap=await tx.getAll(...ar);
    const counters=snap.map(x=>transition(x.data(),status));
+   const metrics=a.adminMetrics===1?await prepareMetrics(tx,db,a.reservedAt,a.plan,status):[];
    tx.set(user,next);tx.update(attempt,{status,finishedAt:now});
    ar.forEach((r,i)=>tx.set(r,counters[i]));
+   writeMetrics(tx,metrics);
   });
  },
- async readCredits(uid){
+ async readCredits(uid,transaction){
   if(!validUid(uid))throw Error('ACCESS_DENIED');
-  return db.runTransaction(async tx=>{
+  const read=async tx=>{
    const [profile,state]=await tx.getAll(profileRef(uid),userRef(uid));
    const now=clock(),plan=planOf(uid,profile.data(),now);
    if(!plan)return null;
@@ -84,7 +101,8 @@ export function createCommercialStore(db,{clock=Date.now,budget={day:30,month:60
    const busy=now-attempt.reservedAt<RECOVERY_GRACE_MS;
    const held=busy&&attempt.plan===plan&&(plan==='free'||attempt.month===balance.month);
    return {plan,...balance,remaining:balance.remaining+(held?0:1),busy};
-  },{readOnly:true});
+  };
+  return transaction?read(transaction):db.runTransaction(read,{readOnly:true});
  }
  };
 }

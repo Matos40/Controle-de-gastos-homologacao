@@ -54,3 +54,14 @@
   .raytech-ai__header { align-items: stretch; flex-direction: column; }
   .raytech-ai button { inline-size: 100%; }
 }
+.raytech-ai-admin { max-inline-size: 58rem; overflow-wrap: anywhere; }
+.raytech-ai-admin__metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,16rem),1fr)); gap: .75rem; }
+.raytech-ai-admin article { padding: .8rem; background: #1e293b; border: 1px solid #475569; border-radius: .8rem; }
+.raytech-ai-admin h2 { font-size: 1.05rem; color: #67e8f9; }
+.raytech-ai-admin dt { font-weight: 700; }
+.raytech-ai-admin dd { margin: .2rem 0 .65rem; color: #cbd5e1; }
+.raytech-ai-admin input:not([type=checkbox]) { font: inherit; padding: .5rem; }
+.raytech-ai-admin input[type=checkbox] { inline-size: 1.2rem; min-block-size: initial; vertical-align: middle; }
+.raytech-ai-admin ul { list-style: none; padding: 0; }
+.raytech-ai-admin li { margin: .4rem 0; }
+.raytech-ai-admin label { display: block; margin-block: .3rem; }

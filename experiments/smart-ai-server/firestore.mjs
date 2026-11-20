@@ -71,7 +71,20 @@ export function createRestStore(db, base, accessToken, signal, transport=fetch, 
       }
       let committed=false;
       try {
-        const result=await run({getAll,get:async r=>(await getAll(r))[0],
+        async function findByIdPrefix(collection,prefix,fieldsToRead) {
+          if(writes.length||!/^[A-Za-z0-9_]{1,80}$/.test(collection)||!/^[A-Za-z0-9_-]{2,128}$/.test(prefix))throw Error('INVALID_QUERY');
+          const name=db+'/documents/'+collection+'/'+prefix;
+          const condition=(op,referenceValue)=>({fieldFilter:{field:{fieldPath:'__name__'},op,value:{referenceValue}}});
+          const rows=await call('runQuery',{transaction,structuredQuery:{from:[{collectionId:collection}],
+            select:{fields:fieldsToRead.map(fieldPath=>({fieldPath}))},
+            where:{compositeFilter:{op:'AND',filters:[condition('GREATER_THAN_OR_EQUAL',name),condition('LESS_THAN',name+'\uf8ff')]}},
+            orderBy:[{field:{fieldPath:'__name__'},direction:'ASCENDING'}],limit:20}});
+          return rows.filter(row=>row.document).map(({document})=>({
+            id:document.name.split('/').at(-1),
+            data:()=>unpack(document.fields??{}),
+          }));
+        }
+        const result=await run({getAll,findByIdPrefix,get:async r=>(await getAll(r))[0],
           set:(r,d)=>queue(r,d,'set'),update:(r,d)=>queue(r,d,'update'),create:(r,d)=>queue(r,d,'create')});
         if(writes.length){await call('commit',{transaction,writes});committed=true;}
         return result;

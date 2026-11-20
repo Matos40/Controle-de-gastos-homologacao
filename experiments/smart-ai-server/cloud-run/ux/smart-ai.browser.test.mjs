@@ -12,7 +12,11 @@ const html=`<!doctype html><html lang="pt-BR"><meta charset="utf-8">
  <title>Raytech CG Smart AI · Ensaio</title><link rel="stylesheet" href="/smart-ai.css">
  <main id="root"></main><script type="module">
  import {mountSmartAI} from '/smart-ai.mjs';
- mountSmartAI(document.getElementById('root'),{
+ import {mountSmartAdminAI} from '/smart-admin-ai.mjs';
+ const root=document.getElementById('root');
+ if(['?owner','?admin'].includes(location.search)){
+  mountSmartAdminAI(root,{getIdToken:async()=>location.search.slice(1)});
+ }else mountSmartAI(root,{
   getIdToken:async()=>location.search==='?premium'?'fixture-premium':'fixture-free',
   onUpgrade:()=>document.body.dataset.upgrade='yes',
   onReview:value=>document.body.dataset.review=String(value.items.length),
@@ -20,8 +24,8 @@ const html=`<!doctype html><html lang="pt-BR"><meta charset="utf-8">
  </script></html>`;
 
 async function lab(){
- const state={remaining:2,requests:0,mode:'success',ids:[]};
- const assets={'/smart-ai.css':'text/css','/smart-ai.mjs':'text/javascript'};
+ const state={remaining:2,requests:0,mode:'success',ids:[],settings:{enabled:true,budget:{day:30,month:60},version:0}};
+ const assets={'/smart-ai.css':'text/css','/smart-ai.mjs':'text/javascript','/smart-admin-ai.mjs':'text/javascript'};
  const server=createServer(async(req,res)=>{
   const url=new URL(req.url,'http://localhost');
   if(url.pathname==='/'){res.writeHead(200,{'content-type':'text/html'});res.end(html);return;}
@@ -29,9 +33,25 @@ async function lab(){
    res.writeHead(200,{'content-type':assets[url.pathname]});
    res.end(await readFile(new URL('.'+url.pathname,import.meta.url)));return;
   }
+  const send=(status,body)=>{res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(body));};
+  if(url.pathname==='/v1/admin/ai'){
+   const role=req.headers.authorization?.slice(7);
+   if(!['owner','admin'].includes(role))return send(403,{error:'ACCESS_DENIED'});
+   const chunks=[];for await(const chunk of req)chunks.push(chunk);
+   const body=JSON.parse(Buffer.concat(chunks));
+   const period={free:{reserved:2,completed:1,failed:1,pending:0},
+    premium:{reserved:1,completed:0,failed:0,pending:1},conversions:1};
+   if(body.action==='overview')return send(200,{role,settings:state.settings,day:period,month:period,monthlyAverage:0.5});
+   if(body.action==='search'&&body.prefix==='fixture')return send(200,{rows:[{uid:'fixture-test',name:'Conta fictícia'}]});
+   if(body.action==='credits'&&body.uid==='fixture-test')return send(200,{plan:'free',remaining:1,busy:false});
+   if(body.action==='configure'&&role==='owner'&&body.expectedVersion===state.settings.version){
+    state.settings={enabled:body.enabled,budget:{day:body.day,month:body.month},version:body.expectedVersion+1};
+    return send(200,{settings:state.settings});
+   }
+   return send(400,{error:'INVALID_REQUEST'});
+  }
   const premium=req.headers.authorization==='Bearer fixture-premium';
   if(!premium&&req.headers.authorization!=='Bearer fixture-free'){res.writeHead(401).end();return;}
-  const send=(status,body)=>{res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(body));};
   if(url.pathname==='/v1/credits')return send(200,premium?
    {plan:'premium',remaining:15,busy:false,nextRenewalDate:'2027-01-01'}:
    {plan:'free',remaining:state.remaining,busy:false,nextRenewalDate:null});
@@ -124,5 +144,34 @@ test('iOS WebKit: Premium monthly renewal and no sideways scrolling',{skip:proce
   assert.equal(await page.locator('[data-count]').textContent(),'15');
   assert.equal(await page.locator('[data-upgrade]').isVisible(),false);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ }finally{await browser?.close();await close();}
+});
+
+test('Smart Admin: mobile Owner controls, desktop Admin read-only, search, credits and cost estimate',async()=>{
+ const {state,url,close}=await lab();
+ let browser;
+ try{
+  browser=await chromium.launch(chromiumOptions);
+  const page=await browser.newPage(devices['Pixel 7']);
+  await page.goto(url+'?owner');
+  await waitText(page,'[data-admission]','habilitadas');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.getByLabel('Pesquisar por início do UID').fill('fixture');
+  await page.getByRole('button',{name:'Pesquisar',exact:true}).click();
+  await page.getByRole('button',{name:'Conta fictícia · fixture-test'}).click();
+  await waitText(page,'[data-credit]','1 créditos disponíveis');
+  await page.getByLabel('Valor estimado por tentativa em reais').fill('0.5');
+  await waitText(page,'[data-estimate]','1,50');
+  await page.getByLabel('Aceitar novas leituras de IA').uncheck();
+  await page.getByLabel('Limite diário (UTC)').fill('12');
+  await page.getByLabel('Limite mensal (UTC)').fill('35');
+  await page.getByRole('button',{name:'Salvar configuração'}).click();
+  await waitText(page,'[data-status]','Configuração salva.');
+  assert.deepEqual(state.settings,{enabled:false,budget:{day:12,month:35},version:1});
+  const desktop=await browser.newPage({viewport:{width:1280,height:720}});
+  await desktop.goto(url+'?admin');
+  await waitText(desktop,'[data-admission]','suspensas');
+  assert.equal(await desktop.locator('[data-config]').isVisible(),false);
+  assert.match(await desktop.locator('[data-month]').textContent(),/Créditos restituídos/);
  }finally{await browser?.close();await close();}
 });
