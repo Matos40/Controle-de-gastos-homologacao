@@ -2,6 +2,7 @@ import {COLLECTION,validUid,planOf,reserve,finish,monthOf,view} from './quota.mj
 import {validRequestId} from '../legacy/usage.mjs';
 import {reserveBudget,validateBudget} from '../legacy/global-budget.mjs';
 import {transition} from '../legacy/outcome.mjs';
+export const RECOVERY_GRACE_MS=120000;
 const accounts='raytechV345Accounts';
 const globalCollection='raytechLabCommercialGlobalV350';
 const auditCollection='raytechLabCommercialAuditV350';
@@ -12,11 +13,31 @@ export function createCommercialStore(db,{clock=Date.now,budget={day:30,month:60
  const profileRef=uid=>db.collection(accounts).doc(uid);
  const budgetRef=db.collection(globalCollection).doc('budget');
  const configRef=db.collection(globalCollection).doc('config');
+ async function recoverExpired(uid){
+  if(!validUid(uid))throw Error('INVALID_UID');
+  const user=userRef(uid);
+  return db.runTransaction(async tx=>{
+   const [state]=await tx.getAll(user),s=state.data();
+   if(!s?.pending)return false;
+   if(!validRequestId(s.pending))throw Error('INVALID_STATE');
+   const attempt=user.collection('attempts').doc(s.pending);
+   const [old]=await tx.getAll(attempt),a=old.data(),now=clock();
+   if(!a||a.status!=='pending'||!Number.isSafeInteger(a.reservedAt)||a.reservedAt>now)throw Error('INVALID_STATE');
+   if(now-a.reservedAt<RECOVERY_GRACE_MS)return false;
+   const next=finish(s,a,s.pending,'failed',now);
+   const ar=refs(db,uid,a.reservedAt),snap=await tx.getAll(...ar);
+   const counters=snap.map(x=>transition(x.data(),'failed'));
+   tx.set(user,next);tx.update(attempt,{status:'failed',finishedAt:now,recovery:'expired-undelivered'});
+   ar.forEach((r,i)=>tx.set(r,counters[i]));
+   return true;
+  });
+ }
  return {
+ recoverExpired,
  async reserveUsage({uid,requestId}){
   if(!validUid(uid)||!validRequestId(requestId))return {status:400,error:'INVALID_REQUEST_ID'};
   const user=userRef(uid),attempt=user.collection('attempts').doc(requestId);
-  try{return await db.runTransaction(async tx=>{
+  try{await recoverExpired(uid);return await db.runTransaction(async tx=>{
    const [profile,state,old,global,config]=await tx.getAll(profileRef(uid),user,attempt,budgetRef,configRef);
    const now=clock(),plan=planOf(uid,profile.data(),now);
    if(!plan)return {status:403,error:'ACCESS_DENIED'};
