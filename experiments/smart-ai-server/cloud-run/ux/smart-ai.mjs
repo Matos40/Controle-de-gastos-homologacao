@@ -26,8 +26,8 @@ function base64(file){
   });
 }
 
-export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch}){
-  root.innerHTML=`
+export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch,native=false,onRender}){
+  if(!native)root.innerHTML=`
     <section class="raytech-ai" aria-label="Leitor Smart AI">
       <header class="raytech-ai__header">
         <div><h1>Smart AI</h1><p>Leitor de faturas</p></div>
@@ -50,6 +50,7 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch})
     </section>`;
   const el=name=>root.querySelector('[data-'+name+']');
   const form=el('form'), input=el('file'), status=el('status'), review=el('review');
+  let generation=0;
   let balance=null, busy=false, refreshing=false, requestId, selectedFile, result;
 
   function render(){
@@ -63,18 +64,19 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch})
       balance?.operational==='unavailable'?unavailable:exhausted?'':
       balance?.busy?messages.ACTIVE_REQUEST:'Disponível';
     operational.hidden=!operational.textContent||(!balance?.operational&&!busy);
-    el('filename').textContent=input.files[0]?.name??'Escolher arquivo';
+    el('filename').textContent=selectedFile?.name??(native?'':'Escolher arquivo');
     const blocked=Boolean(balance?.operational&&balance.operational!=='available');
     const renewal=el('renewal');
     renewal.hidden=balance?.plan!=='premium';
     renewal.textContent=renewal.hidden?'':'Próxima renovação em '+balance.nextRenewalDate.split('-').reverse().join('/');
     el('lock').hidden=!exhausted;
     el('upgrade').hidden=balance?.plan!=='free'||typeof onUpgrade!=='function';
-    input.disabled=busy||blocked||Boolean(exhausted);
-    el('send').disabled=busy||refreshing||blocked||!balance||exhausted||balance.busy||!input.files.length;
-    el('send').textContent=busy?'Processando…':'Ler fatura';
+    input.disabled=busy||blocked||Boolean(exhausted)||(native&&(!balance||refreshing||balance.busy));
+    el('send').disabled=busy||refreshing||blocked||!balance||exhausted||balance.busy||!selectedFile;
+    if(!native)el('send').textContent=busy?'Processando…':'Ler fatura';
     form.setAttribute('aria-busy',String(busy));
     el('refresh').disabled=busy||refreshing;
+    onRender?.({file:selectedFile,busy});
   }
 
   async function api(path,options={}){
@@ -104,20 +106,23 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch})
     }finally{refreshing=false;render();}
   }
 
-  input.addEventListener('change',()=>{
-    selectedFile=input.files[0];requestId=undefined;result=undefined;review.hidden=true;
+  function select(file){
+    if(input.disabled&&file)return;
+    selectedFile=file;requestId=undefined;result=undefined;review.hidden=true;
     status.textContent='';render();
-  });
+  }
+  input.addEventListener('change',()=>select(input.files[0]));
   el('refresh').addEventListener('click',()=>void refresh());
   el('upgrade').addEventListener('click',()=>onUpgrade?.());
   review.addEventListener('click',()=>onReview?.(result));
-  form.addEventListener('submit',async event=>{
+  async function submit(event){
     event.preventDefault();
     if(busy||refreshing||!balance||balance.busy||!balance.remaining||(balance.operational&&balance.operational!=='available'))return;
-    const file=input.files[0];
+    const file=selectedFile;
     if(!file||!types.includes(file.type)||!file.size){status.textContent=messages.INVALID_FILE;return;}
     if(file.size>maxBytes){status.textContent=messages.FILE_TOO_LARGE;return;}
     if(file!==selectedFile){selectedFile=file;requestId=undefined;}
+    const current=generation;
     requestId??=crypto.randomUUID();
     busy=true;result=undefined;review.hidden=true;status.textContent='Lendo sua fatura…';render();
     try{
@@ -125,6 +130,7 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch})
         headers:{'content-type':'application/json','x-request-id':requestId},
         body:JSON.stringify({feature:'invoice-ai',mimeType:file.type,data:await base64(file)}),
       });
+      if(current!==generation)return;
       if(!ok){
         status.textContent=(messages[data.error]??unavailable)+(data.creditRefunded===true?' O crédito foi restituído.':'');
         if(data.creditRefunded===true)requestId=undefined;
@@ -145,8 +151,15 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch})
           totals+
           (reconciliation?.warnings?.includes('POSSIBLE_DUPLICATES')?' Há possíveis duplicidades.':'');
       }
-    }catch(error){status.textContent=messages[error.message]??'Falha de comunicação. Atualize o saldo antes de repetir a leitura.';}
+    }catch(error){if(current===generation)status.textContent=messages[error.message]??'Falha de comunicação. Atualize o saldo antes de repetir a leitura.';}
     finally{await refresh({announce:false});busy=false;render();}
-  });
-  return {refresh,ready:refresh(),discardReview(){result=undefined;review.hidden=true;status.textContent='';}};
+  }
+  if(native)el('send').addEventListener('click',submit);
+  else form.addEventListener('submit',submit);
+  return {refresh,ready:refresh(),select,hasReview:()=>Boolean(result),discardReview(){
+   result=undefined;review.hidden=true;status.textContent='';
+  },reset(){
+   generation++;result=undefined;selectedFile=undefined;requestId=undefined;input.value='';review.hidden=true;status.textContent='';render();
+  }};
+
 }

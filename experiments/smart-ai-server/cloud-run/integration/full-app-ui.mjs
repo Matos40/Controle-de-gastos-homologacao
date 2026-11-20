@@ -1,4 +1,4 @@
-import {mountIntegration} from './mount.mjs';
+import {bindNativeInvoice} from './native-invoice.mjs';
 import {mountSmartAdminAI} from '../ux/smart-admin-ai.mjs';
 import {mountAdmin} from '/app/js/productionV2/smartAdminView.mjs';
 import {mountSmartLoginView} from '/app/js/productionV2/smartLoginView.mjs';
@@ -12,7 +12,7 @@ role.setAttribute('aria-label','Perfil experimental');
 for(const value of ['free','premium','admin','owner'])role.add(new Option(value,value));
 login.querySelector('[data-login-enter]').before(role);
 const indicator=document.createElement('p');
-indicator.textContent='Ambiente isolado · use somente dados fictícios';
+indicator.textContent='Ambiente isolado Ãƒâ€šÃ‚Â· use somente dados fictÃƒÆ’Ã‚Â­cios';
 role.before(indicator);
 const storage=new Map();
 globalThis.raytechStorage={getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,String(value)),removeItem:key=>storage.delete(key)};
@@ -26,7 +26,7 @@ const request=async(action,body={})=>{
  return reply.json();
 };
 const reauthenticate=async()=>{
- if(!confirm('Simular uma nova autenticação do Owner fictício?'))throw Error('REAUTH_REQUIRED');
+ if(!confirm('Simular uma nova autenticaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o do Owner fictÃƒÆ’Ã‚Â­cio?'))throw Error('REAUTH_REQUIRED');
  const current=token,result=await request('reauthenticate');
  if(token!==current)throw Error('REAUTH_REQUIRED');
  token=result.token;return token;
@@ -42,52 +42,72 @@ function signOut(){
 async function signIn(){
  if(load)return;
  load=activate();
- try{await load;}catch{loginView.paint({phase:'workspace-blocked',message:'Não foi possível abrir a cópia experimental.'});}
+ try{await load;}catch{loginView.paint({phase:'workspace-blocked',message:'NÃƒÆ’Ã‚Â£o foi possÃƒÆ’Ã‚Â­vel abrir a cÃƒÆ’Ã‚Â³pia experimental.'});}
 }
 async function activate(){
  const profile=role.value;
  ({token}=await request('login',{profile}));
+ const privilege=await fetch('/v1/admin/ai',{method:'POST',cache:'no-store',
+  headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:'{"action":"overview"}'});
+ const adminRole=privilege.ok?(await privilege.json()).role:null;
  for(const file of scripts)await new Promise((resolve,reject)=>{
   const script=document.createElement('script');script.src='./js/'+file;
   script.onload=resolve;script.onerror=reject;document.body.append(script);
  });
- const dialog=modal.firstElementChild;
- const heading=dialog.firstElementChild;
- dialog.replaceChildren(heading);
- const surface=document.createElement('div');dialog.append(surface);
- const apiKey=get('apiKeyModal');
- if(apiKey){
-  const surface=apiKey.firstElementChild??apiKey;
-  const message=document.createElement('p');message.textContent='Chave API pessoal · demonstração. Nenhuma chave é solicitada ou usada.';
-  const close=document.createElement('button');close.textContent='Fechar';close.onclick=()=>apiKey.classList.add('hidden');
-  surface.replaceChildren(message,close);
- }
- globalThis.openOcrModal=()=>modal.classList.remove('hidden');
- globalThis.closeOcrModal=()=>{invoiceView.clear();modal.classList.add('hidden');};
- globalThis.openApiKeyModal=()=>{modal.classList.add('hidden');apiKey?.classList.remove('hidden');};
+ // The role is selected only on the isolated sign-in screen; the server accepts it only for fixture sessions.
+ get('smartAdminOpen').hidden=true;
+ const headerProfile=app.querySelector('.v345-account');
+ if(headerProfile)headerProfile.hidden=!['owner','admin'].includes(adminRole);
+ if(get('v345Avatar'))get('v345Avatar').textContent=adminRole==='owner'?'OF':'AF';
+ if(get('v345Identity'))get('v345Identity').textContent=(adminRole==='owner'?'Owner':'Admin')+' fictÃƒÂ­cio';
+ if(get('v345Logout'))get('v345Logout').onclick=signOut;
+ if(get('productionCloudProfile'))get('productionCloudProfile').hidden=false;
+ if(get('productionCloudGuest'))get('productionCloudGuest').hidden=true;
+ if(get('productionCloudName'))get('productionCloudName').textContent='Perfil fictÃƒÂ­cio '+profile;
+ if(get('productionCloudInitial'))get('productionCloudInitial').textContent=profile.slice(0,1).toUpperCase();
  globalThis.raytechInvoiceState=()=>({visible:true,premium:true,reason:''});
- invoiceView=mountIntegration(surface,{enabled:true,getIdToken,fetcher:fetch,reauthenticate,hideAdmin:true,
-  openApiKey:globalThis.openApiKeyModal,
+ invoiceView=bindNativeInvoice({modal,apiKey:get('apiKeyModal'),getIdToken,
   readCategories:()=>Object.entries(CATEGORIES).map(([id,{label,icon}])=>({id,label:icon+' '+label})),
-  simulateConfirmation:async (rows,invoice)=>confirmations.confirm(invoice,rows),
+  confirm:(invoice,rows)=>confirmations.confirm(invoice,rows),
  });
- if(['owner','admin'].includes(profile)){
-  const accounts=['free','premium','admin','owner'].map(name=>({uid:'lab-'+name,name:'Perfil fictício '+name,
+ if(['owner','admin'].includes(adminRole)){
+  const accounts=['free','premium','admin','owner'].map(name=>({uid:'lab-'+name,name:'Perfil fictÃƒÆ’Ã‚Â­cio '+name,
    role:['admin','owner'].includes(name)?name:'user',plan:name==='premium'?'premium':'free',blocked:false}));
-  cleanupAdmin=mountAdmin({api:{role:async()=>profile,list:async()=>accounts,audit:async()=>[],monitor:async()=>({unavailable:true})},
-   role:profile,uid:'lab-'+profile});
+  cleanupAdmin=mountAdmin({api:{role:async()=>adminRole,list:async()=>accounts,audit:async()=>[],monitor:async()=>({unavailable:true})},
+   role:adminRole,uid:'lab-'+profile});
   const observer=new MutationObserver(()=>{
-   if(adminHost.hidden||!adminHost.querySelector('h2')||adminHost.querySelector('[data-smart-admin-ai]'))return;
-   const slot=document.createElement('section');slot.dataset.smartAdminAi='';adminHost.append(slot);
-   mountSmartAdminAI(slot,{getIdToken,reauthenticate});
+   const monitor=adminHost.querySelector('.v3467-monitor');
+   if(monitor&&!monitor.querySelector('[data-smart-admin-ai]')){
+    const slot=document.createElement('section');slot.dataset.smartAdminAi='';
+    monitor.querySelector('summary').after(slot);
+    mountSmartAdminAI(slot,{getIdToken,reauthenticate,embedded:true});
+   }
+   for(const detail of adminHost.querySelectorAll('dialog .v3467-ai:not([data-credits-mounted])')){
+    detail.dataset.creditsMounted='';
+    const uid=detail.closest('dialog').querySelector('.admin-detail-uid code')?.textContent;
+    if(!uid)continue;
+    const line=document.createElement('p');line.textContent='CrÃƒÂ©ditos Smart AI Ã‚Â· ConsultandoÃ¢â‚¬Â¦';detail.append(line);
+    void getIdToken().then(value=>fetch('/v1/admin/ai',{method:'POST',cache:'no-store',headers:{authorization:'Bearer '+value,'content-type':'application/json'},
+     body:JSON.stringify({action:'credits',uid})})).then(async reply=>{
+      if(!reply.ok)throw Error('ACCESS_DENIED');
+      const data=await reply.json();
+      line.textContent='Smart AI Ã‚Â· '+data.remaining+' crÃƒÂ©ditos disponÃƒÂ­veis Ã‚Â· '+(data.plan==='premium'?'Premium':'Free')+' Ã‚Â· cotas da Chave API separadas';
+     }).catch(()=>{line.textContent='CrÃƒÂ©ditos Smart AI indisponÃƒÂ­veis.';});
+   }
   });
-  observer.observe(adminHost,{childList:true});
+  observer.observe(adminHost,{childList:true,subtree:true});
  }
- window.addEventListener('offline',()=>{invoiceView.clear();});
  get('productionCloudLogout').disabled=false;
  get('productionCloudLogout').onclick=signOut;
- const headerLogout=document.createElement('button');headerLogout.className='admin-action';headerLogout.textContent='Sair do laboratório';headerLogout.onclick=signOut;
+ const headerLogout=document.createElement('button');headerLogout.className='admin-action';headerLogout.textContent='Sair do laboratÃƒÆ’Ã‚Â³rio';headerLogout.onclick=signOut;
  app.prepend(headerLogout);
+ get('incomeBaseHelpToggle')?.addEventListener('click',event=>{
+  const help=get('incomeBaseHelp');help.hidden=!help.hidden;
+  event.currentTarget.setAttribute('aria-expanded',String(!help.hidden));
+ });
+ const pwa=get('smartPwaDialog');
+ get('smartPwaOpen')?.addEventListener('click',()=>{if(pwa&&!pwa.open)pwa.showModal();});
+ get('smartPwaClose')?.addEventListener('click',()=>pwa?.close());
  window.dispatchEvent(new Event('raytech-account-start'));
  app.hidden=false;app.inert=false;loginView.paint({phase:'ready'});
 }

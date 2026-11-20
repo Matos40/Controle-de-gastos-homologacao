@@ -20,10 +20,10 @@ export function googleOwnerReauthentication(auth,provider,reauthenticateWithPopu
  };
 }
 
-export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}){
+export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch,embedded=false}){
  root.innerHTML=`
   <section class="raytech-ai raytech-ai-admin" aria-label="Smart Admin AI">
-   <header class="raytech-ai__header"><h1>Smart Admin AI</h1><button type="button" data-reload>Atualizar indicadores</button></header>
+   <header class="raytech-ai__header">${embedded?'<h3>Consumo e proteção Smart AI</h3>':'<h1>Smart Admin AI</h1>'}<button type="button" data-reload>Atualizar indicadores</button></header>
    <p role="status" aria-live="polite" data-status></p>
    <div data-content hidden>
     <div class="raytech-ai-admin__metrics">

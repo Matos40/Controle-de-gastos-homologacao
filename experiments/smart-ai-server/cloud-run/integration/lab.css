@@ -29,3 +29,11 @@ dialog::backdrop { background: #020617b0; }
 }
 #smartAdminHost [data-smart-admin-ai] { margin-block:1rem; }
 #smartAdminHost [data-smart-admin-ai] li { overflow-wrap:anywhere; }
+
+#ocrModal .native-ai-modes, #ocrModal .native-ai-details { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin-block:.55rem; }
+#ocrModal .native-ai-summary { flex:1 1 10rem; font-size:.8rem; color:#cbd5e1; }
+#ocrModal .native-ai-modes button, #ocrModal .native-ai-details button, #ocrModal [data-review] {
+ padding:.42rem .8rem; border-radius:.55rem; background:#1e1b4b; color:#ddd6fe; border:1px solid #6366f1; font-size:.8rem;
+}
+#ocrDropZone:has(input:disabled) { opacity:.55; cursor:not-allowed; }
+#smartAdminHost .v3467-monitor [data-smart-admin-ai] .raytech-ai { padding:.8rem; max-width:none; border:0; background:transparent; }

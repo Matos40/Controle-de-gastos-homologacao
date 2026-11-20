@@ -6,7 +6,7 @@ import {fullAppAsset} from './full-app-assets.mjs';
 import {createLab} from './lab.mjs';
 
 const assets=new Map(Object.entries({
- '/':'integration/index.html','/integration/review-store.mjs':'integration/review-store.mjs','/integration/full-app-ui.mjs':'integration/full-app-ui.mjs',
+ '/':'integration/index.html','/integration/native-invoice.mjs':'integration/native-invoice.mjs','/integration/review-store.mjs':'integration/review-store.mjs','/integration/full-app-ui.mjs':'integration/full-app-ui.mjs',
  '/integration/full-app-scripts.mjs':'integration/full-app-scripts.mjs','/integration/lab.css':'integration/lab.css',
  '/integration/lab-ui.mjs':'integration/lab-ui.mjs','/integration/mount.mjs':'integration/mount.mjs',
  '/integration/review.mjs':'integration/review.mjs','/ux/smart-ai.css':'ux/smart-ai.css',
@@ -28,7 +28,7 @@ export async function startLab({port=0,mode='reconciled',observedCents,vendorRoo
    if(!lab||req.headers.host!==new URL(origin).host||req.headers.origin&&req.headers.origin!==origin)return send(403,{error:'ACCESS_DENIED'});
    if(req.method==='GET'&&req.url.startsWith('/app/')){
     const path=new URL(req.url,origin).pathname;
-    const asset=await fullAppAsset(path,vendorRoot);
+    const asset=await fullAppAsset(path,vendorRoot,new URL(req.url,origin).searchParams.get('reference')==='1');
     if(!asset)return send(404,{error:'NOT_FOUND'});
     res.setHeader('content-security-policy',"default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self'; manifest-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'");
     res.writeHead(200,{'content-type':asset.type});
@@ -79,5 +79,5 @@ export async function startLab({port=0,mode='reconciled',observedCents,vendorRoo
 }
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url){
  const {origin}=await startLab({port:8784,mode:process.argv[2]});
- console.log('Laboratório Smart AI · '+origin);
+ console.log('LaboratÃ³rio Smart AI Â· '+origin);
 }
