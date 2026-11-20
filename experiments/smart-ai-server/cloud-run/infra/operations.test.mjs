@@ -31,6 +31,7 @@ test('offline rendering pins compute project, immutable image, VPC and disabled 
  assert.equal(monitoring.applyAuthorized,false);
  assert.equal(monitoring.computeProject,'raytech-3d');
  assert.equal(iam.firebaseProject,'gen-lang-client-0593667072');
+ assert.equal(iam.runtime.firestoreRole.databaseCondition,'resource.name == "projects/gen-lang-client-0593667072/databases/(default)"');
  assert.equal(resources.firebaseProject,'gen-lang-client-0593667072');
  assert.equal(resources.network.privateGoogleAccess,true);
  assert.equal(resources.secretManager.gatewayAccess,false);

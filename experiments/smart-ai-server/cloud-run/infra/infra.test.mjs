@@ -26,8 +26,9 @@ test('offline manifest is private, disabled and pins runtime capacity and secret
  assert.equal(iam.applyAuthorized,false);
  assert.equal(iam.invoker.public,false);
  assert.equal(iam.runtime.staticKeys,false);
- assert.deepEqual(iam.runtime.firebaseCustomRole.includedPermissions,[
-  'firebaseauth.users.get','datastore.databases.get','datastore.entities.get','datastore.entities.list',
+ assert.deepEqual(iam.runtime.firebaseAuthRole.includedPermissions,['firebaseauth.users.get']);
+ assert.deepEqual(iam.runtime.firestoreRole.includedPermissions,[
+  'datastore.databases.get','datastore.entities.get','datastore.entities.list',
   'datastore.entities.create','datastore.entities.update',
  ]);
  assert.equal(monitoring.applyAuthorized,false);
