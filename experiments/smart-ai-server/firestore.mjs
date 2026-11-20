@@ -32,16 +32,18 @@ export function createEmulatorStore(signal, transport=fetch) {
   return createRestStore(db, base, async () => 'owner', signal, transport);
 }
 
-export function createRestStore(db, base, accessToken, signal, transport=fetch) {
+export function createRestStore(db, base, accessToken, signal, transport=fetch, {abortedRetries=0}={}) {
   async function call(method, body, requestSignal=signal) {
     const r = await transport(base + ':' + method,{method:'POST',redirect:'manual',signal:requestSignal,
       headers:{authorization:'Bearer ' + await accessToken(),'content-type':'application/json'},body:JSON.stringify(body)});
+    if (r.status===409 && abortedRetries>0) {
+      const body=await r.json().catch(()=>null);
+      if(body?.error?.status==='ABORTED')throw Error('FIRESTORE_TRANSACTION_ABORTED');
+    }
     if (!r.ok) throw Error('FIRESTORE_UNAVAILABLE');
     return r.json();
   }
-  return {
-    collection: name => ({doc:id=>ref(db+'/documents/'+name+'/'+id)}),
-    async runTransaction(run, options) {
+  async function runOnce(run, options) {
       const readOnly=options?.readOnly===true;
       const {transaction} = await call('beginTransaction',{options:readOnly?{readOnly:{}}:{readWrite:{}}});
       if (typeof transaction!=='string' || !transaction) throw Error('FIRESTORE_UNAVAILABLE');
@@ -76,6 +78,19 @@ export function createRestStore(db, base, accessToken, signal, transport=fetch) 
       } finally {
         if(!committed)await call('rollback',{transaction},AbortSignal.timeout(500)).catch(()=>{});
       }
+  }
+  return {
+    collection: name => ({doc:id=>ref(db+'/documents/'+name+'/'+id)}),
+    async runTransaction(run, options) {
+      for(let attempt=0;;attempt++){
+        try{return await runOnce(run,options);}
+        catch(error){
+          if(error.message!=='FIRESTORE_TRANSACTION_ABORTED'||attempt>=abortedRetries)throw error;
+          await delay(25+Math.floor(Math.random()*75),undefined,{signal});
+        }
+      }
     },
   };
 }
+import {setTimeout as delay} from 'node:timers/promises';
+

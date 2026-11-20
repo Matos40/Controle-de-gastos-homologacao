@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {planOf,monthOf,view,reserve,finish} from './quota.mjs';
 import {createCommercialStore} from './store.mjs';
 import {makeServer} from './server.mjs';
+import {createRestStore} from '../firestore.mjs';
 const t=Date.parse('2026-11-30T23:59:00-03:00');
 const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 const account=(plan='free')=>({uid:'u',blocked:false,plan,premiumUntil:t+10000000});
@@ -131,4 +132,23 @@ test('expired undelivered reservation recovered once; late success rejected',asy
  now+=120001;
  assert.equal(await s.recoverExpired('u'),false);
  assert.equal((await s.readCredits('u')).remaining,1);
+});
+
+test('REST transaction retries an explicit Firestore abort and never retries an ambiguous commit',async()=>{
+ for(const [failure,expected] of [['ABORTED',2],['UNAVAILABLE',1]]){
+  let commits=0,begins=0;
+  const db=createRestStore('projects/demo-test/databases/(default)','http://127.0.0.1:1/documents',
+   async()=> 'synthetic',new AbortController().signal,async url=>{
+    if(url.endsWith(':beginTransaction'))return Response.json({transaction:String(++begins)});
+    if(url.endsWith(':rollback'))return Response.json({});
+    assert.ok(url.endsWith(':commit'));
+    if(++commits===1)return Response.json({error:{status:failure}},{status:failure==='ABORTED'?409:503});
+    return Response.json({});
+   },{abortedRetries:3});
+  const work=db.runTransaction(tx=>tx.set(db.collection('synthetic').doc('fixture'),{count:1}));
+  if(expected===1)await assert.rejects(work,/FIRESTORE_UNAVAILABLE/);
+  else await work;
+  assert.equal(begins,expected);
+  assert.equal(commits,expected);
+ }
 });

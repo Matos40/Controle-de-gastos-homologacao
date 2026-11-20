@@ -114,7 +114,7 @@ export function createCloudRunHandler(transport = fetch) {
       const access = () => googleAccessToken(counted, deadline);
       const dbName = 'projects/' + experimentProject + '/databases/(default)';
       const db = createRestStore(dbName, 'https://firestore.googleapis.com/v1/' + dbName + '/documents',
-        access, deadline, counted);
+        access, deadline, counted,{abortedRetries:3});
       const verifyToken = token => verifyFirebase(token, access, counted, deadline);
       const readPermissions = uid => db.runTransaction(async tx => {
         const [account, role] = await tx.getAll(
