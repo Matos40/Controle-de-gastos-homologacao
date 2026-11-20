@@ -15,6 +15,23 @@ const reply = (status, body) => Response.json(body, {status, headers:{
   'cache-control':'no-store', 'x-content-type-options':'nosniff',
 }});
 
+export async function readCreditBalance(request,{verifyToken,readCredits}) {
+  const bearer=request.headers.get('authorization');
+  if(!bearer||bearer.length>8192||!/^Bearer [^\s,]+$/.test(bearer))return reply(401,{error:'ACCESS_DENIED'});
+  let uid;
+  try { ({uid}=await verifyToken(bearer.slice(7))); }
+  catch { return reply(401,{error:'ACCESS_DENIED'}); }
+  if(typeof uid!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(uid))return reply(401,{error:'ACCESS_DENIED'});
+  try {
+    const balance=await readCredits(uid);
+    if(!balance)return reply(403,{error:'ACCESS_DENIED'});
+    const {plan,remaining,busy,month}=balance;
+    const [year,number]=month.split('-').map(Number);
+    const renewal=new Date(Date.UTC(year,number,1)).toISOString().slice(0,10);
+    return reply(200,{plan,remaining,busy,nextRenewalDate:plan==='premium'?renewal:null});
+  } catch { return reply(503,{error:'USAGE_UNAVAILABLE'}); }
+}
+
 async function boundedJson(request, signal) {
   const declared = request.headers.get('content-length');
   if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > requestCap)) {
@@ -80,11 +97,13 @@ export function createCloudRunHandler(transport = fetch) {
   let googleAccessToken;
   return {async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.protocol !== 'https:' || url.pathname !== '/v1/invoices' || url.search) {
+    const credits=url.pathname==='/v1/credits';
+    if (url.protocol !== 'https:' || (!credits&&url.pathname !== '/v1/invoices') || url.search) {
       return reply(404, {error:'NOT_FOUND'});
     }
-    if (request.method !== 'POST') return reply(405, {error:'METHOD_NOT_ALLOWED'});
-    if (request.headers.has('origin')) return reply(403, {error:'ACCESS_DENIED'});
+    if (request.method !== (credits?'GET':'POST')) return reply(405, {error:'METHOD_NOT_ALLOWED'});
+    const origin=request.headers.get('origin');
+    if (origin!==null && (origin==='null'||origin!==env.SMART_AI_UI_ORIGIN))return reply(403,{error:'ACCESS_DENIED'});
     if (env.FIREBASE_PROJECT_ID !== experimentProject ||
         env.FIRESTORE_EMULATOR_HOST || env.FIREBASE_AUTH_EMULATOR_HOST) {
       return reply(503, {error:'EXPERIMENT_UNAVAILABLE'});
@@ -93,10 +112,10 @@ export function createCloudRunHandler(transport = fetch) {
       authorization:request.headers.get('authorization'),
       'x-request-id':request.headers.get('x-request-id'),
     };
-    if (!validRequestId(headers['x-request-id'])) return reply(400, {error:'INVALID_REQUEST_ID'});
+    if (!credits&&!validRequestId(headers['x-request-id'])) return reply(400, {error:'INVALID_REQUEST_ID'});
     const contentType = request.headers.get('content-type') ?? '';
     const binary = false; // JSON transport only for initial Cloud Run candidate.
-    if (!binary && !/^application\/json(?:;|$)/i.test(contentType)) {
+    if (!credits && !binary && !/^application\/json(?:;|$)/i.test(contentType)) {
       return reply(415, {error:'INVALID_FILE'});
     }
     const deadline = AbortSignal.any([AbortSignal.timeout(30000), request.signal]);
@@ -116,6 +135,8 @@ export function createCloudRunHandler(transport = fetch) {
       const db = createRestStore(dbName, 'https://firestore.googleapis.com/v1/' + dbName + '/documents',
         access, deadline, counted,{abortedRetries:3});
       const verifyToken = token => verifyFirebase(token, access, counted, deadline);
+      const {readCredits,reserveUsage,finishOutcome}=createCommercialStore(db);
+      if(credits)return readCreditBalance(request,{verifyToken,readCredits});
       const readPermissions = uid => db.runTransaction(async tx => {
         const [account, role] = await tx.getAll(
           db.collection('raytechV345Accounts').doc(uid), db.collection('raytechV345Roles').doc(uid));
@@ -138,7 +159,6 @@ export function createCloudRunHandler(transport = fetch) {
       let providerMetrics;
       const provider = geminiProvider(env.RAYTECH_GEMINI_API_KEY, counted,
         metrics => { providerMetrics = metrics; }, binary);
-      const {reserveUsage,finishOutcome} = createCommercialStore(db);
       let result;
       try {
         result = await extractInvoice({method:'POST',headers,body},{

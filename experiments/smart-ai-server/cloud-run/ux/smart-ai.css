@@ -1,0 +1,56 @@
+.raytech-ai {
+  box-sizing: border-box;
+  color-scheme: dark;
+  color: #e2e8f0;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 1.25rem;
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  max-inline-size: 44rem;
+  margin-inline: auto;
+  padding: clamp(1rem, 4vw, 2rem);
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+}
+.raytech-ai *, .raytech-ai *::before { box-sizing: border-box; }
+.raytech-ai [hidden] { display: none; }
+.raytech-ai__header, .raytech-ai__balance {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+}
+.raytech-ai h1 { margin: 0; color: #67e8f9; font: 700 1.65rem "Orbitron", system-ui, sans-serif; }
+.raytech-ai p { margin: .4rem 0; }
+.raytech-ai__header p, .raytech-ai__hint { color: #cbd5e1; }
+.raytech-ai__balance {
+  padding: 1rem;
+  margin-block: 1.25rem .75rem;
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: .9rem;
+}
+.raytech-ai__balance strong { display: block; font-size: 2rem; color: #67e8f9; }
+.raytech-ai [data-lock] { color: #fde68a; }
+.raytech-ai form { display: grid; gap: .6rem; margin-block-start: 1rem; }
+.raytech-ai label { font-weight: 700; }
+.raytech-ai input { inline-size: 100%; min-inline-size: 0; min-block-size: 44px; }
+.raytech-ai button {
+  min-block-size: 44px;
+  border: 1px solid transparent;
+  border-radius: .65rem;
+  padding: .55rem .85rem;
+  background: #67e8f9;
+  color: #082f49;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.raytech-ai button.raytech-ai__quiet { background: #1e293b; color: #e2e8f0; border-color: #64748b; }
+.raytech-ai button:disabled { background: #334155; color: #cbd5e1; cursor: default; }
+.raytech-ai button:focus-visible, .raytech-ai input:focus-visible { outline: 2px solid #67e8f9; outline-offset: 3px; }
+.raytech-ai__status { min-block-size: 1.5em; overflow-wrap: anywhere; }
+@media (max-width: 29rem) {
+  .raytech-ai__header { align-items: stretch; flex-direction: column; }
+  .raytech-ai button { inline-size: 100%; }
+}

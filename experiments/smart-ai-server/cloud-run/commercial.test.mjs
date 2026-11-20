@@ -4,6 +4,8 @@ import {planOf,monthOf,view,reserve,finish} from './quota.mjs';
 import {createCommercialStore} from './store.mjs';
 import {makeServer} from './server.mjs';
 import {createRestStore} from '../firestore.mjs';
+import {readCreditBalance} from './handler.mjs';
+import {extractInvoice} from './invoice.mjs';
 const t=Date.parse('2026-11-30T23:59:00-03:00');
 const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 const account=(plan='free')=>({uid:'u',blocked:false,plan,premiumUntil:t+10000000});
@@ -150,5 +152,59 @@ test('REST transaction retries an explicit Firestore abort and never retries an 
   else await work;
   assert.equal(begins,expected);
   assert.equal(commits,expected);
+ }
+});
+
+test('GET credits derives UID from verified token and returns only balance, plan and renewal date',async()=>{
+ const {db,docs}=mockDb();
+ docs.set('raytechV345Accounts/u',{uid:'u',blocked:false,plan:'premium'});
+ const s=createCommercialStore(db,{clock:()=>t});
+ const snapshot=structuredClone(docs);
+ const env={SMART_AI_EXPERIMENT_ENABLED:'true'};
+ const server=makeServer({env,handler:{fetch:request=>readCreditBalance(request,{
+  verifyToken:async token=>{if(token==='invalid')throw Error('REVOKED');return {uid:token};},
+  readCredits:s.readCredits,
+ })}});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ try{
+  const url='http://127.0.0.1:'+server.address().port+'/v1/credits';
+  const read=token=>fetch(url,token?{headers:{authorization:'Bearer '+token,'x-user-id':'v'}}:{});
+  assert.equal((await read()).status,401);
+  assert.equal((await read('invalid')).status,401);
+  assert.equal((await read('missing')).status,403);
+  const premium=await read('u');
+  assert.equal(premium.headers.get('cache-control'),'no-store');
+  assert.deepEqual(await premium.json(),{plan:'premium',remaining:15,busy:false,nextRenewalDate:'2026-12-01'});
+  assert.deepEqual(await (await read('v')).json(),{plan:'free',remaining:2,busy:false,nextRenewalDate:null});
+  assert.equal((await fetch(url+'?uid=v')).status,404);
+  assert.deepEqual(docs,snapshot);
+ }finally{await new Promise(resolve=>server.close(resolve));}
+});
+
+test('credit reads account for current-month and expired holds without writing',async()=>{
+ const {db,docs}=mockDb();let now=t;
+ docs.set('raytechV345Accounts/u',{uid:'u',blocked:false,plan:'premium'});
+ const s=createCommercialStore(db,{clock:()=>now});
+ assert.equal((await s.reserveUsage({uid:'u',requestId:id(121)})).status,200);
+ assert.equal((await s.readCredits('u')).remaining,14);
+ const snapshot=structuredClone(docs);
+ now+=60000;
+ assert.deepEqual(await s.readCredits('u'),{plan:'premium',remaining:15,busy:true,month:'2026-12'});
+ now+=60000;
+ assert.deepEqual(await s.readCredits('u'),{plan:'premium',remaining:15,busy:false,month:'2026-12'});
+ assert.deepEqual(docs,snapshot);
+});
+
+test('extraction acknowledges a refund only after the settlement succeeds',async()=>{
+ const body={feature:'invoice-ai',mimeType:'application/pdf',data:Buffer.from('%PDF-1.4\n%%EOF\n').toString('base64')};
+ const request={method:'POST',headers:{authorization:'Bearer synthetic','x-request-id':id(131)},body};
+ for(const blocked of [false,true]){
+  const result=await extractInvoice(request,{
+   verifyToken:async()=>({uid:'u'}),readPermissions:async()=>({account:account()}),
+   reserveUsage:async()=>({status:200}),provider:async()=>{throw Error('synthetic provider failure');},
+   finishOutcome:async ({status})=>{assert.equal(status,'failed');if(blocked)throw Error('unavailable');},
+  });
+  assert.equal(result.status,502);
+  assert.equal(result.body.creditRefunded,!blocked||undefined);
  }
 });

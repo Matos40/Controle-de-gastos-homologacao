@@ -73,8 +73,17 @@ export function createCommercialStore(db,{clock=Date.now,budget={day:30,month:60
   return db.runTransaction(async tx=>{
    const [profile,state]=await tx.getAll(profileRef(uid),userRef(uid));
    const now=clock(),plan=planOf(uid,profile.data(),now);
-   if(!plan)throw Error('ACCESS_DENIED');
-   return {plan,...view(state.data(),now,plan)};
+   if(!plan)return null;
+   const quota=state.data();
+   const balance=view(quota,now,plan);
+   if(!balance.busy)return {plan,...balance};
+   if(!validRequestId(quota.pending))throw Error('INVALID_STATE');
+   const [pending]=await tx.getAll(userRef(uid).collection('attempts').doc(quota.pending));
+   const attempt=pending.data();
+   if(attempt?.status!=='pending'||!Number.isSafeInteger(attempt.reservedAt)||attempt.reservedAt>now)throw Error('INVALID_STATE');
+   const busy=now-attempt.reservedAt<RECOVERY_GRACE_MS;
+   const held=busy&&attempt.plan===plan&&(plan==='free'||attempt.month===balance.month);
+   return {plan,...balance,remaining:balance.remaining+(held?0:1),busy};
   },{readOnly:true});
  }
  };
