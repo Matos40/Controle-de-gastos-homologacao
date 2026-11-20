@@ -18,3 +18,14 @@ dialog::backdrop { background: #020617b0; }
 .raytech-ai [data-cancel] { background:#1e293b; color:#e2e8f0; border:1px solid #475569; }
 .raytech-ai button { margin-block:.2rem; }
 @media (max-width:600px) { [data-entries] { grid-template-columns:minmax(0,1fr); } }
+
+#ocrModal:not(.hidden), #apiKeyModal:not(.hidden) {
+ display:flex; position:fixed; inset:0; z-index:10001; align-items:center; justify-content:center;
+ padding:1rem; background:#020617db;
+}
+#ocrModal>div, #apiKeyModal>div {
+ max-height:calc(100dvh - 2rem); overflow:auto; overscroll-behavior:contain;
+ width:min(100%,48rem); min-width:0; background:#0f172a; border-radius:1rem;
+}
+#smartAdminHost [data-smart-admin-ai] { margin-block:1rem; }
+#smartAdminHost [data-smart-admin-ai] li { overflow-wrap:anywhere; }

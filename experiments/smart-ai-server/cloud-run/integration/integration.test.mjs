@@ -139,3 +139,40 @@ test('financial reactivation expires after five minutes and a later observation 
  assert.equal((await overview()).finance.observedCents,1000);
  assert.equal((await credits(lab,lab.login('free'))).remaining,2);
 });
+
+test('administrative search is private, paginated and bounded, with a sanitized audit',async()=>{
+ const lab=createLab({origin,mode:'suspended'});await lab.ready;
+ const owner=lab.login('owner'),free=lab.login('free');
+ const post=(token,data)=>call(lab,token,'/v1/admin/ai',data);
+ assert.equal((await post(free,{action:'search',prefix:'perfil'})).status,403);
+ const search=async(prefix,cursor)=> (await post(owner,{action:'search',prefix,...(cursor?{cursor}:{})})).json();
+ for(const key of ['fictício premium','premium@example.invalid','lab-premium']){
+  assert.deepEqual(await search(key),{rows:[{uid:'lab-premium',name:'Perfil fictício premium'}],nextCursor:null});
+ }
+ const page=await search('perfil');
+ assert.equal(page.rows.length,2);
+ assert.equal((await search('perfil',page.nextCursor)).rows.length,2);
+ assert.equal((await post(owner,{action:'search',prefix:'perfil',cursor:page.nextCursor})).status,400);
+ for(let i=0;i<4;i++)await search('perfil');
+ assert.equal((await post(owner,{action:'search',prefix:'perfil'})).status,429);
+ const audit=(await (await post(owner,{action:'overview'})).json()).audit;
+ assert.ok(audit.some(event=>event.action==='finance'));
+ assert.ok(audit.some(event=>event.action==='search'&&event.result==='rejected'));
+ assert.ok(!JSON.stringify(audit).includes('example.invalid'));
+});
+
+test('simulated confirmation snapshots the extraction and selected edits separately',async()=>{
+ const {createInvoiceReviewStore}=await import('./review-store.mjs');
+ const lab=createLab({origin}),member=lab.login('free');
+ const invoice=await (await call(lab,member,'/v1/invoices',body)).json();
+ const store=createInvoiceReviewStore();
+ store.confirm(invoice,[{...invoice.entries[0],category:'alimentacao'},invoice.entries[2]]);
+ const [result]=store.read();
+ assert.equal(result.original.reconciliation.statementTotalCents,3855);
+ assert.equal(result.totalCents,1265);
+ assert.equal(result.rows[0].category,'alimentacao');
+ assert.equal(result.rows[1].amountCents,-625);
+ result.rows[0].amountCents=0;
+ assert.equal(store.read()[0].rows[0].amountCents,1890);
+ store.clear();assert.deepEqual(store.read(),[]);
+});

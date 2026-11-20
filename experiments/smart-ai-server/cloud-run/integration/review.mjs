@@ -52,7 +52,7 @@ export function mountReview(root,invoice,{confirm,cancel,categories=[]}){
    wrapper.textContent=label;
    if(type==='select'){
     for(const category of ['',...categories]){
-     const option=document.createElement('option');option.value=category;option.textContent=category||'Selecione';input.append(option);
+     const option=document.createElement('option');option.value=category?.id??category;option.textContent=(category?.label??category)||'Selecione';input.append(option);
     }
    }else input.type=type;
    if(type==='checkbox')input.checked=true;

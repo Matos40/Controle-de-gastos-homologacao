@@ -105,3 +105,54 @@ test('orçamento no painel — níveis, consumo superior a 100% e ausência de o
   }finally{await page.close();await lab.close();}
  }
 });
+
+for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1280,height:900}}],
+ ['Android',chromium,devices['Pixel 7']],['iOS',webkit,devices['iPhone 13']]]){
+ test('aplicativo completo '+name+' — dashboard, importação e catálogo original',async t=>{
+  assert.ok(process.env.RAYTECH_APP_VENDOR,'RAYTECH_APP_VENDOR deve indicar dependências locais aprovadas');
+  const lab=await startLab(),browser=await engine.launch();
+  t.after(async()=>{await browser.close();await lab.close();});
+  const page=await browser.newPage(device);page.setDefaultTimeout(8000);
+  const requests=[];
+  const capture=async label=>{if(process.env.RAYTECH_SCREENSHOTS)await page.screenshot({path:join(process.env.RAYTECH_SCREENSHOTS,'app-'+name+'-'+label+'.png')});};
+  await page.route('**/*',route=>{
+   if(route.request().url().startsWith(lab.origin+'/'))return route.continue();
+   requests.push(route.request().url());return route.abort();
+  });
+  await page.goto(lab.origin+'/app/');
+  await page.getByLabel('Perfil experimental').selectOption('owner');
+  await page.getByRole('button',{name:'Entrar com Google'}).click();
+  await page.locator('#smartAccountApp').waitFor();
+  await page.evaluate(()=>switchTab('card'));
+  await page.locator('#tabContentCard').waitFor();
+  await capture('dashboard');
+  await page.locator('#headerToolsToggleBtn').click();
+  await page.locator('#premiumInvoiceButton').click();
+  await page.getByRole('button',{name:'Chave API',exact:true}).waitFor();
+  await capture('modalidades');
+  await page.getByRole('button',{name:'Smart AI',exact:true}).click();
+  await page.locator('[data-file]').setInputFiles(file);
+  await page.getByRole('button',{name:'Ler fatura'}).click();
+  await page.getByRole('button',{name:'Revisar lançamentos'}).click();
+  const review=page.getByRole('region',{name:'Revisão da fatura'});
+  await review.getByLabel('Categoria').first().selectOption('alimentacao');
+  assert.match(await review.locator('[data-selected]').textContent(),/38,55/);
+  await capture('categorias');
+  await review.getByRole('button',{name:'Confirmar simulação'}).click();
+  await page.getByText('Simulação confirmada. Nenhum lançamento foi gravado.').waitFor();
+  await page.evaluate(()=>closeOcrModal());
+  await page.locator('#smartAdminOpen').click();
+  await page.getByRole('heading',{name:'Smart Admin AI',exact:true}).waitFor();
+  const smart=page.locator('[data-smart-admin-ai]');
+  await smart.getByLabel('Pesquisar por nome, e-mail ou UID').fill('perfil');
+  await smart.getByRole('button',{name:'Pesquisar',exact:true}).click();
+  await smart.getByRole('button',{name:'Próxima página'}).click();
+  await smart.getByRole('button',{name:/Perfil fictício owner/}).waitFor();
+  await smart.getByRole('button',{name:'Atualizar indicadores'}).click();
+  await smart.getByText('Auditoria administrativa',{exact:true}).click();
+  await capture('admin');
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  assert.deepEqual(requests,[]);
+  assert.equal(await page.evaluate(()=>localStorage.length),0);
+ });
+}

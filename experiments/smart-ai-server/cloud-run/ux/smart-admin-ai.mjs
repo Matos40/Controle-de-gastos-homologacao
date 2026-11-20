@@ -7,6 +7,7 @@ const number=new Intl.NumberFormat('pt-BR');
 const currency=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
 const messages={ACCESS_DENIED:'Acesso reservado à administração.',
  VERSION_CONFLICT:'As configurações foram alteradas em outra sessão. Revise os valores atualizados.',
+ RATE_LIMIT:'Limite de consultas administrativas atingido. Aguarde um minuto.',
  NOT_FOUND:'O perfil não tem saldo disponível para consulta.',INVALID_REQUEST:'Confira os valores informados.'};
 
 export function googleOwnerReauthentication(auth,provider,reauthenticateWithPopup){
@@ -33,8 +34,8 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
     <form data-search><label for="ai-admin-prefix">Pesquisar por nome, e-mail ou UID</label>
      <input id="ai-admin-prefix" required minlength="2" maxlength="128" >
      <button type="submit">Pesquisar</button></form>
-    <ul data-users></ul><p data-credit aria-live="polite"></p>
-    <p data-admission></p><p data-audit></p>
+    <ul data-users></ul><button type="button" data-more hidden>Próxima página</button><p data-credit aria-live="polite"></p>
+    <p data-admission></p><p data-audit></p><details data-audit-events hidden><summary>Auditoria administrativa</summary><ol></ol></details>
     <article aria-label="Proteção financeira Smart AI">
      <h2>Proteção financeira Smart AI</h2>
      <p data-finance></p><p data-finance-observed></p>
@@ -112,6 +113,19 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
    (overview.monthlyAverage===null?'sem dados':number.format(overview.monthlyAverage));
   el('audit').textContent=Number.isSafeInteger(overview.auditCount)?
    'Auditoria simulada · '+number.format(overview.auditCount)+' alterações registradas':'';
+  const audit=el('audit-events');
+  audit.hidden=!overview.audit?.length;
+  const actions={reactivateFinance:'Reativação financeira',configure:'Alteração de limites',suspend:'Suspensão administrativa',finance:'Suspensão financeira',search:'Consulta administrativa',admin:'Operação administrativa'};
+  const describe=value=>value&&typeof value==='object'?
+   (value.enabled?'Ativo':'Suspenso')+' · '+(value.budget?.day??'—')+'/dia · '+(value.budget?.month??'—')+'/mês':
+   typeof value==='number'?'Revisão '+value:value??'—';
+  audit.querySelector('ol').replaceChildren(...(overview.audit??[]).map(event=>{
+   const item=document.createElement('li');
+   item.textContent=[new Date(event.at).toLocaleString('pt-BR'),event.actor+' ('+event.role+')',
+    actions[event.action]??'Operação administrativa',describe(event.before)+' → '+describe(event.after),
+    event.result==='accepted'?'Concluída':'Rejeitada',event.reason??''].filter(Boolean).join(' · ');
+   return item;
+  }));
   const {settings}=overview;
   const finance=overview.finance;
   el('admission').textContent=finance?.suspended?'Suspensão financeira automática.':!settings.enabled?'Novas leituras suspensas pela administração.':'Novas leituras habilitadas.';
@@ -164,12 +178,12 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
    await load();return 'Proteção financeira reativada. Confira se as novas leituras estão habilitadas.';
   });
  });
- search.addEventListener('submit',event=>{
-  event.preventDefault();
+ let query,cursor;
+ function searchPage(next){
   void run(async()=>{
    el('users').replaceChildren();el('credit').textContent='';
-   const query=search.querySelector('input').value.trim();
-   const {rows}=await request('search',{prefix:query});
+   const {rows,nextCursor}=await request('search',{prefix:query,...(next?{cursor}: {})});
+   cursor=nextCursor;el('more').hidden=!cursor;
    for(const row of rows){
     const item=document.createElement('li'),button=document.createElement('button');
     button.type='button';button.textContent=(row.name?row.name+' · ':'')+row.uid;
@@ -183,7 +197,11 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
    }
    if(!rows.length)return 'Nenhum usuário encontrado.';
   });
+ }
+ search.addEventListener('submit',event=>{
+  event.preventDefault();query=search.querySelector('input').value.trim();cursor=null;el('more').hidden=true;searchPage(false);
  });
+ el('more').onclick=()=>{if(cursor)searchPage(true);};
  el('emergency').onclick=()=>{
   if(overview?.role!=='owner'||!overview.settings.enabled)return;
   config.elements.enabled.checked=false;

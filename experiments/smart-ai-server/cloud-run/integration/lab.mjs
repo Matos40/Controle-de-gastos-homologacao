@@ -41,7 +41,7 @@ function memoryDb(){
 }
 
 export function createLab({origin,mode='reconciled',observedCents=mode==='suspended'?750:null,clock=Date.now}){
- const {docs,db}=memoryDb(),sessions=new Map();
+ const {docs,db}=memoryDb(),sessions=new Map(),queries=new Map(),securityEvents=[];
  for(const [role,uid] of Object.entries(profiles)){
   docs.set('raytechV345Accounts/'+uid,{uid,blocked:false,plan:role==='premium'?'premium':'free',name:'Perfil fictício '+role});
   if(['admin','owner'].includes(role))docs.set('raytechV345Roles/'+uid,{role,active:true});
@@ -78,18 +78,40 @@ export function createLab({origin,mode='reconciled',observedCents=mode==='suspen
   let body;
   try{body=await request.json();}catch{return send(400,{error:'INVALID_FILE'});}
   if(path==='/v1/admin/ai'){
+   const adminContext={db,verifyToken,ownerUid:profiles.owner,clock,security:event=>{
+    securityEvents.push({actorUid:identity.uid,at:clock(),action:body?.action==='search'?'search':'admin',result:'rejected',reason:event.code});
+    if(securityEvents.length>100)securityEvents.shift();
+   }};
    if(body?.action==='search'&&typeof body.prefix==='string'&&body.prefix.trim().length>=2){
-    const access=await handleSmartAdmin(request,{action:'overview'},{db,verifyToken,ownerUid:profiles.owner,clock});
+    const access=await handleSmartAdmin(request,{action:'overview'},adminContext);
     if(access.status!==200)return send(access.status,access.body);
-    const query=body.prefix.trim().toLocaleLowerCase('pt-BR');
-    return send(200,{rows:Object.entries(profiles).filter(([role,uid])=>
-     [uid,'Perfil fictício '+role,role+'@example.invalid'].some(value=>value.toLowerCase().includes(query)))
-     .map(([role,uid])=>({uid,name:'Perfil fictício '+role}))});
+    if(!Object.keys(body).every(key=>['action','prefix','cursor'].includes(key))||body.prefix.length>128)return send(400,{error:'INVALID_REQUEST'});
+    const query=body.prefix.trim().normalize('NFKC').toLocaleLowerCase('pt-BR');
+    let window=queries.get(identity.uid);
+    if(!window||clock()-window.start>=60000){window={start:clock(),count:0,pages:new Map()};queries.set(identity.uid,window);}
+    if(++window.count>10)return send(429,{error:'RATE_LIMIT'});
+    const page=body.cursor==null?{query,offset:0}:window.pages.get(body.cursor);
+    if(!page||page.query!==query)return send(400,{error:'INVALID_REQUEST'});
+    if(body.cursor)window.pages.delete(body.cursor);
+    const matches=Object.entries(profiles).filter(([role,uid])=>
+     [uid,'Perfil fictício '+role,role+'@example.invalid'].some(value=>value.toLowerCase().includes(query)));
+    const rows=matches.slice(page.offset,page.offset+2).map(([role,uid])=>({uid,name:'Perfil fictício '+role}));
+    const nextCursor=matches.length>page.offset+2?randomUUID():null;
+    if(nextCursor)window.pages.set(nextCursor,{query,offset:page.offset+2});
+    securityEvents.push({actorUid:identity.uid,at:clock(),action:'search',result:'accepted'});
+    if(securityEvents.length>100)securityEvents.shift();
+    return send(200,{rows,nextCursor});
    }
-   const result=await handleSmartAdmin(request,body,{db,verifyToken,ownerUid:profiles.owner,clock});
+   const result=await handleSmartAdmin(request,body,adminContext);
    if(result.status===200&&body.action==='overview'){
     const audit=[...docs.entries()].filter(([key])=>key.startsWith('raytechLabSmartAiAdminAuditV350/'));
     result.body.auditCount=audit.length;
+    const events=[...audit.map(([,event])=>({...event,result:'accepted',action:event.action??(event.after?.enabled===false?'suspend':'configure')})),...securityEvents];
+    if(finance().suspended)events.push({actorUid:null,at:finance().publishedAt,action:'finance',result:'accepted',before:'Em operação',after:'Suspenso',reason:'Limite financeiro observado'});
+    result.body.audit=events.sort((a,b)=>b.at-a.at).slice(0,20).map(({actorUid,...event})=>{
+     const role=Object.keys(profiles).find(key=>profiles[key]===actorUid);
+     return {...event,actor:role?'Perfil fictício '+role:'Finance Guard',role:role??'Sistema'};
+    });
     result.body.simulated=true;
    }
    return send(result.status,result.body);

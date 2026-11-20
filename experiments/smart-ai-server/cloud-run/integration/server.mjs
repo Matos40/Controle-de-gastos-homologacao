@@ -1,18 +1,20 @@
 import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {Readable} from 'node:stream';
-import {pathToFileURL} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+import {fullAppAsset} from './full-app-assets.mjs';
 import {createLab} from './lab.mjs';
 
 const assets=new Map(Object.entries({
- '/':'integration/index.html','/integration/lab.css':'integration/lab.css',
+ '/':'integration/index.html','/integration/review-store.mjs':'integration/review-store.mjs','/integration/full-app-ui.mjs':'integration/full-app-ui.mjs',
+ '/integration/full-app-scripts.mjs':'integration/full-app-scripts.mjs','/integration/lab.css':'integration/lab.css',
  '/integration/lab-ui.mjs':'integration/lab-ui.mjs','/integration/mount.mjs':'integration/mount.mjs',
  '/integration/review.mjs':'integration/review.mjs','/ux/smart-ai.css':'ux/smart-ai.css',
  '/ux/budget.mjs':'ux/budget.mjs',
  '/ux/smart-ai.mjs':'ux/smart-ai.mjs','/ux/smart-admin-ai.mjs':'ux/smart-admin-ai.mjs',
 }));
 const types={html:'text/html',css:'text/css',mjs:'text/javascript'};
-export async function startLab({port=0,mode='reconciled',observedCents}={}){
+export async function startLab({port=0,mode='reconciled',observedCents,vendorRoot=process.env.RAYTECH_APP_VENDOR??fileURLToPath(new URL('../../../../vendor/',import.meta.url))}={}){
  if(!['reconciled','divergent','incomplete','duplicates','failed','unavailable','suspended'].includes(mode))throw Error('INVALID_MODE');
  let origin,lab;
  const server=createServer({requestTimeout:35000,headersTimeout:10000,maxHeaderSize:16384},async(req,res)=>{
@@ -24,6 +26,14 @@ export async function startLab({port=0,mode='reconciled',observedCents}={}){
   };
   try{
    if(!lab||req.headers.host!==new URL(origin).host||req.headers.origin&&req.headers.origin!==origin)return send(403,{error:'ACCESS_DENIED'});
+   if(req.method==='GET'&&req.url.startsWith('/app/')){
+    const path=new URL(req.url,origin).pathname;
+    const asset=await fullAppAsset(path,vendorRoot);
+    if(!asset)return send(404,{error:'NOT_FOUND'});
+    res.setHeader('content-security-policy',"default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self'; manifest-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'");
+    res.writeHead(200,{'content-type':asset.type});
+    return res.end(asset.data);
+   }
    if(assets.has(req.url)&&req.method==='GET'){
     const path=assets.get(req.url);
     const data=await readFile(new URL('../'+path,import.meta.url));

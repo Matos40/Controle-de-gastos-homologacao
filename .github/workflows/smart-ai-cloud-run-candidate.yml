@@ -21,10 +21,19 @@ jobs:
         with:
           node-version: '22'
       - run: node --test experiments/smart-ai-server/cloud-run/integration/integration.test.mjs experiments/smart-ai-server/cloud-run/commercial.test.mjs experiments/smart-ai-server/cloud-run/invoice-contract.test.mjs experiments/smart-ai-server/cloud-run/infra/infra.test.mjs experiments/smart-ai-server/cloud-run/infra/operations.test.mjs experiments/smart-ai-server/remote/worker.test.mjs experiments/smart-ai-server/legacy/invoice.test.mjs
+      - name: Prepare verified local UI dependencies
+        run: |
+          mkdir -p "$RUNNER_TEMP/raytech-app-vendor"
+          checks="$GITHUB_WORKSPACE/experiments/smart-ai-server/cloud-run/integration/vendor.sha256"
+          cd "$RUNNER_TEMP/raytech-app-vendor"
+          while read -r hash file; do
+            curl -fsSL --retry 2 -o "$file" "https://raw.githubusercontent.com/Matos40/Controle-de-gastos-2.0/121cca799aa7072094c668697249214b899e86d5/vendor/$file"
+          done < "$checks"
+          sha256sum -c "$checks"
       - name: Test synthetic Smart AI UX in desktop and mobile engines
         timeout-minutes: 5
         run: |
-          docker run --rm --ipc=host --volume "$GITHUB_WORKSPACE:/work:ro" --workdir /work \
+          docker run --rm --ipc=host --volume "$GITHUB_WORKSPACE:/work:ro" --volume "$RUNNER_TEMP/raytech-app-vendor:/vendor:ro" --env RAYTECH_APP_VENDOR=/vendor --workdir /work \
             mcr.microsoft.com/playwright:v1.56.1-noble bash -euc '
               npm install --no-save --package-lock=false --prefix /tmp/raytech-ux playwright@1.56.1
               export PLAYWRIGHT_MODULE=/tmp/raytech-ux/node_modules/playwright/index.mjs
@@ -59,10 +68,15 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-      - name: Package the loopback-only Smart AI lab
-        run: git archive --format=zip --output=raytech-smart-ai-085.zip HEAD experiments/smart-ai-server
+      - name: Package the isolated full app
+        run: |
+          mkdir -p "$RUNNER_TEMP/raytech-app"
+          git archive HEAD experiments/smart-ai-server | tar -x -C "$RUNNER_TEMP/raytech-app"
+          node experiments/smart-ai-server/cloud-run/integration/package-full-app.mjs "$RUNNER_TEMP/raytech-app"
+          cp -r "$RUNNER_TEMP/raytech-app-vendor" "$RUNNER_TEMP/raytech-app/vendor"
+          (cd "$RUNNER_TEMP/raytech-app" && zip -qr "$GITHUB_WORKSPACE/raytech-smart-ai-0851.zip" .)
       - uses: actions/upload-artifact@v4
         with:
-          name: raytech-smart-ai-085-${{ github.sha }}
-          path: raytech-smart-ai-085.zip
+          name: raytech-smart-ai-0851-${{ github.sha }}
+          path: raytech-smart-ai-0851.zip
           if-no-files-found: error
