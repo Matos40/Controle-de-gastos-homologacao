@@ -51,7 +51,7 @@ The browser tests mount the component over loopback with synthetic tokens and re
 
 ## Smart Admin AI candidate
 
-Mount `mountSmartAdminAI(container, {getIdToken})` from `/smart-ai/smart-admin-ai.mjs` inside the isolated administrative host using its verified Firebase session and the shared Smart AI stylesheet. `POST /v1/admin/ai` rechecks token revocation, account and role on each call. Active Owner and Admin can see aggregates and search up to 20 matching UID prefixes. Individual credit reads are performed in the authorized read transaction. Only Owner can change admission or global limits.
+Mount `mountSmartAdminAI(container, {getIdToken, reauthenticate})` from `/smart-ai/smart-admin-ai.mjs` inside the isolated administrative host with its verified Firebase session and shared Smart AI stylesheet. Use the exported `googleOwnerReauthentication` adapter with the host's Firebase Auth SDK. See the [Guard procedure](infra/guards.md) for authorization, finance handling, monitoring and shutdown.
 
 The switch and limits are updated with an expected version and an append-only audit entry in one transaction. The switch is checked when reserving a new attempt. Settlements and recovery of existing attempts remain available. Daily and monthly limits use UTC and can be configured within the current lab ceiling of 30 and 60 attempts respectively. No billing is connected.
 

@@ -16,5 +16,9 @@
     "inputTokens", "outputTokens", "totalTokens", "thinkingTokens", "latencyMs"
   ],
   "proposedThresholds": {"p95LatencyMs":25000,"memoryUtilization":0.8,"cpuUtilization":0.8,"fiveMinuteServerErrorRatio":0.1},
+  "candidateLogAlerts": [
+    {"filter": "jsonPayload.event=\"smart_ai_security\"", "emailChannel": "__APPROVED_SECURITY_CHANNEL__"},
+    {"filter": "jsonPayload.event=\"smart_ai_budget_observation\" AND severity>=WARNING", "emailChannel": "__APPROVED_BUDGET_EMAIL_CHANNEL__"}
+  ],
   "invoiceContentLogging": false
 }

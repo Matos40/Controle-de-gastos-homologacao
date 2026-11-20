@@ -4,6 +4,7 @@ import {pathToFileURL} from 'node:url';
 import {createFirebaseSignatureVerifier} from '../remote/auth.mjs';
 import {corsFor} from './cors.mjs';
 import {MAX_BYTES} from './invoice.mjs';
+import {invalidLimiter} from './security-guard.mjs';
 
 const methods={'/v1/credits':'GET','/v1/invoices':'POST','/v1/admin/ai':'POST'};
 const experiment='gen-lang-client-0593667072';
@@ -26,16 +27,20 @@ export async function requestIdentity(audience,transport,signal){
 }
 
 export function makeGateway({env=process.env,transport=fetch,
- verifySignature=createFirebaseSignatureVerifier(experiment),identity=requestIdentity}={}){
+ verifySignature=createFirebaseSignatureVerifier(experiment),identity=requestIdentity,
+ security=event=>console.log(JSON.stringify(event))}={}){
  const configured=env.SMART_AI_GATEWAY_ENABLED==='true';
+ const invalid=invalidLimiter();
  const audience=configured?backendAudience(env.SMART_AI_COMPUTE_PROJECT_NUMBER):null;
  return createServer({requestTimeout:35000,headersTimeout:10000,maxHeaderSize:16384},async(req,res)=>{
   const cors=corsFor(req,env.SMART_AI_UI_ORIGIN);
   const fail=(status,error)=>{
+   if([400,401,403,404,405,413,415].includes(status)&&invalid.record()===30)security({event:'smart_ai_security',code:'GATEWAY_INVALID_RATE'});
    res.writeHead(status,{'content-type':'application/json','cache-control':'no-store',...cors.headers});
    res.end(error?JSON.stringify({error}):undefined);
   };
   if(!configured)return fail(503,'EXPERIMENT_UNAVAILABLE');
+  if(invalid.blocked())return fail(429,'RATE_LIMIT');
   if(cors.status)return fail(cors.status);
   if(!Object.hasOwn(methods,req.url))return fail(404,'NOT_FOUND');
   if(req.method!==methods[req.url])return fail(405,'METHOD_NOT_ALLOWED');
@@ -68,6 +73,7 @@ export function makeGateway({env=process.env,transport=fetch,
    const body=isPost?Readable.toWeb(req.pipe(limiter)):undefined;
    const upstream=await transport(audience+req.url,{method:req.method,headers,signal,redirect:'manual',
     ...(body?{body,duplex:'half'}:{})});
+   if([400,401,403,413,415].includes(upstream.status)&&invalid.record()===30)security({event:'smart_ai_security',code:'GATEWAY_INVALID_RATE'});
    if(upstream.status>=300&&upstream.status<400)return fail(502,'GATEWAY_UNAVAILABLE');
    const content=await upstream.text();
    res.writeHead(upstream.status,{'content-type':'application/json','cache-control':'no-store',...cors.headers});

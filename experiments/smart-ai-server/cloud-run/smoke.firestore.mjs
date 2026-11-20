@@ -31,7 +31,7 @@ await db.runTransaction(async tx=>{
 });
 const admin=body=>handleSmartAdmin(new Request('https://fixture.invalid/v1/admin/ai',{
  headers:{authorization:'Bearer fixture'},
-}),body,{db,clock:()=>now,verifyToken:async()=>({uid})});
+}),body,{db,clock:()=>now,ownerUid:uid,verifyToken:async()=>({uid,authTime:Math.floor(now/1000)})});
 const search=await admin({action:'search',prefix:uid.slice(0,16)});
 assert.equal(search.status,200);
 assert.ok(search.body.rows.some(row=>row.uid===uid));

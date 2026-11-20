@@ -7,6 +7,7 @@ const encode = value => {
   if (typeof value === 'boolean') return {booleanValue:value};
   if (typeof value === 'string') return {stringValue:value};
   if (Number.isSafeInteger(value)) return {integerValue:String(value)};
+  if (Array.isArray(value)) return {arrayValue:{values:value.map(encode)}};
   if (value && typeof value === 'object' && !Array.isArray(value)) return {mapValue:{fields:fields(value)}};
   throw Error('INVALID_DOCUMENT');
 };
@@ -20,6 +21,7 @@ const decode = value => {
   if ('stringValue' in value) return value.stringValue;
   if ('booleanValue' in value) return value.booleanValue;
   if ('nullValue' in value) return null;
+  if ('arrayValue' in value) return (value.arrayValue.values??[]).map(decode);
   if ('mapValue' in value) return unpack(value.mapValue.fields ?? {});
   throw Error('INVALID_DOCUMENT');
 };

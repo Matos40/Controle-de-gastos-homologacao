@@ -8,7 +8,17 @@ const messages={ACCESS_DENIED:'Acesso reservado à administração.',
  VERSION_CONFLICT:'As configurações foram alteradas em outra sessão. Revise os valores atualizados.',
  NOT_FOUND:'O perfil não tem saldo disponível para consulta.',INVALID_REQUEST:'Confira os valores informados.'};
 
-export function mountSmartAdminAI(root,{getIdToken,fetcher=fetch}){
+export function googleOwnerReauthentication(auth,provider,reauthenticateWithPopup){
+ return async()=>{
+  const user=auth.currentUser;
+  if(!user)throw Error('REAUTH_REQUIRED');
+  const result=await reauthenticateWithPopup(user,provider);
+  if(result.user.uid!==user.uid||auth.currentUser?.uid!==user.uid)throw Error('REAUTH_REQUIRED');
+  return result.user.getIdToken(true);
+ };
+}
+
+export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}){
  root.innerHTML=`
   <section class="raytech-ai raytech-ai-admin" aria-label="Smart Admin AI">
    <header class="raytech-ai__header"><h1>Smart Admin AI</h1><button type="button" data-reload>Atualizar indicadores</button></header>
@@ -24,6 +34,15 @@ export function mountSmartAdminAI(root,{getIdToken,fetcher=fetch}){
      <button type="submit">Pesquisar</button></form>
     <ul data-users></ul><p data-credit aria-live="polite"></p>
     <p data-admission></p>
+    <article aria-label="Proteção financeira Smart AI">
+     <h2>Proteção financeira Smart AI</h2>
+     <p data-finance></p><p data-finance-observed></p><p data-security></p>
+     <details><summary>Histórico de alertas</summary><ul data-alerts></ul></details>
+     <form data-reactivate hidden>
+      <label><input type="checkbox" required> Revisei o faturamento e confirmo a reativação</label>
+      <button type="submit">Reautenticar e reativar</button>
+     </form>
+    </article>
     <form data-config hidden>
      <label><input name="enabled" type="checkbox"> Aceitar novas leituras de IA</label>
      <div class="raytech-ai-admin__metrics">
@@ -41,8 +60,10 @@ export function mountSmartAdminAI(root,{getIdToken,fetcher=fetch}){
  const status=el('status'),config=el('config'),search=el('search');
  let overview,busy=false;
  const unavailable='Os controles do Smart Admin AI estão indisponíveis.';
- async function request(action,parameters={}){
-  const token=await getIdToken();
+ async function request(action,parameters={},critical=false){
+  if(critical&&typeof reauthenticate!=='function')throw Error('REAUTH_REQUIRED');
+  const token=critical?await reauthenticate():await getIdToken();
+  if(critical&&!token)throw Error('REAUTH_REQUIRED');
   if(!token)throw Error('ACCESS_DENIED');
   const response=await fetcher('/v1/admin/ai',{method:'POST',cache:'no-store',
    headers:{authorization:'Bearer '+token,'content-type':'application/json'},
@@ -76,7 +97,23 @@ export function mountSmartAdminAI(root,{getIdToken,fetcher=fetch}){
   el('average').textContent='Média mensal de extrações por usuário com tentativa: '+
    (overview.monthlyAverage===null?'sem dados':number.format(overview.monthlyAverage));
   const {settings}=overview;
-  el('admission').textContent=settings.enabled?'Novas leituras habilitadas.':'Novas leituras suspensas. Solicitações em andamento podem concluir.';
+  const finance=overview.finance;
+  el('admission').textContent=settings.enabled&&!finance?.suspended?'Novas leituras habilitadas.':'Novas leituras suspensas. Solicitações em andamento podem concluir.';
+  if(finance){
+   el('finance').textContent=(finance.suspended?'Suspensa pelo limite financeiro':'Proteção financeira ativa')+
+    ' · Orçamento mensal '+currency.format(finance.budgetCents/100);
+   el('finance-observed').textContent=finance.observedCents===null?'Faturamento observado ainda indisponível.':
+    'Faturamento observado: '+currency.format(finance.observedCents/100)+' · '+
+    number.format(100*finance.observedCents/finance.budgetCents)+'% · Atualizado em '+new Date(finance.updatedAt).toLocaleString('pt-BR');
+   el('alerts').replaceChildren(...finance.alerts.slice().reverse().map(alert=>{
+    const item=document.createElement('li');
+    item.textContent=alert.period+' · '+alert.threshold+'%'+(alert.threshold===100?' · Alerta crítico':'');
+    return item;
+   }));
+  }
+  el('security').textContent=overview.security?.serverAuthorization?
+   'Autorização no servidor · Autenticação recente de até cinco minutos para alterações.':'';
+  el('reactivate').hidden=!(finance?.suspended&&overview.role==='owner');
   config.hidden=overview.role!=='owner';
   config.elements.enabled.checked=settings.enabled;
   config.elements.day.value=settings.budget.day;
@@ -89,12 +126,22 @@ export function mountSmartAdminAI(root,{getIdToken,fetcher=fetch}){
   try{setStatus(await task()??'');}
   catch(error){
    if(error.message==='ACCESS_DENIED'){el('content').hidden=true;el('users').replaceChildren();el('credit').textContent='';}
-   setStatus(messages[error.message]??unavailable);
+   setStatus(error.message==='REAUTH_REQUIRED'?'Confirme sua identidade com um novo login para continuar.':messages[error.message]??unavailable);
   }
   finally{busy=false;root.setAttribute('aria-busy','false');}
  }
  el('reload').addEventListener('click',()=>void run(load));
  el('cost').addEventListener('input',estimate);
+ el('reactivate').addEventListener('submit',event=>{
+  event.preventDefault();
+  if(overview?.role!=='owner'||!overview.finance?.suspended||!event.currentTarget.querySelector('input').checked)return;
+  event.currentTarget.reset();
+  void run(async()=>{
+   try{await request('reactivateFinance',{confirmed:true,expectedVersion:overview.finance.version},true);}
+   catch(error){if(error.message==='VERSION_CONFLICT')await load();throw error;}
+   await load();return 'Proteção financeira reativada. Confira se as novas leituras estão habilitadas.';
+  });
+ });
  search.addEventListener('submit',event=>{
   event.preventDefault();
   void run(async()=>{
@@ -120,7 +167,7 @@ export function mountSmartAdminAI(root,{getIdToken,fetcher=fetch}){
   void run(async()=>{
    const settings={enabled:config.elements.enabled.checked,day:config.elements.day.valueAsNumber,
     month:config.elements.month.valueAsNumber,expectedVersion:overview.settings.version};
-   try{await request('configure',settings);}
+   try{await request('configure',settings,true);}
    catch(error){if(error.message==='VERSION_CONFLICT')await load();throw error;}
    await load();return 'Configuração salva.';
   });

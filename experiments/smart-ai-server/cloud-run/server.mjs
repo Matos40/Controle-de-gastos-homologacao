@@ -14,7 +14,8 @@ export function makeServer({handler=createCloudRunHandler(),env=process.env}={})
   const abort=new AbortController();
   res.on('close',()=>{if(!res.writableFinished)abort.abort();});
   try{
-   if(env.SMART_AI_EXPERIMENT_ENABLED!=='true'){
+   const finance=req.url==='/internal/budget-push';
+   if(finance?env.SMART_AI_FINANCE_PUSH_ENABLED!=='true':env.SMART_AI_EXPERIMENT_ENABLED!=='true'){
     res.writeHead(503,{'cache-control':'no-store'});res.end();return;
    }
    const cors=corsFor(req,env.SMART_AI_UI_ORIGIN);
@@ -25,7 +26,7 @@ export function makeServer({handler=createCloudRunHandler(),env=process.env}={})
     res.writeHead(200,{'content-type':type,'cache-control':'no-store','x-content-type-options':'nosniff'});
     res.end(content);return;
    }
-   const routes={'/v1/invoices':'POST','/v1/credits':'GET','/v1/admin/ai':'POST'};
+   const routes={'/v1/invoices':'POST','/v1/credits':'GET','/v1/admin/ai':'POST','/internal/budget-push':'POST'};
    if(!Object.hasOwn(routes,req.url)||req.method!==routes[req.url]){
     res.writeHead(Object.hasOwn(routes,req.url)?405:404);res.end();return;
    }

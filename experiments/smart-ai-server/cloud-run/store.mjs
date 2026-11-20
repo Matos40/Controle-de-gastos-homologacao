@@ -3,13 +3,14 @@ import {validRequestId} from '../legacy/usage.mjs';
 import {reserveBudget,validateBudget} from '../legacy/global-budget.mjs';
 import {transition} from '../legacy/outcome.mjs';
 import {prepareMetrics,ADMIN_METRICS} from './admin-metrics.mjs';
+import {financeRef,financeState,financeView} from './finance-guard.mjs';
 export const RECOVERY_GRACE_MS=120000;
 export const COMMERCIAL_ACCOUNTS='raytechV345Accounts';
 export const COMMERCIAL_GLOBAL='raytechLabCommercialGlobalV350';
 export const LAB_CAP={day:30,month:60,perAttempt:1};
 const auditCollection='raytechLabCommercialAuditV350';
 const refs=(db,uid,at)=>['global','user_'+uid].map(scope=>db.collection(auditCollection).doc(scope+'_'+monthOf(at)));
-export function createCommercialStore(db,{clock=Date.now,budget=LAB_CAP}={}){
+export function createCommercialStore(db,{clock=Date.now,budget=LAB_CAP,requireFinance=false}={}){
  const cap=validateBudget(budget);
  const userRef=uid=>db.collection(COLLECTION).doc(uid);
  const profileRef=uid=>db.collection(COMMERCIAL_ACCOUNTS).doc(uid);
@@ -43,11 +44,13 @@ export function createCommercialStore(db,{clock=Date.now,budget=LAB_CAP}={}){
   if(!validUid(uid)||!validRequestId(requestId))return {status:400,error:'INVALID_REQUEST_ID'};
   const user=userRef(uid),attempt=user.collection('attempts').doc(requestId);
   try{await recoverExpired(uid);return await db.runTransaction(async tx=>{
-   const [profile,state,old,global,config]=await tx.getAll(profileRef(uid),user,attempt,budgetRef,configRef);
+   const [profile,state,old,global,config,finance]=await tx.getAll(profileRef(uid),user,attempt,budgetRef,configRef,financeRef(db));
    const now=clock(),plan=planOf(uid,profile.data(),now);
    if(!plan)return {status:403,error:'ACCESS_DENIED'};
    if(old.exists)return {status:409,error:'DUPLICATE_REQUEST'};
-   if(config.data()?.enabled===false)return {status:503,error:'USAGE_UNAVAILABLE'};
+   const protection=financeView(financeState(finance.data()),now);
+   if(protection.suspended||(requireFinance&&protection.observedCents===null)||config.data()?.enabled===false)
+    return {status:503,error:'USAGE_UNAVAILABLE'};
    const decision=reserve(state.data(),now,plan,requestId);
    if(decision.status!==200)return decision;
    const configuredBudget=config.data()?.budget;

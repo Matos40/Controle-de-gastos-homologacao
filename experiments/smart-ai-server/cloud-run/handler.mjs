@@ -10,6 +10,8 @@ import {handleSmartAdmin} from './admin.mjs';
 import {createRuntimeAccess} from './runtime.mjs';
 import {trustedOrigin} from './cors.mjs';
 import {startObservation} from './telemetry.mjs';
+import {createPushVerifier,invalidLimiter} from './security-guard.mjs';
+import {parseBudgetPush,recordBudgetPush} from './finance-guard.mjs';
 
 const requestCap = 4 * Math.ceil(MAX_BYTES / 3) + 1024;
 const experimentProject = 'gen-lang-client-0593667072';
@@ -95,14 +97,17 @@ export async function boundedBinary(request, mimeType, signal) {
   }
 }
 
-export function createCloudRunHandler(transport = fetch,{connect,writeTelemetry=event=>console.log(JSON.stringify(event))}={}) {
+export function createCloudRunHandler(transport = fetch,{connect,verifyPush=createPushVerifier(),writeTelemetry=event=>console.log(JSON.stringify(event))}={}) {
   const verifyFirebase = createFirebaseVerifier(experimentProject);
+  const denials=invalidLimiter();
+  const security=event=>{if([1,30].includes(denials.record()))writeTelemetry({severity:'WARNING',...event});};
   let runtimeAccess;
   return {async fetch(request, env) {
     const url = new URL(request.url);
     const credits=url.pathname==='/v1/credits';
     const admin=url.pathname==='/v1/admin/ai';
-    if (url.protocol !== 'https:' || (!credits&&!admin&&url.pathname !== '/v1/invoices') || url.search) {
+    const finance=url.pathname==='/internal/budget-push';
+    if (url.protocol !== 'https:' || (!credits&&!admin&&!finance&&url.pathname !== '/v1/invoices') || url.search) {
       return reply(404, {error:'NOT_FOUND'});
     }
     if (request.method !== (credits?'GET':'POST')) return reply(405, {error:'METHOD_NOT_ALLOWED'});
@@ -116,7 +121,7 @@ export function createCloudRunHandler(transport = fetch,{connect,writeTelemetry=
       authorization:request.headers.get('authorization'),
       'x-request-id':request.headers.get('x-request-id'),
     };
-    if (!credits&&!admin&&!validRequestId(headers['x-request-id'])) return reply(400, {error:'INVALID_REQUEST_ID'});
+    if (!credits&&!admin&&!finance&&!validRequestId(headers['x-request-id'])) return reply(400, {error:'INVALID_REQUEST_ID'});
     const contentType = request.headers.get('content-type') ?? '';
     const binary = false; // JSON transport only for initial Cloud Run candidate.
     if (!credits && !binary && !/^application\/json(?:;|$)/i.test(contentType)) {
@@ -137,6 +142,32 @@ export function createCloudRunHandler(transport = fetch,{connect,writeTelemetry=
       return response;
     };
     try {
+      let budgetEvent;
+      if(finance){
+        if(env.SMART_AI_FINANCE_PUSH_ENABLED!=='true')return send(503,{error:'EXPERIMENT_UNAVAILABLE'});
+        const project='raytech-ai-run-exp-v350';
+        const audience=env.SMART_AI_PUSH_AUDIENCE;
+        if(!/^https:\/\/raytech-smart-ai-exp-\d{6,18}\.us-central1\.run\.app$/.test(audience??'')||
+           !/^\d{6,24}$/.test(env.SMART_AI_PUSH_SUBJECT??''))return send(503,{error:'EXPERIMENT_UNAVAILABLE'});
+        const bearer=request.headers.get('authorization');
+        try{
+          if(!bearer?.startsWith('Bearer '))throw Error('INVALID_PUSH_IDENTITY');
+          await verifyPush(bearer.slice(7),{audience,subject:env.SMART_AI_PUSH_SUBJECT,
+           email:'raytech-budget-push@'+project+'.iam.gserviceaccount.com'},counted,deadline);
+        }catch(err){
+          security({event:'smart_ai_security',code:'BUDGET_PUSH_DENIED'});
+          return send(err.message==='PUSH_AUTH_UNAVAILABLE'?503:401,{error:'ACCESS_DENIED'});
+        }
+        try{
+          budgetEvent=parseBudgetPush(await boundedJson(request,deadline,16384),{
+           subscription:'projects/'+project+'/subscriptions/raytech-budget-push',
+           budgetId:env.SMART_AI_BUDGET_ID,billingAccount:env.SMART_AI_BILLING_ACCOUNT_ID,
+          },Date.now());
+        }catch{
+          security({event:'smart_ai_security',code:'BUDGET_EVENT_REJECTED'});
+          return send(400,{error:'INVALID_REQUEST'});
+        }
+      }
       const dbName = 'projects/' + experimentProject + '/databases/(default)';
       let db,verifyToken;
       if(connect){({db,verifyToken}=connect(deadline,counted));}
@@ -147,14 +178,20 @@ export function createCloudRunHandler(transport = fetch,{connect,writeTelemetry=
           access,deadline,counted,{abortedRetries:3});
         verifyToken=token=>verifyFirebase(token,access,counted,deadline);
       }
+      if(finance){
+        if(await recordBudgetPush(db,budgetEvent))writeTelemetry({event:'smart_ai_budget_observation',
+         severity:budgetEvent.observedCents>=1000?'CRITICAL':budgetEvent.observedCents>=750?'WARNING':'INFO',
+         observedCents:budgetEvent.observedCents,period:budgetEvent.period});
+        return send(200,{accepted:true});
+      }
       if(admin){
         let body;
         try{body=await boundedJson(request,deadline,4096);}
         catch(error){return send(error.message==='FILE_TOO_LARGE'?413:400,{error:'INVALID_REQUEST'});}
-        const result=await handleSmartAdmin(request,body,{db,verifyToken});
+        const result=await handleSmartAdmin(request,body,{db,verifyToken,ownerUid:env.SMART_AI_OWNER_UID,security});
         return send(result.status,result.body);
       }
-      const {readCredits,reserveUsage,finishOutcome}=createCommercialStore(db);
+      const {readCredits,reserveUsage,finishOutcome}=createCommercialStore(db,{requireFinance:!connect});
       if(credits){
         const response=await readCreditBalance(request,{verifyToken,readCredits});
         observe(response.status,counts);

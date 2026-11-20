@@ -7,6 +7,9 @@ import {createRestStore} from '../firestore.mjs';
 import {readCreditBalance} from './handler.mjs';
 import {extractInvoice} from './invoice.mjs';
 import {handleSmartAdmin} from './admin.mjs';
+import {createHash,generateKeyPairSync,sign} from 'node:crypto';
+import {financeRef,parseBudgetPush,recordBudgetPush} from './finance-guard.mjs';
+import {createPushVerifier,invalidLimiter,recentlyAuthenticated} from './security-guard.mjs';
 const t=Date.parse('2026-11-30T23:59:00-03:00');
 const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
 const account=(plan='free')=>({uid:'u',blocked:false,plan,premiumUntil:t+10000000});
@@ -222,12 +225,100 @@ function adminFixture(){
  const clock=()=>now;
  const api=(token,body)=>handleSmartAdmin(new Request('https://fixture.invalid/v1/admin/ai',{
   headers:token?{authorization:'Bearer '+token}:{},
- }),body,{db,clock,verifyToken:async value=>{
+ }),body,{db,clock,ownerUid:'owner',verifyToken:async value=>{
   if(value==='revoked')throw Error('REVOKED');
-  return {uid:value};
+  return {uid:value==='owner-old'?'owner':value,authTime:Math.floor(now/1000)-(value==='owner-old'?301:0),smartAiAdmin:value==='admin'};
  }});
  return {db,docs,api,store:createCommercialStore(db,{clock}),advance:ms=>{now+=ms;}};
 }
+
+test('forged role documents and administrative payloads cannot elevate a Free caller',async()=>{
+ const {api,docs}=adminFixture();
+ for(const role of ['owner','admin']){
+  docs.set('raytechV345Roles/u',{role,active:true});
+  assert.equal((await api('u',{action:'overview'})).status,403);
+ }
+ for(const fields of [{role:'owner'},{plan:'premium'},{credits:15},{blocked:true}]){
+  assert.equal((await api('owner',{action:'overview',...fields})).status,400);
+ }
+ const change={action:'configure',enabled:true,day:10,month:20,expectedVersion:0};
+ assert.equal((await api('owner-old',change)).body.error,'REAUTH_REQUIRED');
+ assert.equal(recentlyAuthenticated(Math.floor(t/1000)-300,t),true);
+ assert.equal(recentlyAuthenticated(Math.floor(t/1000)+1,t),false);
+});
+
+test('finance guard serializes admission, preserves settlements and persists across month and store recreation',async()=>{
+ const {db,docs,api,store,advance}=adminFixture();
+ const reserve={uid:'u',requestId:id(731)},next={uid:'v',requestId:id(732)};
+ assert.equal((await store.reserveUsage(reserve)).status,200);
+ const budget={period:'2026-11',current:true,publishedAt:t-1,observedCents:750,id:'1'};
+ const [written,attempt]=await Promise.all([recordBudgetPush(db,budget),store.reserveUsage(next)]);
+ assert.equal(written,true);
+ assert.equal(attempt.status,503);
+ await store.finishOutcome({...reserve,status:'failed'});
+ assert.equal((await store.readCredits('u')).remaining,2);
+ const restarted=createCommercialStore(db,{clock:()=>t+86400000,requireFinance:true});
+ await recordBudgetPush(db,{...budget,period:'2026-12',id:'2',publishedAt:t+86400000,observedCents:20});
+ assert.equal((await restarted.reserveUsage(next)).status,503);
+ assert.equal(await recordBudgetPush(db,budget),false);
+ assert.equal(await recordBudgetPush(db,{...budget,period:'2026-12',id:'2',publishedAt:t+86400000,observedCents:20}),false);
+ assert.equal(await recordBudgetPush(db,{...budget,period:'2026-12',id:'3',publishedAt:t+80000000,observedCents:1000}),false);
+ const state=docs.get(financeRef(db).name);
+ assert.deepEqual(state.alerts.map(x=>x.threshold),[25,50,75]);
+ const change={action:'reactivateFinance',confirmed:true,expectedVersion:state.version};
+ assert.equal((await api('u',change)).status,403);
+ assert.equal((await api('admin',change)).status,403);
+ assert.equal((await api('owner-old',change)).body.error,'REAUTH_REQUIRED');
+ assert.equal((await api('owner',{...change,confirmed:false})).status,400);
+ advance(86400000);
+ assert.equal((await api('owner',change)).status,200);
+ assert.equal((await api('owner',change)).status,409);
+ assert.equal((await restarted.reserveUsage(next)).status,200);
+ assert.equal(await recordBudgetPush(db,{...budget,period:'2026-12',id:'4',publishedAt:t+86400001,observedCents:1000}),true);
+ assert.equal(docs.get(financeRef(db).name).alerts.at(-1).threshold,100);
+});
+
+test('budget push rejects mismatched project subscription, account, budget, currency and period',()=>{
+ const config={subscription:'projects/fixture/subscriptions/push',billingAccount:'fixture-account',budgetId:'fixture-budget'};
+ const message={messageId:'180',publishTime:'2026-11-19T18:00:00Z',
+  attributes:{billingAccountId:config.billingAccount,budgetId:config.budgetId,schemaVersion:'1.0'}};
+ const make=(fields={})=>({subscription:config.subscription,message:{...message,
+  data:Buffer.from(JSON.stringify({budgetAmount:10,budgetAmountType:'SPECIFIED_AMOUNT',
+   costIntervalStart:'2026-11-01T07:00:00Z',currencyCode:'BRL',costAmount:7.5,...fields})).toString('base64')}});
+ assert.equal(parseBudgetPush(make(),config,t).observedCents,750);
+ for(const fields of [{currencyCode:'USD'},{budgetAmount:100},{costIntervalStart:'2026-11-02T08:00:00Z'}])
+  assert.throws(()=>parseBudgetPush(make(fields),config,t));
+ for(const fields of [{subscription:'projects/another/subscriptions/push'},{billingAccount:'other'},{budgetId:'other'}])
+  assert.throws(()=>parseBudgetPush(make(),{...config,...fields},t));
+});
+
+test('push OIDC requires an authentic Google signature and exact issuer, account, subject and audience',async()=>{
+ const {publicKey,privateKey}=generateKeyPairSync('rsa',{modulusLength:2048});
+ const verifier=createPushVerifier(),now=Math.floor(Date.now()/1000);
+ const config={audience:'https://backend.example.invalid',email:'push@example.invalid',subject:'123456'};
+ const encode=value=>Buffer.from(JSON.stringify(value)).toString('base64url');
+ const token=(overrides={})=>{
+  const input=encode({alg:'RS256',kid:'fixture'})+'.'+encode({iss:'https://accounts.google.com',aud:config.audience,
+   email:config.email,email_verified:true,sub:config.subject,exp:now+600,iat:now,...overrides});
+  return input+'.'+sign('RSA-SHA256',Buffer.from(input),privateKey).toString('base64url');
+ };
+ const transport=async()=>Response.json({keys:[{...publicKey.export({format:'jwk'}),alg:'RS256',kid:'fixture'}]},
+  {headers:{'cache-control':'max-age=600'}});
+ await verifier(token(),config,transport);
+ for(const fields of [{sub:'other'},{aud:'elsewhere'},{email_verified:false},{exp:now-1},{iss:'https://wrong.invalid'}])
+  await assert.rejects(verifier(token(fields),config,transport));
+ const forged=token().split('.').slice(0,2).join('.')+'.'+createHash('sha256').update('fixture').digest('base64url');
+ await assert.rejects(verifier(forged,config,transport));
+});
+
+test('invalid requests use bounded counters and recover after one minute',()=>{
+ let now=0;
+ const limiter=invalidLimiter(()=>now);
+ for(let i=0;i<30;i++)assert.equal(limiter.record(),i+1);
+ assert.equal(limiter.blocked(),true);
+ now=60000;
+ assert.equal(limiter.blocked(),false);
+});
 
 test('Smart Admin authorizes active operators on every request and reserves writes for Owner',async()=>{
  const {api,docs}=adminFixture();

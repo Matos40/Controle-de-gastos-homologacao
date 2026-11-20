@@ -15,7 +15,7 @@ const html=`<!doctype html><html lang="pt-BR"><meta charset="utf-8">
  import {mountSmartAdminAI} from '/smart-admin-ai.mjs';
  const root=document.getElementById('root');
  if(['?owner','?admin'].includes(location.search)){
-  mountSmartAdminAI(root,{getIdToken:async()=>location.search.slice(1)});
+  mountSmartAdminAI(root,{getIdToken:async()=>location.search.slice(1),reauthenticate:async()=>location.search.slice(1)+'-recent'});
  }else mountSmartAI(root,{
   getIdToken:async()=>location.search==='?premium'?'fixture-premium':'fixture-free',
   onUpgrade:()=>document.body.dataset.upgrade='yes',
@@ -35,16 +35,21 @@ async function lab(){
   }
   const send=(status,body)=>{res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(body));};
   if(url.pathname==='/v1/admin/ai'){
-   const role=req.headers.authorization?.slice(7);
+   const token=req.headers.authorization?.slice(7),role=token==='owner-recent'?'owner':token;
    if(!['owner','admin'].includes(role))return send(403,{error:'ACCESS_DENIED'});
    const chunks=[];for await(const chunk of req)chunks.push(chunk);
    const body=JSON.parse(Buffer.concat(chunks));
    const period={free:{reserved:2,completed:1,failed:1,pending:0},
     premium:{reserved:1,completed:0,failed:0,pending:1},conversions:1};
-   if(body.action==='overview')return send(200,{role,settings:state.settings,day:period,month:period,monthlyAverage:0.5});
+   if(body.action==='overview')return send(200,{role,settings:state.settings,day:period,month:period,monthlyAverage:0.5,
+    finance:state.finance,security:{serverAuthorization:true}});
+   if(body.action==='reactivateFinance'&&token==='owner-recent'&&body.confirmed===true&&body.expectedVersion===state.finance?.version){
+    state.finance={...state.finance,suspended:false,version:state.finance.version+1};
+    return send(200,{finance:state.finance});
+   }
    if(body.action==='search'&&body.prefix==='fixture')return send(200,{rows:[{uid:'fixture-test',name:'Conta fictícia'}]});
    if(body.action==='credits'&&body.uid==='fixture-test')return send(200,{plan:'free',remaining:1,busy:false});
-   if(body.action==='configure'&&role==='owner'&&body.expectedVersion===state.settings.version){
+   if(body.action==='configure'&&token==='owner-recent'&&body.expectedVersion===state.settings.version){
     state.settings={enabled:body.enabled,budget:{day:body.day,month:body.month},version:body.expectedVersion+1};
     return send(200,{settings:state.settings});
    }
@@ -109,6 +114,30 @@ test('desktop Chromium: lock, Premium action, double-submit guard, refresh and r
   assert.equal(await page.getByText('Créditos esgotados').isVisible(),true);
   assert.equal(await page.locator('[data-send]').isDisabled(),true);
  }finally{state.release?.();await browser?.close();await close();}
+});
+
+test('Finance Guard shows observed budget and requires explicit Owner confirmation on mobile',async()=>{
+ const {state,url,close}=await lab();
+ state.finance={suspended:true,budgetCents:1000,observedCents:750,updatedAt:Date.now(),version:1,
+  alerts:[{period:'2026-11',threshold:75}]};
+ let browser;
+ try{
+  browser=await chromium.launch(chromiumOptions);
+  const desktop=await browser.newPage({viewport:{width:1280,height:720}});
+  await desktop.goto(url+'?admin');
+  await waitText(desktop,'[data-finance-observed]','75%');
+  assert.equal(await desktop.locator('[data-reactivate]').isVisible(),false);
+  const mobile=await browser.newPage(devices['Pixel 7']);
+  await mobile.goto(url+'?owner');
+  await waitText(mobile,'[data-finance]','Suspensa pelo limite financeiro');
+  assert.equal(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await mobile.getByRole('button',{name:'Reautenticar e reativar'}).click();
+  assert.equal(state.finance.suspended,true);
+  await mobile.getByLabel('Revisei o faturamento e confirmo a reativação').check();
+  await mobile.getByRole('button',{name:'Reautenticar e reativar'}).click();
+  await waitText(mobile,'[data-status]','Proteção financeira reativada.');
+  assert.equal(state.finance.suspended,false);
+ }finally{await browser?.close();await close();}
 });
 
 test('Android Chromium: responsive layout and distinct rate limit, refund and unknown outcome',async()=>{

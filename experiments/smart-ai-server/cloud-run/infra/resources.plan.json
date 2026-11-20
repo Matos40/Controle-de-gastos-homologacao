@@ -6,7 +6,7 @@
   "requiredApisAfterApproval": [
     "run.googleapis.com", "compute.googleapis.com", "iam.googleapis.com",
     "artifactregistry.googleapis.com", "secretmanager.googleapis.com", "monitoring.googleapis.com",
-    "logging.googleapis.com", "billingbudgets.googleapis.com"
+    "logging.googleapis.com", "billingbudgets.googleapis.com", "pubsub.googleapis.com"
   ],
   "network": {
     "name": "raytech-ai-exp-vpc",
@@ -47,11 +47,23 @@
     },
     "automaticLogExport": false
   },
+  "budgetPush": {
+    "enabled": false,
+    "topic": "projects/__COMPUTE_PROJECT_ID__/topics/raytech-budget-events",
+    "subscription": "projects/__COMPUTE_PROJECT_ID__/subscriptions/raytech-budget-push",
+    "endpoint": "https://raytech-smart-ai-exp-__COMPUTE_PROJECT_NUMBER__.us-central1.run.app/internal/budget-push",
+    "audience": "https://raytech-smart-ai-exp-__COMPUTE_PROJECT_NUMBER__.us-central1.run.app",
+    "pushIdentity": "raytech-budget-push@__COMPUTE_PROJECT_ID__.iam.gserviceaccount.com",
+    "allowedPublisher": "billing-budget-alert@system.gserviceaccount.com",
+    "protectedRuntimeInputs": ["SMART_AI_OWNER_UID", "SMART_AI_PUSH_SUBJECT", "SMART_AI_BUDGET_ID", "SMART_AI_BILLING_ACCOUNT_ID"]
+  },
   "budget": {
     "displayName": "Raytech CG Smart AI experimental BRL 10",
-    "budgetFilter": {"projects": ["projects/__COMPUTE_PROJECT_NUMBER__"]},
+    "budgetFilter": {"projects": ["projects/__COMPUTE_PROJECT_NUMBER__"], "calendarPeriod": "MONTH"},
     "amount": {"specifiedAmount": {"currencyCode": "BRL", "units": "10"}},
     "notificationsRule": {
+      "pubsubTopic": "projects/__COMPUTE_PROJECT_ID__/topics/raytech-budget-events",
+      "schemaVersion": "1.0",
       "disableDefaultIamRecipients": false,
       "monitoringNotificationChannels": ["__APPROVED_BUDGET_EMAIL_CHANNEL__"]
     },

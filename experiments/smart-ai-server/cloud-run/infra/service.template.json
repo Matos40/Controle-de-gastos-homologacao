@@ -32,6 +32,8 @@
             "resources": {"limits": {"cpu": "1", "memory": "512Mi"}},
             "env": [
               {"name": "SMART_AI_EXPERIMENT_ENABLED", "value": "false"},
+              {"name": "SMART_AI_FINANCE_PUSH_ENABLED", "value": "false"},
+              {"name": "SMART_AI_PUSH_AUDIENCE", "value": "https://raytech-smart-ai-exp-__COMPUTE_PROJECT_NUMBER__.us-central1.run.app"},
               {"name": "SMART_AI_TELEMETRY", "value": "true"},
               {"name": "FIREBASE_PROJECT_ID", "value": "gen-lang-client-0593667072"},
               {"name": "SMART_AI_UI_ORIGIN", "value": "__EXPERIMENT_HTTPS_ORIGIN__"},

@@ -49,14 +49,15 @@ export function createFirebaseSignatureVerifier(projectId) {
     if (!key || !verify('RSA-SHA256', Buffer.from(header + '.' + payload), key,
       Buffer.from(signature, 'base64url'))) throw Error('INVALID_TOKEN');
 
-    return {uid,authTime:claims.auth_time};
+    return {uid,authTime:claims.auth_time,smartAiAdmin:claims.smartAiAdmin===true};
   };
 }
 
 export function createFirebaseVerifier(projectId) {
   const verifySignature=createFirebaseSignatureVerifier(projectId);
   return async (token,getAccessToken,transport,signal)=>{
-    const {uid,authTime}=await verifySignature(token,transport,signal);
+    const identity=await verifySignature(token,transport,signal);
+    const {uid,authTime}=identity;
     const accessToken = await getAccessToken();
     const response = await transport(accountUrl + projectId + '/accounts:lookup', {
       method:'POST', redirect:'manual', signal,
@@ -71,6 +72,6 @@ export function createFirebaseVerifier(projectId) {
         || !Number.isSafeInteger(validSince) || validSince < 0 || authTime < validSince) {
       throw Error('INVALID_TOKEN');
     }
-    return {uid};
+    return identity;
   };
 }
