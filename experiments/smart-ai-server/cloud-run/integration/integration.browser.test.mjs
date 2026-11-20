@@ -36,11 +36,14 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1280,hei
   await page.getByRole('button',{name:'Revisar lançamentos'}).click();
   const review=page.getByRole('region',{name:'Revisão da fatura'});
   await review.getByText('Fatura reconciliada').waitFor();
-  assert.equal(await review.getByText(/38,55/).count(),2);
+  assert.equal(await review.locator('[data-totals]').getByText(/38,55/).count(),2);
   assert.equal(await review.getByLabel('Parcela atual').inputValue(),'2');
-  assert.equal(await review.getByLabel('Valor em centavos').last().inputValue(),'-625');
+  assert.equal(await review.getByLabel('Valor (R$)').last().inputValue(),'-R$\u00a06,25');
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   if(process.env.RAYTECH_SCREENSHOTS)await page.screenshot({path:join(process.env.RAYTECH_SCREENSHOTS,name+'-revisao.png'),fullPage:true});
+  await review.getByLabel('Selecionar').nth(1).uncheck();
+  assert.match(await review.locator('[data-selected]').textContent(),/12,65/);
+  await review.getByLabel('Selecionar').nth(1).check();
   await review.getByLabel('Descrição').first().fill('Descrição revisada');
   await review.getByLabel('Selecionar').first().uncheck();
   await review.getByRole('button',{name:'Confirmar simulação'}).click();
@@ -76,4 +79,29 @@ test('Smart Admin do laboratório — reautenticação do Owner e auditoria em m
  await page.getByRole('button',{name:'Reautenticar e reativar'}).click();
  await page.getByText(/1 alterações registradas/).waitFor();
  if(process.env.RAYTECH_SCREENSHOTS)await page.screenshot({path:join(process.env.RAYTECH_SCREENSHOTS,'smart-admin.png'),fullPage:true});
+});
+
+test('orçamento no painel — níveis, consumo superior a 100% e ausência de observação',async t=>{
+ const browser=await chromium.launch();
+ t.after(()=>browser.close());
+ for(const [cents,level,percent] of [[null,null,null],[100,'normal',10],[250,'attention',25],
+  [500,'alert',50],[750,'preventive',75],[1250,'critical',125]]){
+  const lab=await startLab({observedCents:cents});
+  const page=await browser.newPage();
+  try{
+   await page.goto(lab.origin);
+   await enter(page,'owner');
+   await page.getByRole('button',{name:'Smart Admin AI',exact:true}).click();
+   await page.getByText('Proteção financeira Smart AI',{exact:true}).waitFor();
+   if(level){
+    await page.locator('progress[data-level='+level+']').waitFor();
+    assert.equal(await page.locator('progress').getAttribute('value'),String(Math.min(100,percent)));
+    assert.ok((await page.locator('[data-budget-level]').textContent()).includes(percent+'%'));
+   }else{
+    await page.getByText('Aguardando atualização do faturamento').waitFor();
+    assert.equal(await page.locator('progress').isVisible(),false);
+   }
+   if(process.env.RAYTECH_SCREENSHOTS)await page.screenshot({path:join(process.env.RAYTECH_SCREENSHOTS,'orcamento-'+(level??'aguardando')+'.png'),fullPage:true});
+  }finally{await page.close();await lab.close();}
+ }
 });

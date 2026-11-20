@@ -41,7 +41,7 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch})
       <button data-upgrade type="button" class="raytech-ai__quiet" hidden>Conhecer o Premium</button>
       <form data-form>
         <label for="raytech-ai-file">Arquivo da fatura</label>
-        <input data-file id="raytech-ai-file" type="file" accept="application/pdf,image/png,image/jpeg,image/webp">
+        <label class="raytech-ai__file"><span data-filename>Escolher arquivo</span><input data-file aria-label="Arquivo da fatura" id="raytech-ai-file" type="file" accept="application/pdf,image/png,image/jpeg,image/webp"></label>
         <p class="raytech-ai__hint">PDF, PNG, JPEG ou WebP de até 10 MiB.</p>
         <button data-send type="submit" disabled>Ler fatura</button>
       </form>
@@ -58,8 +58,12 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch})
     el('plan').textContent=balance ? 'Créditos '+(balance.plan==='free'?'Free':'Premium') : 'Créditos disponíveis';
     const operational=el('operational');
     operational.hidden=!balance?.operational;
-    operational.textContent=balance?.operational==='available'?'Disponível':
-      balance?.operational==='suspended'?messages.FINANCE_SUSPENDED:unavailable;
+    operational.textContent=busy?'Processando':balance?.operational==='suspended'?messages.FINANCE_SUSPENDED:
+      balance?.operational==='administrative'?'Temporariamente suspenso pela administração':
+      balance?.operational==='unavailable'?unavailable:exhausted?'':
+      balance?.busy?messages.ACTIVE_REQUEST:'Disponível';
+    operational.hidden=!operational.textContent||(!balance?.operational&&!busy);
+    el('filename').textContent=input.files[0]?.name??'Escolher arquivo';
     const blocked=Boolean(balance?.operational&&balance.operational!=='available');
     const renewal=el('renewal');
     renewal.hidden=balance?.plan!=='premium';
@@ -144,5 +148,5 @@ export function mountSmartAI(root,{getIdToken,onUpgrade,onReview,fetcher=fetch})
     }catch(error){status.textContent=messages[error.message]??'Falha de comunicação. Atualize o saldo antes de repetir a leitura.';}
     finally{await refresh({announce:false});busy=false;render();}
   });
-  return {refresh,ready:refresh(),discardReview(){result=undefined;review.hidden=true;}};
+  return {refresh,ready:refresh(),discardReview(){result=undefined;review.hidden=true;status.textContent='';}};
 }

@@ -8,3 +8,13 @@ main { margin: 1rem auto; }
 [data-entries] label:not(:first-of-type) input { display: block; inline-size: 100%; }
 dialog { max-inline-size: min(28rem, 85vw); color: #e2e8f0; background: #0f172a; border: 1px solid #334155; border-radius: 1rem; }
 dialog::backdrop { background: #020617b0; }
+
+[data-entries] input[type=checkbox] { inline-size:1rem; min-block-size:1rem; vertical-align:middle; margin-inline:.5rem; }
+[data-entries] input:not([type=checkbox]), [data-entries] select { min-block-size:2rem; padding:.25rem .4rem; background:#152236; color:inherit; border:1px solid #41536b; border-radius:.4rem; width:100%; }
+[data-entries] label { margin:.25rem 0; }
+[data-entries] .credit { color:#4ade80; }
+[data-reconciliation] { padding:.4rem .6rem; border-inline-start:3px solid #fbbf24; }
+[data-reconciliation][data-state=RECONCILED] { border-color:#4ade80; }
+.raytech-ai [data-cancel] { background:#1e293b; color:#e2e8f0; border:1px solid #475569; }
+.raytech-ai button { margin-block:.2rem; }
+@media (max-width:600px) { [data-entries] { grid-template-columns:minmax(0,1fr); } }

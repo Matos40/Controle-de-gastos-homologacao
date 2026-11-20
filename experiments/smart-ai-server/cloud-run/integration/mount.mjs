@@ -3,7 +3,7 @@ import {mountSmartAdminAI} from '../ux/smart-admin-ai.mjs';
 import {mountReview} from './review.mjs';
 
 // Host callbacks are explicit and never receive Gemini secrets or an IAM identity.
-export function mountIntegration(root,{enabled,getIdToken,fetcher,reauthenticate,openApiKey,simulateConfirmation,online=()=>navigator.onLine}){
+export function mountIntegration(root,{enabled,getIdToken,fetcher,reauthenticate,openApiKey,simulateConfirmation,readCategories=()=>[],online=()=>navigator.onLine}){
  if(!enabled)return {clear(){}};
  root.innerHTML=`<section class="raytech-ai" aria-label="Importação inteligente de faturas">
  <button type="button" data-smart>Smart AI</button> <button type="button" data-key>Chave API</button>
@@ -35,7 +35,7 @@ export function mountIntegration(root,{enabled,getIdToken,fetcher,reauthenticate
   const smart=mountSmartAI(panel,{...session,onUpgrade:()=>{notice.textContent='Premium oferece 15 créditos por mês. Assinaturas desativadas neste ensaio.';},
    onReview:data=>{
     if(!session.active())return;
-    mountReview(review,data,{confirm:async rows=>{
+    mountReview(review,data,{categories:readCategories(),confirm:async rows=>{
      if(!session.active())throw Error('ACCESS_DENIED');
      await simulateConfirmation(rows);
     },cancel:message=>{smart.discardReview();notice.textContent=message??'Revisão cancelada.';}});

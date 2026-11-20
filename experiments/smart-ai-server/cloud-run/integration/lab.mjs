@@ -40,24 +40,24 @@ function memoryDb(){
  return {docs,db};
 }
 
-export function createLab({origin,mode='reconciled'}){
+export function createLab({origin,mode='reconciled',observedCents=mode==='suspended'?750:null,clock=Date.now}){
  const {docs,db}=memoryDb(),sessions=new Map();
  for(const [role,uid] of Object.entries(profiles)){
   docs.set('raytechV345Accounts/'+uid,{uid,blocked:false,plan:role==='premium'?'premium':'free',name:'Perfil fictício '+role});
   if(['admin','owner'].includes(role))docs.set('raytechV345Roles/'+uid,{role,active:true});
  }
- const store=createCommercialStore(db);
+ const store=createCommercialStore(db,{clock});
  const verifyFirebase=async token=>{
   const identity=sessions.get(token);
-  if(!identity||identity.expires<=Date.now())throw Error('INVALID_SESSION');
+  if(!identity||identity.expires<=clock())throw Error('INVALID_SESSION');
   return identity;
  };
  function login(role,oldToken){
   const old=sessions.get(oldToken);
-  if(!Object.hasOwn(profiles,role)||oldToken&&(role!=='owner'||old?.uid!==profiles.owner||old.expires<=Date.now()))return null;
+  if(!Object.hasOwn(profiles,role)||oldToken&&(role!=='owner'||old?.uid!==profiles.owner||old.expires<=clock()))return null;
   const token=randomUUID();
   if(oldToken)sessions.delete(oldToken);
-  sessions.set(token,{uid:profiles[role],smartAiAdmin:role==='admin',authTime:oldToken?Math.floor(Date.now()/1000):0,expires:Date.now()+3600000});
+  sessions.set(token,{uid:profiles[role],smartAiAdmin:role==='admin',authTime:oldToken?Math.floor(clock()/1000):0,expires:clock()+3600000});
   return token;
  }
  const readPermissions=async uid=>({account:docs.get('raytechV345Accounts/'+uid),role:docs.get('raytechV345Roles/'+uid)});
@@ -70,7 +70,7 @@ export function createLab({origin,mode='reconciled'}){
    return checked;
   };
   const finance=()=>financeState(docs.get(financeRef(db).name));
-  const operational=()=>finance().suspended?'suspended':mode==='unavailable'?'unavailable':'available';
+  const operational=()=>finance().suspended?'suspended':docs.get('raytechLabCommercialGlobalV350/config')?.enabled===false?'administrative':mode==='unavailable'?'unavailable':'available';
   if(path==='/v1/credits'){
    const result=await readCreditBalance(request,{verifyToken,readCredits:store.readCredits});
    return result.ok?send(200,{...await result.json(),operational:operational()}):result;
@@ -78,10 +78,19 @@ export function createLab({origin,mode='reconciled'}){
   let body;
   try{body=await request.json();}catch{return send(400,{error:'INVALID_FILE'});}
   if(path==='/v1/admin/ai'){
-   const result=await handleSmartAdmin(request,body,{db,verifyToken,ownerUid:profiles.owner});
+   if(body?.action==='search'&&typeof body.prefix==='string'&&body.prefix.trim().length>=2){
+    const access=await handleSmartAdmin(request,{action:'overview'},{db,verifyToken,ownerUid:profiles.owner,clock});
+    if(access.status!==200)return send(access.status,access.body);
+    const query=body.prefix.trim().toLocaleLowerCase('pt-BR');
+    return send(200,{rows:Object.entries(profiles).filter(([role,uid])=>
+     [uid,'Perfil fictício '+role,role+'@example.invalid'].some(value=>value.toLowerCase().includes(query)))
+     .map(([role,uid])=>({uid,name:'Perfil fictício '+role}))});
+   }
+   const result=await handleSmartAdmin(request,body,{db,verifyToken,ownerUid:profiles.owner,clock});
    if(result.status===200&&body.action==='overview'){
     const audit=[...docs.entries()].filter(([key])=>key.startsWith('raytechLabSmartAiAdminAuditV350/'));
     result.body.auditCount=audit.length;
+    result.body.simulated=true;
    }
    return send(result.status,result.body);
   }
@@ -100,6 +109,10 @@ export function createLab({origin,mode='reconciled'}){
   });
   return send(result.status,result.body);
  }
- return {login,logout:token=>sessions.delete(token),bridge:createBridge({verifyFirebase,invoke,origin}),
-  ready:mode==='suspended'?recordBudgetPush(db,{period:new Date().toISOString().slice(0,7),publishedAt:Date.now(),observedCents:750,current:true,id:'lab-observation'}):Promise.resolve()};
+ const observe=(cents,id=randomUUID())=>recordBudgetPush(db,{
+  period:new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit'}).format(clock()),
+  publishedAt:clock(),observedCents:cents,current:true,id,
+ });
+ return {login,logout:token=>sessions.delete(token),bridge:createBridge({verifyFirebase,invoke,origin,clock}),
+  observe,ready:observedCents===null?Promise.resolve():observe(observedCents)};
 }

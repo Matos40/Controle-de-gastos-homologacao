@@ -65,3 +65,22 @@
 .raytech-ai-admin ul { list-style: none; padding: 0; }
 .raytech-ai-admin li { margin: .4rem 0; }
 .raytech-ai-admin label { display: block; margin-block: .3rem; }
+
+.raytech-ai__file { display:grid; position:relative; padding:.65rem .85rem; border:1px solid #475569; border-radius:.6rem; cursor:pointer; }
+.raytech-ai__file:focus-within { outline:2px solid #67e8f9; }
+.raytech-ai__file input { inset:0; opacity:0; position:absolute; cursor:pointer; width:100%; }
+.raytech-ai__file:has(input:disabled) { opacity:.55; cursor:default; }
+.raytech-ai progress { display:block; width:100%; height:.45rem; border:0; border-radius:1rem; overflow:hidden; color:var(--fill); background:#263449; }
+.raytech-ai progress::-webkit-progress-bar { background:#263449; }
+.raytech-ai progress::-webkit-progress-value { background:var(--fill); }
+.raytech-ai progress::-moz-progress-bar { background:var(--fill); }
+[data-level=normal] { --fill:#4ade80; }
+[data-level=attention] { --fill:#facc15; }
+[data-level=alert] { --fill:#fb923c; }
+[data-level=preventive] { --fill:#f87171; }
+[data-level=critical] { --fill:#ef4444; }
+
+.raytech-ai-plan-chart label { display:grid; grid-template-columns:minmax(6.5rem,auto) 1fr; align-items:center; gap:.4rem; font-size:.8rem; }
+.raytech-ai-plan-chart meter { width:100%; height:.6rem; }
+.raytech-ai-admin__metrics dl { display:grid; grid-template-columns:minmax(0,1fr); gap:.15rem; }
+.raytech-ai-admin__metrics dd { margin:0 0 .25rem; font-size:.8rem; color:#a7bed2; }

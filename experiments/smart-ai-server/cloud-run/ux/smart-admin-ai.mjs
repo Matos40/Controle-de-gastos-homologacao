@@ -1,3 +1,4 @@
+import {budgetLevel} from './budget.mjs';
 const counts=[
  ['reserved','Leituras admitidas'],['completed','Extrações concluídas'],
  ['failed','Falhas'],['pending','Reservas pendentes'],['failed','Créditos restituídos'],
@@ -29,14 +30,16 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
      <article><h2>Este mês</h2><dl data-month></dl></article>
     </div>
     <p data-conversions></p><p data-average></p>
-    <form data-search><label for="ai-admin-prefix">Pesquisar por início do UID</label>
-     <input id="ai-admin-prefix" required minlength="2" maxlength="128" pattern="[A-Za-z0-9_-]+">
+    <form data-search><label for="ai-admin-prefix">Pesquisar por nome, e-mail ou UID</label>
+     <input id="ai-admin-prefix" required minlength="2" maxlength="128" >
      <button type="submit">Pesquisar</button></form>
     <ul data-users></ul><p data-credit aria-live="polite"></p>
     <p data-admission></p><p data-audit></p>
     <article aria-label="Proteção financeira Smart AI">
      <h2>Proteção financeira Smart AI</h2>
-     <p data-finance></p><p data-finance-observed></p><p data-security></p>
+     <p data-finance></p><p data-finance-observed></p>
+     <div data-budget-meter hidden><progress max="100" aria-label="Utilização do orçamento"></progress>
+     <p data-budget-level></p></div><small>Alertas: 25% · 50% · 75% · 100%. O orçamento não é um teto de cobrança.</small><p data-security></p>
      <details><summary>Histórico de alertas</summary><ul data-alerts></ul></details>
      <form data-reactivate hidden>
       <label><input type="checkbox" required> Revisei o faturamento e confirmo a reativação</label>
@@ -49,7 +52,7 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
       <label>Limite diário (UTC)<input name="day" type="number" min="1" max="30" required></label>
       <label>Limite mensal (UTC)<input name="month" type="number" min="1" max="60" required></label>
      </div>
-     <button type="submit">Salvar configuração</button>
+     <button type="submit">Salvar configuração</button> <button type="button" data-emergency>Suspender novas leituras</button>
     </form>
     <h2>Estimativa de custos</h2>
     <label>Valor estimado por tentativa em reais<input data-cost type="number" min="0" step="0.0001" inputmode="decimal"></label>
@@ -74,6 +77,15 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
  }
  const setStatus=text=>{status.textContent=text;};
  function renderMetrics(target,period){
+  const graph=document.createElement('div');
+  graph.className='raytech-ai-plan-chart';
+  const total=period.free.reserved+period.premium.reserved;
+  for(const [plan,label] of [['free','Free'],['premium','Premium']]){
+   const row=document.createElement('label'),bar=document.createElement('meter');
+   row.textContent=label+' · '+number.format(period[plan].reserved)+' leituras';
+   bar.min=0;bar.max=Math.max(1,total);bar.value=period[plan].reserved;
+   row.append(bar);graph.append(row);
+  }
   target.replaceChildren(...counts.flatMap(([key,label])=>{
    const term=document.createElement('dt'),detail=document.createElement('dd');
    term.textContent=label;
@@ -81,6 +93,8 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
     ' · Free '+number.format(period.free[key])+' · Premium '+number.format(period.premium[key]);
    return [term,detail];
   }));
+  if(target.previousElementSibling?.classList.contains(graph.className))target.previousElementSibling.remove();
+  target.before(graph);
  }
  function estimate(){
   const input=el('cost'),price=input.valueAsNumber;
@@ -100,13 +114,19 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
    'Auditoria simulada · '+number.format(overview.auditCount)+' alterações registradas':'';
   const {settings}=overview;
   const finance=overview.finance;
-  el('admission').textContent=settings.enabled&&!finance?.suspended?'Novas leituras habilitadas.':'Novas leituras suspensas. Solicitações em andamento podem concluir.';
+  el('admission').textContent=finance?.suspended?'Suspensão financeira automática.':!settings.enabled?'Suspensão administrativa manual.':'Novas leituras habilitadas.';
   if(finance){
    el('finance').textContent=(finance.suspended?'Suspensa pelo limite financeiro':'Proteção financeira ativa')+
     ' · Orçamento mensal '+currency.format(finance.budgetCents/100);
-   el('finance-observed').textContent=finance.observedCents===null?'Faturamento observado ainda indisponível.':
-    'Faturamento observado: '+currency.format(finance.observedCents/100)+' · '+
+   el('finance-observed').textContent=finance.observedCents===null?'Aguardando atualização do faturamento':
+    (overview.simulated?'Faturamento simulado: ':'Faturamento observado: ')+currency.format(finance.observedCents/100)+' · '+
     number.format(100*finance.observedCents/finance.budgetCents)+'% · Atualizado em '+new Date(finance.updatedAt).toLocaleString('pt-BR');
+   const level=budgetLevel(finance.observedCents,finance.budgetCents),meter=el('budget-meter');
+   meter.hidden=!level;
+   if(level){
+    const progress=meter.querySelector('progress');progress.value=level.width;progress.dataset.level=level.level;
+    el('budget-level').textContent=level.label+' · '+number.format(level.percent)+'%';
+   }
    el('alerts').replaceChildren(...finance.alerts.slice().reverse().map(alert=>{
     const item=document.createElement('li');
     item.textContent=alert.period+' · '+alert.threshold+'%'+(alert.threshold===100?' · Alerta crítico':'');
@@ -117,7 +137,7 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
    'Autorização no servidor · Autenticação recente de até cinco minutos para alterações.':'';
   el('reactivate').hidden=!(finance?.suspended&&overview.role==='owner');
   config.hidden=overview.role!=='owner';
-  config.elements.enabled.checked=settings.enabled;
+  config.elements.enabled.checked=settings.enabled;el('emergency').disabled=!settings.enabled;
   config.elements.day.value=settings.budget.day;
   config.elements.month.value=settings.budget.month;
   estimate();
@@ -148,7 +168,8 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
   event.preventDefault();
   void run(async()=>{
    el('users').replaceChildren();el('credit').textContent='';
-   const {rows}=await request('search',{prefix:search.querySelector('input').value.trim()});
+   const query=search.querySelector('input').value.trim();
+   const {rows}=await request('search',{prefix:query});
    for(const row of rows){
     const item=document.createElement('li'),button=document.createElement('button');
     button.type='button';button.textContent=(row.name?row.name+' · ':'')+row.uid;
@@ -163,6 +184,11 @@ export function mountSmartAdminAI(root,{getIdToken,reauthenticate,fetcher=fetch}
    if(!rows.length)return 'Nenhum usuário encontrado.';
   });
  });
+ el('emergency').onclick=()=>{
+  if(overview?.role!=='owner'||!overview.settings.enabled)return;
+  config.elements.enabled.checked=false;
+  config.requestSubmit();
+ };
  config.addEventListener('submit',event=>{
   event.preventDefault();
   if(overview?.role!=='owner')return;

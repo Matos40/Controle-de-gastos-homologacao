@@ -28,7 +28,7 @@ const html=`<!doctype html><html lang="pt-BR"><meta charset="utf-8">
 
 async function lab(){
  const state={remaining:2,requests:0,mode:'success',ids:[],settings:{enabled:true,budget:{day:30,month:60},version:0}};
- const assets={'/smart-ai.css':'text/css','/smart-ai.mjs':'text/javascript','/smart-admin-ai.mjs':'text/javascript'};
+ const assets={'/budget.mjs':'text/javascript','/smart-ai.css':'text/css','/smart-ai.mjs':'text/javascript','/smart-admin-ai.mjs':'text/javascript'};
  const server=createServer(async(req,res)=>{
   const url=new URL(req.url,'http://localhost');
   if(url.pathname==='/'){res.writeHead(200,{'content-type':'text/html'});res.end(html);return;}
@@ -193,7 +193,7 @@ test('Smart Admin: mobile Owner controls, desktop Admin read-only, search, credi
   await page.goto(url+'?owner');
   await waitText(page,'[data-admission]','habilitadas');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-  await page.getByLabel('Pesquisar por início do UID').fill('fixture');
+  await page.getByLabel('Pesquisar por nome, e-mail ou UID').fill('fixture');
   await page.getByRole('button',{name:'Pesquisar',exact:true}).click();
   await page.getByRole('button',{name:'Conta fictícia · fixture-test'}).click();
   await waitText(page,'[data-credit]','1 créditos disponíveis');

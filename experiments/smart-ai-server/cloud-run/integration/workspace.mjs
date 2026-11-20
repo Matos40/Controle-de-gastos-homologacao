@@ -1,10 +1,10 @@
 import {mountIntegration} from './mount.mjs';
 
 // This adapter is imported only by an experimental host with an approved session.
-export function connectInvoiceWorkspace({root,experimentEnabled,auth,onAuthStateChanged,openApiKeyModal,fetcher,reauthenticate,simulateConfirmation}){
+export function connectInvoiceWorkspace({root,experimentEnabled,auth,onAuthStateChanged,openApiKeyModal,fetcher,reauthenticate,simulateConfirmation,readCategories}){
  if(experimentEnabled!==true)return ()=>{};
  let activeUid=auth.currentUser?.uid;
- const integration=mountIntegration(root,{enabled:true,fetcher,reauthenticate,simulateConfirmation,
+ const integration=mountIntegration(root,{enabled:true,fetcher,reauthenticate,simulateConfirmation,readCategories,
   openApiKey:openApiKeyModal,
   async getIdToken(){
    const user=auth.currentUser;

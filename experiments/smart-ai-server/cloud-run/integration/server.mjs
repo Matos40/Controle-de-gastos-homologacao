@@ -8,10 +8,11 @@ const assets=new Map(Object.entries({
  '/':'integration/index.html','/integration/lab.css':'integration/lab.css',
  '/integration/lab-ui.mjs':'integration/lab-ui.mjs','/integration/mount.mjs':'integration/mount.mjs',
  '/integration/review.mjs':'integration/review.mjs','/ux/smart-ai.css':'ux/smart-ai.css',
+ '/ux/budget.mjs':'ux/budget.mjs',
  '/ux/smart-ai.mjs':'ux/smart-ai.mjs','/ux/smart-admin-ai.mjs':'ux/smart-admin-ai.mjs',
 }));
 const types={html:'text/html',css:'text/css',mjs:'text/javascript'};
-export async function startLab({port=0,mode='reconciled'}={}){
+export async function startLab({port=0,mode='reconciled',observedCents}={}){
  if(!['reconciled','divergent','incomplete','duplicates','failed','unavailable','suspended'].includes(mode))throw Error('INVALID_MODE');
  let origin,lab;
  const server=createServer({requestTimeout:35000,headersTimeout:10000,maxHeaderSize:16384},async(req,res)=>{
@@ -62,7 +63,7 @@ export async function startLab({port=0,mode='reconciled'}={}){
  });
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
  origin='http://127.0.0.1:'+server.address().port;
- lab=createLab({origin,mode});
+ lab=createLab({origin,mode,observedCents});
  await lab.ready;
  return {origin,close:()=>new Promise(resolve=>server.close(resolve))};
 }

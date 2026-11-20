@@ -92,3 +92,50 @@ test('bridge keeps the browser bearer separate from IAM and rejects foreign orig
  assert.equal(result.headers.has('set-cookie'),false);
  assert.equal(invoked,1);
 });
+
+test('budget levels preserve observed percentage and cap the fill only',async()=>{
+ const {budgetLevel}=await import('../ux/budget.mjs');
+ assert.equal(budgetLevel(null,1000),null);
+ assert.deepEqual([249,250,500,750,1000,1250].map(cents=>budgetLevel(cents,1000).level),
+  ['normal','attention','alert','preventive','critical','critical']);
+ assert.deepEqual(budgetLevel(1250,1000),{percent:125,width:100,level:'critical',label:'Crítico'});
+});
+test('centavos are derived from reais without floating point rounding',async()=>{
+ const {parseReais}=await import('./review.mjs');
+ for(const [value,cents] of [['R$ 18,90',1890],['-R$ 6,25',-625],['−1.234,09',-123409],['0,01',1],['1,005',null]]){
+  assert.equal(parseReais(value),cents);
+ }
+});
+test('bridge caps streamed bytes and rejects bursts before invoking the private service',async()=>{
+ const {createBridge}=await import('./bridge.mjs');
+ let now=0,invocations=0;
+ const bridge=createBridge({origin,clock:()=>now,limit:2,verifyFirebase:async()=>({uid:'lab-free'}),
+  invoke:async()=>{invocations++;return Response.json({ok:true});}});
+ const request=new Request(origin+'/v1/admin/ai',{method:'POST',body:'x'.repeat(4097),
+  headers:{authorization:'Bearer synthetic','content-type':'application/json'}});
+ assert.equal((await bridge(request)).status,413);
+ assert.equal((await bridge(new Request(origin+'/v1/credits'))).status,401);
+ assert.equal((await bridge(new Request(origin+'/v1/credits'))).status,429);
+ assert.equal(invocations,0);
+ now=60000;
+ assert.equal((await bridge(new Request(origin+'/v1/credits',{headers:{authorization:'Bearer synthetic'}}))).status,200);
+ assert.equal(invocations,1);
+});
+
+test('financial reactivation expires after five minutes and a later observation can suspend again',async()=>{
+ let now=Date.now();
+ const lab=createLab({origin,mode:'suspended',clock:()=>now});await lab.ready;
+ let owner=lab.login('owner');owner=lab.login('owner',owner);
+ now+=301000;
+ const reactivate=token=>call(lab,token,'/v1/admin/ai',{action:'reactivateFinance',confirmed:true,expectedVersion:1});
+ assert.equal((await reactivate(owner)).status,403);
+ owner=lab.login('owner',owner);
+ assert.equal((await reactivate(owner)).status,200);
+ const overview=async()=> (await call(lab,owner,'/v1/admin/ai',{action:'overview'})).json();
+ assert.equal((await overview()).finance.observedCents,750);
+ now+=1000;
+ await lab.observe(1000);
+ assert.equal((await overview()).finance.suspended,true);
+ assert.equal((await overview()).finance.observedCents,1000);
+ assert.equal((await credits(lab,lab.login('free'))).remaining,2);
+});

@@ -17,7 +17,7 @@ signIn.onclick=async()=>{
   ({token}=await session('login',{profile:profile.value}));
   profile.disabled=true;signIn.hidden=true;signOut.hidden=false;status.textContent='Sessão fictícia ativa.';
   view=mountIntegration(workspace,{enabled:true,getIdToken:async()=>token,fetcher:(path,opts)=>fetch(path,opts),
-   openApiKey:()=>get('api-key').showModal(),simulateConfirmation:async()=>{},
+   openApiKey:()=>get('api-key').showModal(),simulateConfirmation:async()=>{},readCategories:()=>['Alimentação','Transporte','Compras','Outros'],
    reauthenticate:async()=>{
     if(!window.confirm('Simular um novo login do Owner fictício?'))throw Error('REAUTH_REQUIRED');
     const current=token;

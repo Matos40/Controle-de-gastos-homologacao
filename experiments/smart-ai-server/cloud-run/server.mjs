@@ -6,6 +6,7 @@ import {createCloudRunHandler} from './handler.mjs';
 import {corsFor} from './cors.mjs';
 const assets={
  '/smart-ai/smart-ai.mjs':['smart-ai.mjs','text/javascript; charset=utf-8'],
+ '/smart-ai/budget.mjs':['budget.mjs','text/javascript; charset=utf-8'],
  '/smart-ai/smart-ai.css':['smart-ai.css','text/css; charset=utf-8'],
  '/smart-ai/smart-admin-ai.mjs':['smart-admin-ai.mjs','text/javascript; charset=utf-8'],
 };
