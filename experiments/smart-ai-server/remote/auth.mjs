@@ -11,7 +11,7 @@ function parsePart(value) {
   return JSON.parse(Buffer.from(value, 'base64url').toString('utf8'));
 }
 
-export function createFirebaseVerifier(projectId) {
+export function createFirebaseSignatureVerifier(projectId) {
   let certificates = new Map();
   let expiresAt = 0;
 
@@ -28,7 +28,7 @@ export function createFirebaseVerifier(projectId) {
     return certificates.get(kid);
   }
 
-  return async (token, getAccessToken, transport, signal) => {
+  return async (token, transport, signal) => {
     if (typeof token !== 'string' || token.length > 8192) throw Error('INVALID_TOKEN');
     const [header, payload, signature, extra] = token.split('.');
     if (!header || !payload || !signature || extra !== undefined || !tokenPart.test(signature)) {
@@ -49,6 +49,14 @@ export function createFirebaseVerifier(projectId) {
     if (!key || !verify('RSA-SHA256', Buffer.from(header + '.' + payload), key,
       Buffer.from(signature, 'base64url'))) throw Error('INVALID_TOKEN');
 
+    return {uid,authTime:claims.auth_time};
+  };
+}
+
+export function createFirebaseVerifier(projectId) {
+  const verifySignature=createFirebaseSignatureVerifier(projectId);
+  return async (token,getAccessToken,transport,signal)=>{
+    const {uid,authTime}=await verifySignature(token,transport,signal);
     const accessToken = await getAccessToken();
     const response = await transport(accountUrl + projectId + '/accounts:lookup', {
       method:'POST', redirect:'manual', signal,
@@ -60,7 +68,7 @@ export function createFirebaseVerifier(projectId) {
     const account = Array.isArray(users) && users.length === 1 ? users[0] : null;
     const validSince = Number(account?.validSince);
     if (!account || account.localId !== uid || account.disabled === true
-        || !Number.isSafeInteger(validSince) || validSince < 0 || claims.auth_time < validSince) {
+        || !Number.isSafeInteger(validSince) || validSince < 0 || authTime < validSince) {
       throw Error('INVALID_TOKEN');
     }
     return {uid};

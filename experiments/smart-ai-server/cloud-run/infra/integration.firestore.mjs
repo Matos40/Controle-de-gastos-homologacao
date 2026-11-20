@@ -4,6 +4,7 @@ import {assertLocalEmulators} from '../../legacy/emulator-guard.mjs';
 import {createRestStore} from '../../firestore.mjs';
 import {makeServer} from '../server.mjs';
 import {createCloudRunHandler} from '../handler.mjs';
+import {makeGateway,backendAudience} from '../gateway.mjs';
 
 assertLocalEmulators();
 const project='projects/demo-raytech-v340/databases/(default)';
@@ -43,8 +44,21 @@ const env={SMART_AI_EXPERIMENT_ENABLED:'true',SMART_AI_TELEMETRY:'true',SMART_AI
  FIREBASE_PROJECT_ID:'gen-lang-client-0593667072',RAYTECH_GEMINI_API_KEY:providerKey};
 const server=makeServer({handler,env});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+const number='123456789012',audience=backendAudience(number);
+const gateway=makeGateway({env:{SMART_AI_GATEWAY_ENABLED:'true',SMART_AI_UI_ORIGIN:ui,SMART_AI_COMPUTE_PROJECT_NUMBER:number},
+ verifySignature:async token=>{
+  if(!['fixture-reader','fixture-owner','fixture-revoked'].includes(token))throw Error('INVALID_FIXTURE');
+ },
+ identity:async target=>{assert.equal(target,audience);return 'fixture.oidc.token';},
+ transport:(url,options)=>{
+  assert.ok(url.startsWith(audience+'/v1/'));
+  assert.equal(options.headers['x-serverless-authorization'],'Bearer fixture.oidc.token');
+  return fetch('http://127.0.0.1:'+server.address().port+new URL(url).pathname,options);
+ },
+});
+await new Promise(resolve=>gateway.listen(0,'127.0.0.1',resolve));
 try{
- const base='http://127.0.0.1:'+server.address().port;
+ const base='http://127.0.0.1:'+gateway.address().port;
  const api=async(path,token,body,extra={})=>{
   const response=await fetch(base+path,{method:body?'POST':'GET',headers:{
    origin:ui,authorization:'Bearer '+token,...(body?{'content-type':'application/json'}:{}),...extra,
@@ -76,5 +90,8 @@ try{
   event.confirmedFirestoreWrites>0&&event.requestedFirestoreReads>0));
  const serialized=JSON.stringify(events);
  for(const absent of [uid,owner,fakeInvoice,providerKey,'Compra fictícia','fixture-reader'])assert.ok(!serialized.includes(absent));
- console.log('Integração Firestore Emulator: leitor, saldo e Smart Admin com a mesma conta sintética; restituição, pausa e telemetria verificadas.');
-}finally{await new Promise(resolve=>server.close(resolve));}
+ console.log('Integração Firestore Emulator: gateway, leitor, saldo e Smart Admin com a mesma conta sintética; restituição, pausa e telemetria verificadas.');
+}finally{
+ await new Promise(resolve=>gateway.close(resolve));
+ await new Promise(resolve=>server.close(resolve));
+}

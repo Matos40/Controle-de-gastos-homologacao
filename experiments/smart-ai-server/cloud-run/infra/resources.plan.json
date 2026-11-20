@@ -1,0 +1,65 @@
+{
+  "applyAuthorized": false,
+  "projectId": "raytech-ai-run-exp-v350",
+  "region": "us-central1",
+  "firebaseProject": "gen-lang-client-0593667072",
+  "requiredApisAfterApproval": [
+    "run.googleapis.com", "compute.googleapis.com", "iam.googleapis.com",
+    "artifactregistry.googleapis.com", "secretmanager.googleapis.com", "monitoring.googleapis.com",
+    "logging.googleapis.com", "billingbudgets.googleapis.com"
+  ],
+  "network": {
+    "name": "raytech-ai-exp-vpc",
+    "subnet": "raytech-ai-exp-us-central1",
+    "ipv4Range": "10.221.64.0/26",
+    "privateGoogleAccess": true,
+    "gatewayEgress": "all-traffic",
+    "cloudNat": false,
+    "privateDnsZone": false
+  },
+  "registry": {
+    "repository": "raytech-smart-ai",
+    "format": "DOCKER",
+    "immutableTags": true,
+    "simulationRetention": {"keepRecentVersions": 2,"deleteUnreferencedAfterDays": 30,"dryRun": true}
+  },
+  "secretManager": {
+    "name": "raytech-ai-gemini",
+    "replication": "automatic",
+    "versionReference": "numeric",
+    "consumers": ["raytech-ai-runtime"],
+    "gatewayAccess": false
+  },
+  "iam": {
+    "gatewayIdentity": "raytech-ai-gateway",
+    "gatewayBinding": {"role": "roles/run.invoker","scope": "raytech-smart-ai-exp"},
+    "runtimeIdentity": "raytech-ai-runtime",
+    "staticKeys": false
+  },
+  "monitoring": {
+    "resources": ["raytech-smart-ai-exp", "raytech-smart-ai-gateway-exp"],
+    "notifyThrough": "__APPROVED_MONITORING_NOTIFICATION_CHANNEL__",
+    "thresholds": {
+      "backendP95LatencyMs": 25000,
+      "backendMemoryUtilization": 0.8,
+      "backendCpuUtilization": 0.8,
+      "fiveMinuteServerErrorRatio": 0.1
+    },
+    "automaticLogExport": false
+  },
+  "budget": {
+    "displayName": "Raytech CG Smart AI experimental BRL 10",
+    "budgetFilter": {"projects": ["projects/__COMPUTE_PROJECT_NUMBER__"]},
+    "amount": {"specifiedAmount": {"currencyCode": "BRL", "units": "10"}},
+    "notificationsRule": {
+      "disableDefaultIamRecipients": false,
+      "monitoringNotificationChannels": ["__APPROVED_BUDGET_EMAIL_CHANNEL__"]
+    },
+    "thresholdRules": [
+      {"thresholdPercent": 0.25, "spendBasis": "CURRENT_SPEND"},
+      {"thresholdPercent": 0.50, "spendBasis": "CURRENT_SPEND"},
+      {"thresholdPercent": 0.75, "spendBasis": "CURRENT_SPEND"},
+      {"thresholdPercent": 1.00, "spendBasis": "CURRENT_SPEND"}
+    ]
+  }
+}

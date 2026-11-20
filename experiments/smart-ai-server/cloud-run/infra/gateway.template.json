@@ -1,0 +1,44 @@
+{
+  "apiVersion": "serving.knative.dev/v1",
+  "kind": "Service",
+  "metadata": {
+    "name": "raytech-smart-ai-gateway-exp",
+    "namespace": "__COMPUTE_PROJECT_NUMBER__",
+    "annotations": {
+      "run.googleapis.com/ingress": "all",
+      "run.googleapis.com/invoker-iam-disabled": "false",
+      "run.googleapis.com/minScale": "0",
+      "run.googleapis.com/maxScale": "1"
+    }
+  },
+  "spec": {
+    "template": {
+      "metadata": {
+        "annotations": {
+          "autoscaling.knative.dev/minScale": "0",
+          "autoscaling.knative.dev/maxScale": "1",
+          "run.googleapis.com/cpu-throttling": "true",
+          "run.googleapis.com/startup-cpu-boost": "false",
+          "run.googleapis.com/network-interfaces": "[{\"network\":\"raytech-ai-exp-vpc\",\"subnetwork\":\"raytech-ai-exp-us-central1\"}]",
+          "run.googleapis.com/vpc-access-egress": "all-traffic"
+        }
+      },
+      "spec": {
+        "serviceAccountName": "raytech-ai-gateway@__COMPUTE_PROJECT_ID__.iam.gserviceaccount.com",
+        "containerConcurrency": 1,
+        "timeoutSeconds": 45,
+        "containers": [{
+          "image": "__EXPERIMENT_IMAGE_DIGEST__",
+          "command": ["node", "/app/experiments/smart-ai-server/cloud-run/gateway.mjs"],
+          "ports": [{"containerPort": 8080}],
+          "resources": {"limits": {"cpu": "1", "memory": "512Mi"}},
+          "env": [
+            {"name": "SMART_AI_GATEWAY_ENABLED", "value": "false"},
+            {"name": "SMART_AI_COMPUTE_PROJECT_NUMBER", "value": "__COMPUTE_PROJECT_NUMBER__"},
+            {"name": "SMART_AI_UI_ORIGIN", "value": "__EXPERIMENT_HTTPS_ORIGIN__"}
+          ]
+        }]
+      }
+    }
+  }
+}
