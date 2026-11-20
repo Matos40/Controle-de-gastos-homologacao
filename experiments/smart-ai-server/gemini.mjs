@@ -41,7 +41,7 @@ export function geminiProvider(secret,transport=fetch,observe=()=>{},stream=fals
   if(typeof secret!=='string'||secret.length<20)throw Error('PROVIDER_UNAVAILABLE');
   return async ({mimeType,bytes,signal})=>{
     const start=Date.now();
-    const result=await transport('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{
+    const request={
       method:'POST',redirect:'manual',signal,headers:{'content-type':'application/json','x-goog-api-key':secret},
       ...(stream?{duplex:'half'}:{}),
       body:encodeGeminiBody({
@@ -49,9 +49,14 @@ export function geminiProvider(secret,transport=fetch,observe=()=>{},stream=fals
         contents:[{role:'user',parts:[{inlineData:{mimeType,data:stream?'raytech-inline-document':bytes.toString('base64')}}]}],
         generationConfig:{responseMimeType:'application/json',responseSchema:contract?.schema??schema,maxOutputTokens:4096,temperature:0},
       },bytes,stream),
-    });
-    if(!result.ok)throw Error('PROVIDER_UNAVAILABLE');
-    const data=await result.json();
+    };
+    let result;
+    try{result=await transport('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',request);}
+    catch(error){if(!contract)throw error;throw Error('PROVIDER_OUTCOME_UNKNOWN',{cause:error});}
+    if(!result.ok)throw Error(contract&&[408,504].includes(result.status)?'PROVIDER_OUTCOME_UNKNOWN':'PROVIDER_UNAVAILABLE');
+    let data;
+    try{data=await result.json();}
+    catch(error){if(!contract)throw error;throw Error(error instanceof SyntaxError?'INVALID_PROVIDER_RESPONSE':'PROVIDER_OUTCOME_UNKNOWN',{cause:error});}
     observe({latencyMs:Date.now()-start,inputTokens:data.usageMetadata?.promptTokenCount,
       outputTokens:data.usageMetadata?.candidatesTokenCount,
       totalTokens:data.usageMetadata?.totalTokenCount,thinkingTokens:data.usageMetadata?.thoughtsTokenCount});

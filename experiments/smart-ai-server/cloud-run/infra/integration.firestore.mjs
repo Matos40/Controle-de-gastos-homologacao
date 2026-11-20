@@ -8,6 +8,7 @@ import {createCloudRunHandler} from '../handler.mjs';
 import {makeGateway,backendAudience} from '../gateway.mjs';
 import {createCommercialStore} from '../store.mjs';
 import {parseBudgetPush,recordBudgetPush} from '../finance-guard.mjs';
+import {geminiProvider} from '../../gemini.mjs';
 
 assertLocalEmulators();
 const project='projects/demo-raytech-v340/databases/(default)';
@@ -57,6 +58,8 @@ const transport=async(url,options)=>{
   usageMetadata:{promptTokenCount:610,candidatesTokenCount:90,totalTokenCount:710,thoughtsTokenCount:10}});
 };
 const handler=createCloudRunHandler(transport,{
+ requireFinance:false, // Successful fixture calls use no billing observation. The guard is covered by its denial tests.
+ providerFactory:(...args)=>geminiProvider(...args), // Transport above is restricted to the emulator and fixture responses.
  verifyPush:async token=>{if(token!=='fixture-budget-push')throw Error('INVALID_PUSH_IDENTITY');},
  connect:(signal,counted)=>({db:db(signal,counted),verifyToken:async token=>{
   if(token==='fixture-reader')return {uid};

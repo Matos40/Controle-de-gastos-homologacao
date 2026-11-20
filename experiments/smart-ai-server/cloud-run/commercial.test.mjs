@@ -4,8 +4,9 @@ import {planOf,monthOf,view,reserve,finish} from './quota.mjs';
 import {createCommercialStore} from './store.mjs';
 import {makeServer} from './server.mjs';
 import {createRestStore} from '../firestore.mjs';
-import {readCreditBalance} from './handler.mjs';
-import {extractInvoice} from './invoice.mjs';
+import {readCreditBalance,createCloudRunHandler} from './handler.mjs';
+import {extractInvoice,MAX_BYTES} from './invoice.mjs';
+import {geminiProvider} from '../gemini.mjs';
 import {handleSmartAdmin} from './admin.mjs';
 import {createHash,generateKeyPairSync,sign} from 'node:crypto';
 import {financeRef,parseBudgetPush,recordBudgetPush} from './finance-guard.mjs';
@@ -212,6 +213,124 @@ test('extraction acknowledges a refund only after the settlement succeeds',async
   });
   assert.equal(result.status,502);
   assert.equal(result.body.creditRefunded,!blocked||undefined);
+ }
+});
+
+const labDocument={feature:'invoice-ai',mimeType:'application/pdf',data:Buffer.from('%PDF-1.4\n%%EOF\n').toString('base64')};
+const labStatement={entries:[{kind:'PURCHASE',title:'Compra fictícia',date:'2026-11-07',amountCents:1200,currentInstallment:null,installments:null}],
+ statementTotalCents:1200,priorBalanceCents:null,priorPaymentsCents:null,balanceBasis:'ACTIVITY_ONLY'};
+const invoiceRequest=(body,requestId,signal)=>new Request('https://example.invalid/v1/invoices',{method:'POST',signal,
+ headers:{authorization:'Bearer synthetic','x-request-id':requestId,'content-type':'application/json'},body:JSON.stringify(body)});
+const labEnv={FIREBASE_PROJECT_ID:'gen-lang-client-0593667072',SMART_AI_EXPERIMENT_ENABLED:'true'};
+
+test('08.6.4 T01–T04, T06, T08: HTTP handler validates, charges once, refunds confirmed failures and keeps review manual',async()=>{
+ for(const plan of ['free','premium']){
+  const {db,docs}=mockDb();
+  docs.set('raytechV345Accounts/u',{uid:'u',blocked:false,plan});
+  let calls=0,outcome=labStatement,entered,release;
+  const started=new Promise(resolve=>{entered=resolve;});
+  const wait=new Promise(resolve=>{release=resolve;});
+  const handler=createCloudRunHandler(()=>assert.fail('Unexpected external transport'),{
+   requireFinance:false,
+   connect:()=>({db,verifyToken:async()=>({uid:'u'})}),
+   providerFactory:()=>async()=>{calls++;if(calls===1){entered();await wait;}if(outcome instanceof Error)throw outcome;return outcome;},
+  });
+  const send=(body,index)=>handler.fetch(invoiceRequest(body,id(index)),labEnv);
+  assert.equal((await createCloudRunHandler(()=>assert.fail('No real provider')).
+   fetch(invoiceRequest(labDocument,id(620)),labEnv)).status,503);
+  assert.equal((await send({...labDocument,mimeType:'image/png'},621)).status,400);
+  const oversized=Buffer.alloc(MAX_BYTES+1);
+  assert.equal((await send({...labDocument,data:oversized.toString('base64')},622)).status,413);
+  assert.equal(calls,0);
+  const connection=new AbortController();
+  const first=handler.fetch(invoiceRequest(labDocument,id(623),connection.signal),labEnv);
+  await started;
+  connection.abort();
+  assert.equal((await send(labDocument,624)).status,409);
+  release();
+  const parsed=await first;
+  assert.equal(parsed.status,200);
+  const body=await parsed.json();
+  assert.equal(body.requiresReview,true);
+  assert.equal(body.simulated,true);
+  assert.equal(body.reconciliation.differenceCents,0);
+  assert.equal((await send(labDocument,623)).status,409);
+  assert.equal(calls,1);
+  let credit=await createCommercialStore(db).readCredits('u');
+  assert.equal(credit.remaining,plan==='free'?1:14);
+  outcome=new Error('confirmed upstream rejection');
+  const failed=await send(labDocument,625);
+  assert.equal(failed.status,502);
+  assert.equal((await failed.json()).creditRefunded,true);
+  // A different UID exercises malformed provider output without bypassing the two-attempt rate limit.
+  const malformed=createCloudRunHandler(()=>assert.fail('Unexpected external transport'),{
+   requireFinance:false,
+   connect:()=>({db,verifyToken:async()=>({uid:'v'})}),
+   providerFactory:()=>async()=>({...labStatement,entries:[{amountCents:'invalid'}]}),
+  });
+  const bad=await malformed.fetch(invoiceRequest(labDocument,id(626)),labEnv);
+  assert.equal(bad.status,502);
+  const rejected=await bad.json();
+  assert.equal(rejected.reconciliation.status,'INVALID');
+  assert.equal(rejected.requiresReview,undefined);
+  assert.equal(rejected.items,undefined);
+  credit=await createCommercialStore(db).readCredits('u');
+  assert.equal(credit.remaining,plan==='free'?1:14);
+  assert.equal((await createCommercialStore(db).readCredits('v')).remaining,2);
+ }
+});
+
+test('08.6.4 T05: timeout and unconfirmed transport failure leave a durable hold; late output cannot settle it',async()=>{
+ for(const mode of ['local','transport','upstream']){
+  const {db,docs}=mockDb();
+  let now=t,release;
+  const late=new Promise(resolve=>{release=resolve;});
+  const store=createCommercialStore(db,{clock:()=>now});
+  const provider=mode==='local'?()=>late:geminiProvider('synthetic-no-network-secret',async()=>{
+   if(mode==='transport')throw new TypeError('disconnected');
+   return new Response(null,{status:504});
+  },undefined,false,{});
+  const requestId=id(630);
+  const result=await extractInvoice({method:'POST',headers:{authorization:'Bearer synthetic','x-request-id':requestId},body:labDocument},{
+   verifyToken:async()=>({uid:'u'}),readPermissions:async()=>({account:account()}),
+   reserveUsage:store.reserveUsage,finishOutcome:store.finishOutcome,provider,
+  },{timeoutMs:10});
+  assert.equal(result.status,504);
+  assert.equal(result.body.creditRefunded,undefined);
+  assert.equal(docs.get('raytechLabCommercialV350/u/attempts/'+requestId).status,'pending');
+  assert.equal((await store.reserveUsage({uid:'u',requestId:id(631)})).status,409);
+  release(labStatement);
+  now+=120000;
+  const restarted=createCommercialStore(db,{clock:()=>now});
+  assert.deepEqual(await Promise.all([restarted.recoverExpired('u'),restarted.recoverExpired('u')]),[true,false]);
+  await assert.rejects(restarted.finishOutcome({uid:'u',requestId,status:'completed'}),/OUTCOME_CONFLICT/);
+  assert.equal((await restarted.reserveUsage({uid:'u',requestId})).status,409);
+  assert.equal((await restarted.readCredits('u')).remaining,2);
+ }
+});
+
+test('08.6.4 T07: sealed Finance Guard and global cap reject before invoking the simulated provider',async()=>{
+ for(const scenario of ['no-observation','suspended','global-cap']){
+  const {db,docs}=mockDb();
+  const now=Date.now();
+  const period=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit'}).format(now);
+  if(scenario!=='no-observation')docs.set('raytechLabCommercialGlobalV350/financeGuard',{
+   version:1,suspended:scenario==='suspended',alerts:[],period,publishedAt:now-500,observedCents:750,highCents:750,
+  });
+  if(scenario==='global-cap'){
+   const iso=new Date(now).toISOString();
+   docs.set('raytechLabCommercialGlobalV350/budget',{lastAt:now-1,
+    day:{period:iso.slice(0,10),attempts:30,reserved:30},
+    month:{period:iso.slice(0,7),attempts:60,reserved:60}});
+  }
+  const before=structuredClone(docs);
+  const handler=createCloudRunHandler(()=>assert.fail('Unexpected external transport'),{
+   requireFinance:true,connect:()=>({db,verifyToken:async()=>({uid:'u'})}),
+   providerFactory:()=>async()=>assert.fail('Gemini must not be invoked'),
+  });
+  const response=await handler.fetch(invoiceRequest(labDocument,id(640)),labEnv);
+  assert.equal(response.status,scenario==='global-cap'?429:503);
+  assert.deepEqual(docs,before);
  }
 });
 

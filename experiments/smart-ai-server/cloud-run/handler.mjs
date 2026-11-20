@@ -98,7 +98,8 @@ export async function boundedBinary(request, mimeType, signal) {
   }
 }
 
-export function createCloudRunHandler(transport = fetch,{connect,verifyPush=createPushVerifier(),writeTelemetry=event=>console.log(JSON.stringify(event))}={}) {
+export function createCloudRunHandler(transport = fetch,{connect,providerFactory=geminiProvider,requireFinance=true,
+  verifyPush=createPushVerifier(),writeTelemetry=event=>console.log(JSON.stringify(event))}={}) {
   const verifyFirebase = createFirebaseVerifier(experimentProject);
   const denials=invalidLimiter();
   const security=event=>{if([1,30].includes(denials.record()))writeTelemetry({severity:'WARNING',...event});};
@@ -112,6 +113,9 @@ export function createCloudRunHandler(transport = fetch,{connect,verifyPush=crea
       return reply(404, {error:'NOT_FOUND'});
     }
     if (request.method !== (credits?'GET':'POST')) return reply(405, {error:'METHOD_NOT_ALLOWED'});
+    const invoice=!credits&&!admin&&!finance;
+    if(invoice&&providerFactory===geminiProvider&&env.SMART_AI_REAL_GEMINI_ENABLED!=='true')
+      return reply(503,{error:'EXPERIMENT_UNAVAILABLE'});
     const origin=request.headers.get('origin');
     if (origin!==null && !trustedOrigin(origin,env.SMART_AI_UI_ORIGIN))return reply(403,{error:'ACCESS_DENIED'});
     if (env.FIREBASE_PROJECT_ID !== experimentProject ||
@@ -128,7 +132,8 @@ export function createCloudRunHandler(transport = fetch,{connect,verifyPush=crea
     if (!credits && !binary && !/^application\/json(?:;|$)/i.test(contentType)) {
       return reply(415, {error:'INVALID_FILE'});
     }
-    const deadline = AbortSignal.any([AbortSignal.timeout(30000), request.signal]);
+    const deadline = invoice?AbortSignal.timeout(30000):AbortSignal.any([AbortSignal.timeout(30000),request.signal]);
+    const uploadDeadline = invoice?AbortSignal.any([deadline,request.signal]):deadline;
     const start = Date.now();
     const counts = {subrequests:0, requestedFirestoreReads:0, confirmedFirestoreWrites:0,firestoreQueries:0};
     const observe=env.SMART_AI_TELEMETRY==='true'?startObservation(url.pathname,writeTelemetry):()=>{};
@@ -191,7 +196,7 @@ export function createCloudRunHandler(transport = fetch,{connect,verifyPush=crea
         const result=await handleSmartAdmin(request,body,{db,verifyToken,ownerUid:env.SMART_AI_OWNER_UID,security});
         return send(result.status,result.body);
       }
-      const {readCredits,reserveUsage,finishOutcome}=createCommercialStore(db,{requireFinance:!connect});
+      const {readCredits,reserveUsage,finishOutcome}=createCommercialStore(db,{requireFinance});
       if(credits){
         const response=await readCreditBalance(request,{verifyToken,readCredits});
         observe(response.status,counts);
@@ -208,27 +213,28 @@ export function createCloudRunHandler(transport = fetch,{connect,verifyPush=crea
       let body;
       try {
         body = binary
-          ? await boundedBinary(request, contentType, deadline)
-          : await boundedJson(request, deadline);
+          ? await boundedBinary(request, contentType, uploadDeadline)
+          : await boundedJson(request, uploadDeadline);
       }
       catch (error) {
         if (deadline.aborted) return send(504, {error:'TIMEOUT'});
         return error.message === 'FILE_TOO_LARGE'
           ? send(413, {error:'FILE_TOO_LARGE'}) : send(400, {error:'INVALID_FILE'});
       }
-      const provider = geminiProvider(env.RAYTECH_GEMINI_API_KEY, counted,
+      if(uploadDeadline.aborted)return send(504,{error:'TIMEOUT'});
+      const provider = providerFactory(env.RAYTECH_GEMINI_API_KEY, counted,
         metrics => { providerMetrics = metrics; }, binary, {schema:invoiceSchema,instructions:invoiceInstructions});
       let result;
       try {
         result = await extractInvoice({method:'POST',headers,body},{
           verifyToken, readPermissions, reserveUsage, finishOutcome,invoiceContractVersion:2,
-          provider:file => provider({...file,signal:AbortSignal.any([file.signal, deadline])}),
-        }, {timeoutMs:27000, decodeFile:binary ? file => validateInvoiceBytes(file.mimeType,file.bytes) : undefined});
+          provider,
+        }, {timeoutMs:27000,deadline,decodeFile:binary ? file => validateInvoiceBytes(file.mimeType,file.bytes) : undefined});
       } finally {
         if(binary)body.bytes.fill(0);
       }
       if (result.status === 200) {
-        result.body.simulated = false;
+        result.body.simulated = providerFactory!==geminiProvider;
         result.body.metrics = {...counts, ...providerMetrics, wallMs:Date.now() - start};
       }
       return send(result.status, result.body);

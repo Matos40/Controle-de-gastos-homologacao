@@ -39,7 +39,7 @@ export function validateResult(items){
   return Object.fromEntries(keys.map(k=>[k,row[k]]));
  });
 }
-export async function extractInvoice(req,deps,{timeoutMs=TIMEOUT_MS,decodeFile=decodeInvoice}={}){
+export async function extractInvoice(req,deps,{timeoutMs=TIMEOUT_MS,decodeFile=decodeInvoice,deadline}={}){
  // Project-specific guard is enforced by the actual HTTP function before any SDK use.
  let verifiedUid;
  const authorize=()=>authorizePremium({method:req.method,headers:req.headers,query:req.query,body:{feature:FEATURE}},{...deps,verifyToken:async token=>{const claims=await deps.verifyToken(token);if(verifiedUid!==undefined&&claims?.uid!==verifiedUid)throw Error('SESSION_CHANGED');verifiedUid=claims?.uid;return claims;}});
@@ -47,6 +47,7 @@ export async function extractInvoice(req,deps,{timeoutMs=TIMEOUT_MS,decodeFile=d
  if(first.status!==200)return fail(first.status,'ACCESS_DENIED');
  let file;
  try{file=decodeFile(req.body);}catch(e){return fail(e.message==='FILE_TOO_LARGE'?413:400,e.message==='FILE_TOO_LARGE'?'FILE_TOO_LARGE':'INVALID_FILE');}
+ if(deadline?.aborted){file.bytes.fill(0);return fail(504,'TIMEOUT');}
  // The HTTP entrypoint always supplies reserveUsage; legacy pure unit fixtures do not.
  if(deps.reserveUsage){
   let reservation;
@@ -54,32 +55,42 @@ export async function extractInvoice(req,deps,{timeoutMs=TIMEOUT_MS,decodeFile=d
   if(reservation?.status!==200){file.bytes.fill(0);const status=[400,403,409,429,503].includes(reservation?.status)?reservation.status:503;return fail(status,({400:'INVALID_REQUEST_ID',403:'ACCESS_DENIED',409:reservation?.error==='ACTIVE_REQUEST'?'ACTIVE_REQUEST':'DUPLICATE_REQUEST',429:['GLOBAL_BUDGET_EXCEEDED','RATE_LIMIT'].includes(reservation?.error)?reservation.error:'QUOTA_EXCEEDED',503:reservation?.error==='FINANCE_SUSPENDED'?'FINANCE_SUSPENDED':'USAGE_UNAVAILABLE'})[status]);}
  }
  const controller=new AbortController();
- let timer;
+ const signal=deadline?AbortSignal.any([controller.signal,deadline]):controller.signal;
+ let timer,onAbort;
  let resultStatus='failed';
  let failure;
  const failed=(status,error)=>(failure=fail(status,error));
  const finish=async status=>{if(!deps.finishOutcome)return;await deps.finishOutcome({uid:verifiedUid,requestId:req.headers?.['x-request-id'],status});};
  try{
   const result=await Promise.race([
-   Promise.resolve().then(()=>deps.provider({...file,signal:controller.signal})),
-   new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Error('TIMEOUT'));},timeoutMs);})
+   Promise.resolve().then(()=>{signal.throwIfAborted();return deps.provider({...file,signal});}),
+   new Promise((_,reject)=>{
+    onAbort=()=>reject(Error('TIMEOUT'));
+    signal.addEventListener('abort',onAbort,{once:true});
+    timer=setTimeout(()=>controller.abort(),timeoutMs);
+   })
   ]);
+  signal.throwIfAborted();
+  clearTimeout(timer);
   const invoice=Array.isArray(result)?undefined:reconcileInvoice(result);
   const items=invoice?reviewItems(invoice.entries):validateResult(result);
   // Re-check account before delivering results; a downgrade during processing is denied.
   const final=await authorize();
+  deadline?.throwIfAborted();
   if(final.status!==200)return failed(final.status,'ACCESS_DENIED');
   resultStatus='completed';
   try{await finish('completed');}catch{return fail(503,'OUTCOME_UNAVAILABLE');}
   return {status:200,body:{items,...invoice,requiresReview:true,simulated:true}};
  }catch(e){
-  const response=failed(controller.signal.aborted?504:502,controller.signal.aborted?'TIMEOUT':'PROCESSING_FAILED');
+  if(signal.aborted||e?.message==='PROVIDER_OUTCOME_UNKNOWN')
+   return fail(504,'TIMEOUT'); // Keep the original reservation until the recovery window.
+  const response=failed(502,'PROCESSING_FAILED');
   if(e.message==='INVALID_PROVIDER_RESPONSE'&&deps.invoiceContractVersion===2)response.body.reconciliation={status:'INVALID'};
   return response;
  }
  finally{
-  clearTimeout(timer);controller.abort();file.bytes.fill(0);
-  if(failure&&resultStatus==='failed'&&deps.reserveUsage&&deps.finishOutcome){
+  clearTimeout(timer);signal.removeEventListener('abort',onAbort);controller.abort();file.bytes.fill(0);
+  if(failure&&!deadline?.aborted&&resultStatus==='failed'&&deps.reserveUsage&&deps.finishOutcome){
    try{await finish('failed');failure.body.creditRefunded=true;}
    catch{/* durable pending remains available for recovery */}
   }
