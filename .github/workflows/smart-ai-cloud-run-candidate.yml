@@ -1,0 +1,20 @@
+name: Smart AI Cloud Run candidate (isolated)
+on:
+  push:
+    branches: [feature/smart-ai-server-v350-poc]
+    paths:
+      - 'experiments/smart-ai-server/cloud-run/**'
+      - '.github/workflows/smart-ai-cloud-run-candidate.yml'
+permissions:
+  contents: read
+jobs:
+  synthetic-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test experiments/smart-ai-server/cloud-run/commercial.test.mjs
+      - run: docker build -f experiments/smart-ai-server/cloud-run/Dockerfile -t smart-ai-candidate .
