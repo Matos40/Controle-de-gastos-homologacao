@@ -1,8 +1,8 @@
+import {RUNTIME_IDENTITY} from './projects.mjs';
 const metadata='http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/';
-const runtimeIdentity=/^raytech-ai-runtime@raytech-ai-run-exp-[a-z0-9-]{3,10}\.iam\.gserviceaccount\.com$/;
 
 export function createRuntimeAccess(expectedIdentity){
- if(!runtimeIdentity.test(expectedIdentity??''))throw Error('INVALID_RUNTIME_IDENTITY');
+ if(expectedIdentity!==RUNTIME_IDENTITY)throw Error('INVALID_RUNTIME_IDENTITY');
  let checked=false,cached;
  return async(transport,signal)=>{
   const now=Math.floor(Date.now()/1000);

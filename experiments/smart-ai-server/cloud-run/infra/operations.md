@@ -1,6 +1,6 @@
 # Etapa 08.3.7 — Preparação operacional bloqueada
 
-Projeto de computação proposto `raytech-ai-run-exp-v350`, região `us-central1`. O Firebase experimental `gen-lang-client-0593667072` permanece no Spark. Seu Firestore `(default)` segue em `southamerica-east1`. O ID do projeto de computação ainda deve ser confirmado como disponível. A preparação local não cria nem lista recursos automaticamente. Nenhuma configuração deste documento autoriza faturamento ou aplicação.
+Projeto de computação reaproveitado `raytech-3d` (`761761828111`), região `us-central1`. O Firebase experimental `gen-lang-client-0593667072` permanece no Spark, com Firestore `(default)` em `southamerica-east1`. A preparação local não chama o Google Cloud. A aplicação e o faturamento exigem autorização específica para o projeto reaproveitado.
 
 ## Preparação executável, sem rede
 
@@ -13,7 +13,7 @@ node infra/operational-cost.mjs
 node --test infra/operations.test.mjs
 ```
 
-O primeiro comando gera `backend.json`, `gateway.json` e `resources.json`. O backend e o gateway são renderizados com IAM de invocação ativo e as flags de aplicação desabilitadas. O backend tem ingresso interno. Ambos provisionam 1 vCPU, 512 MiB, mínimo 0, máximo 1 e concorrência 1 por serviço. CPU sob demanda e sem boost. O backend mantém prazo de aplicação de 30 s, compatibilidade de 10 MiB, créditos comerciais, limites de 30 tentativas por dia e 60 por mês e pausa de novas reservas. Ambos têm timeout de plataforma de 45 s. O trânsito autenticado pelo gateway tem prazo de 35 s.
+O primeiro comando gera `backend.json`, `gateway.json`, `resources.json`, `iam.json` e `monitoring.json`. Use `projectNumber: "761761828111"` e a imagem por digest no registro `us-central1-docker.pkg.dev/raytech-3d/raytech-smart-ai/candidate`. O backend e o gateway são renderizados com IAM de invocação ativo e flags de aplicação desabilitadas. O backend tem ingresso interno. Cada serviço usa 1 vCPU, 512 MiB, mínimo 0, máximo 1, concorrência 1, CPU sob demanda e boost desabilitado. O backend mantém prazo de aplicação de 30 s, compatibilidade de 10 MiB, créditos comerciais, limites globais de 30 tentativas por dia e 60 por mês e pausa de novas reservas. Ambos têm timeout de plataforma de 45 s. O trânsito autenticado pelo gateway tem prazo de 35 s.
 
 ## Caminho do aplicativo
 
@@ -30,7 +30,7 @@ O gateway começará privado. O eventual acesso do navegador a um ingresso públ
 2. Preparar subnet `raytech-ai-exp-us-central1` com Private Google Access na rede `raytech-ai-exp-vpc`. As operações futuras são `gcloud compute networks create` em modo custom e `gcloud compute networks subnets create` com `--enable-private-ip-google-access`, CIDR e região do plano. Não reutilizar VPC de ambientes oficiais.
 3. Criar as identidades descritas. Aplicar a proposta `permissions.json` apenas ao Firebase experimental para o runtime. Ela inclui `datastore.entities.list`. Conceder leitura da versão Gemini apenas no segredo individual ao runtime. O gateway não recebe acesso a esse segredo. Usar Artifact Registry Docker `raytech-smart-ai` na mesma região, com tags imutáveis e retenção inicial em simulação. Gerar e registrar o digest da imagem antes de preparar os manifestos.
 4. Configurar métrica e canal de e-mail de Cloud Monitoring. Criar o alerta de orçamento restrito ao projeto de computação nas quatro faixas de **25%, 50%, 75% e 100%** de **R$ 10,00**. O plano mantém notificações para responsáveis IAM e um canal de e-mail a confirmar. Usar conta cuja moeda seja BRL. A proposta é apenas de alerta, sem bloqueio ou desativação automática por gasto. Pode haver atraso na apuração. [API de Budgets](https://docs.cloud.google.com/billing/docs/reference/budget/rest/v1/billingAccounts.budgets)
-5. Após autorização, a aplicação preparada usa `gcloud run services replace prepared-local/backend.json --project raytech-ai-run-exp-v350 --region us-central1` e o mesmo comando para `gateway.json`. Conferir no ambiente bloqueado os IDs, digest, flag, versão do Secret e IAM. Somente uma revisão de ensaio posterior autorizada pode habilitar o tráfego e a execução. Registrar os manifestos, revisões, IAM e estados anteriores antes de alterar o tráfego.
+5. Após autorização, a aplicação preparada usa `gcloud run services replace prepared-local/backend.json --project raytech-3d --region us-central1` e o mesmo comando para `gateway.json`. Conferir no ambiente bloqueado os IDs, digest, flags, versão do Secret e IAM. Confirmar a URL efetiva do backend contra a audiência candidata antes do ensaio. Somente uma revisão de ensaio posterior autorizada pode habilitar o tráfego e a execução. Registrar os manifestos, revisões, IAM e estados anteriores antes de alterar o tráfego.
 
 ## Estimativa mensal operativa
 

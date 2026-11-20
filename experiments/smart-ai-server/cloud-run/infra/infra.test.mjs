@@ -21,7 +21,7 @@ test('offline manifest is private, disabled and pins runtime capacity and secret
  assert.deepEqual(container.resources.limits,{cpu:'1',memory:'512Mi'});
  assert.equal(container.image,'__EXPERIMENT_IMAGE_DIGEST__');
  assert.equal(env.SMART_AI_EXPERIMENT_ENABLED,'false');
- assert.equal(env.FIREBASE_PROJECT_ID,'gen-lang-client-0593667072');
+ assert.equal(env.FIREBASE_PROJECT_ID,'__EXPERIMENT_FIREBASE_PROJECT__');
  assert.deepEqual(env.RAYTECH_GEMINI_API_KEY,{secretKeyRef:{name:'raytech-ai-gemini',key:'__SECRET_VERSION_NUMBER__'}});
  assert.equal(iam.applyAuthorized,false);
  assert.equal(iam.invoker.public,false);
@@ -35,7 +35,7 @@ test('offline manifest is private, disabled and pins runtime capacity and secret
 });
 
 test('runtime uses only the pinned metadata service identity and caches short-lived credentials',async()=>{
- const identity='raytech-ai-runtime@raytech-ai-run-exp-test.iam.gserviceaccount.com';
+ const identity='raytech-ai-runtime@raytech-3d.iam.gserviceaccount.com';
  const access=createRuntimeAccess(identity),requests=[];
  const transport=async(url,options)=>{
   requests.push(url);

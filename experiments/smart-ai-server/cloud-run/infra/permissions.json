@@ -1,7 +1,8 @@
 {
   "applyAuthorized": false,
   "computeProject": "__COMPUTE_PROJECT_ID__",
-  "firebaseProject": "gen-lang-client-0593667072",
+  "computeProjectNumber": "__COMPUTE_PROJECT_NUMBER__",
+  "firebaseProject": "__EXPERIMENT_FIREBASE_PROJECT__",
   "region": "us-central1",
   "runtime": {
     "accountId": "raytech-ai-runtime",
@@ -19,5 +20,5 @@
     },
     "secretBinding": {"name": "raytech-ai-gemini", "role": "roles/secretmanager.secretAccessor"}
   },
-  "invoker": {"role": "roles/run.invoker", "principal": "__APPROVED_EXPERIMENT_GATEWAY_IDENTITY__", "public": false}
+  "invoker": {"role": "roles/run.invoker", "principal": "raytech-ai-gateway@__COMPUTE_PROJECT_ID__.iam.gserviceaccount.com", "public": false}
 }

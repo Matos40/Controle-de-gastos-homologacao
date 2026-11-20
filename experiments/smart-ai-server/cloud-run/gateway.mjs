@@ -5,15 +5,15 @@ import {createFirebaseSignatureVerifier} from '../remote/auth.mjs';
 import {corsFor} from './cors.mjs';
 import {MAX_BYTES} from './invoice.mjs';
 import {invalidLimiter} from './security-guard.mjs';
+import {BACKEND_AUDIENCE,COMPUTE_PROJECT_NUMBER,FIREBASE_PROJECT} from './projects.mjs';
 
 const methods={'/v1/credits':'GET','/v1/invoices':'POST','/v1/admin/ai':'POST'};
-const experiment='gen-lang-client-0593667072';
 const metadata='http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity';
 const maxInvoiceBody=4*Math.ceil(MAX_BYTES/3)+1024;
 
 export function backendAudience(number){
- if(!/^\d{6,18}$/.test(number??''))throw Error('INVALID_COMPUTE_PROJECT');
- return `https://raytech-smart-ai-exp-${number}.us-central1.run.app`;
+ if(number!==COMPUTE_PROJECT_NUMBER)throw Error('INVALID_COMPUTE_PROJECT');
+ return BACKEND_AUDIENCE;
 }
 
 export async function requestIdentity(audience,transport,signal){
@@ -27,7 +27,7 @@ export async function requestIdentity(audience,transport,signal){
 }
 
 export function makeGateway({env=process.env,transport=fetch,
- verifySignature=createFirebaseSignatureVerifier(experiment),identity=requestIdentity,
+ verifySignature=createFirebaseSignatureVerifier(FIREBASE_PROJECT),identity=requestIdentity,
  security=event=>console.log(JSON.stringify(event))}={}){
  const configured=env.SMART_AI_GATEWAY_ENABLED==='true';
  const invalid=invalidLimiter();

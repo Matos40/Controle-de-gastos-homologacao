@@ -2,6 +2,8 @@
 
 Complemento experimental da Etapa 08.3.7. O backend permanece com ingresso interno, IAM ativo e ambos os recursos de execução desabilitados nos manifestos. O gateway não encaminha a rota de orçamento. O Firebase experimental continua no Spark e a parte financeira publicada fica fora do fluxo.
 
+O orçamento, tópico e inscrição candidatos são restritos a `raytech-3d` (`761761828111`). O Firebase legado permanece fora do fluxo de identidade, créditos e auditoria do Smart AI. A criação do orçamento e o vínculo de faturamento exigem autorização específica.
+
 ## Autoridade e ativação candidata
 
 - O servidor confere assinatura, projeto, conta ativa e revogação Firebase. O UID Owner é fixado na configuração protegida `SMART_AI_OWNER_UID` e precisa coincidir com a função Owner ativa lida em transação. Administradores precisam da claim assinada `smartAiAdmin` e da função Admin ativa. A configuração ou a claim só podem vir do operador experimental autorizado. O endpoint não oferece escrita de perfil, função, plano ou saldo. Os créditos dependem do documento de conta confiável, do UID validado e de reservas transacionais.

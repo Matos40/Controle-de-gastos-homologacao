@@ -64,12 +64,12 @@ const handler=createCloudRunHandler(transport,{
 });
 const ui='https://raytech-smart-ai.example.invalid';
 const env={SMART_AI_EXPERIMENT_ENABLED:'true',SMART_AI_TELEMETRY:'true',SMART_AI_UI_ORIGIN:ui,SMART_AI_OWNER_UID:owner,
- SMART_AI_FINANCE_PUSH_ENABLED:'true',SMART_AI_PUSH_AUDIENCE:backendAudience('123456789012'),SMART_AI_PUSH_SUBJECT:'111222333',
+ SMART_AI_FINANCE_PUSH_ENABLED:'true',SMART_AI_PUSH_AUDIENCE:backendAudience('761761828111'),SMART_AI_PUSH_SUBJECT:'111222333',
  SMART_AI_BILLING_ACCOUNT_ID:'synthetic-account',SMART_AI_BUDGET_ID:'synthetic-budget',
  FIREBASE_PROJECT_ID:'gen-lang-client-0593667072',RAYTECH_GEMINI_API_KEY:providerKey};
 const server=makeServer({handler,env});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-const number='123456789012',audience=backendAudience(number);
+const number='761761828111',audience=backendAudience(number);
 const gateway=makeGateway({env:{SMART_AI_GATEWAY_ENABLED:'true',SMART_AI_UI_ORIGIN:ui,SMART_AI_COMPUTE_PROJECT_NUMBER:number},
  verifySignature:async token=>{
   if(!['fixture-reader','fixture-owner','fixture-revoked'].includes(token))throw Error('INVALID_FIXTURE');
@@ -108,7 +108,7 @@ try{
  assert.equal((await admin({action:'credits',uid})).data.remaining,1);
  assert.equal((await api('/v1/admin/ai','fixture-reader',{action:'overview'})).status,403);
  const current=new Date(),pacific=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit'}).format(current);
- const event={subscription:'projects/raytech-ai-run-exp-v350/subscriptions/raytech-budget-push',message:{
+ const event={subscription:'projects/raytech-3d/subscriptions/raytech-budget-push',message:{
   messageId:'507',publishTime:current.toISOString(),attributes:{schemaVersion:'1.0',billingAccountId:'synthetic-account',budgetId:'synthetic-budget'},
  }};
  for(const offset of ['07','08']){

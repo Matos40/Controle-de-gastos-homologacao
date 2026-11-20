@@ -1,5 +1,6 @@
 {
   "applyAuthorized": false,
+  "computeProject": "__COMPUTE_PROJECT_ID__",
   "resource": "cloud_run_revision",
   "service": "raytech-smart-ai-exp",
   "cloudRunMetrics": [

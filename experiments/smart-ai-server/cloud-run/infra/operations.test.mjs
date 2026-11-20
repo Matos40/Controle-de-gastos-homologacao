@@ -4,13 +4,14 @@ import {test} from 'node:test';
 import {inflateSync} from 'node:zlib';
 import {backendAudience,makeGateway,requestIdentity} from '../gateway.mjs';
 import {makeServer} from '../server.mjs';
+import {createCloudRunHandler} from '../handler.mjs';
 import {decodeInvoice} from '../invoice.mjs';
 import {prepare} from './prepare.mjs';
 import {invoices} from './fixtures.mjs';
 import {operationalCost} from './operational-cost.mjs';
 import {scenarios} from './cost.mjs';
 
-const origin='https://smart-ai.example.invalid',number='123456789012';
+const origin='https://smart-ai.example.invalid',number='761761828111';
 const audience=backendAudience(number);
 const listen=server=>new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const close=server=>new Promise(resolve=>server.close(resolve));
@@ -19,11 +20,17 @@ const pngMagic=Buffer.from([137,80,78,71,13,10,26,10]);
 
 test('offline rendering pins compute project, immutable image, VPC and disabled manifests',async()=>{
  const input={projectNumber:number,origin,secretVersion:'7',
-  image:'us-central1-docker.pkg.dev/raytech-ai-run-exp-v350/raytech-smart-ai/candidate@sha256:'+'f'.repeat(64)};
- const {backend,gateway,resources}=await prepare(input);
+  image:'us-central1-docker.pkg.dev/raytech-3d/raytech-smart-ai/candidate@sha256:'+'f'.repeat(64)};
+ const {backend,gateway,resources,iam,monitoring}=await prepare(input);
  assert.equal(backend.metadata.namespace,number);
  assert.equal(backend.metadata.annotations['run.googleapis.com/ingress'],'internal');
  assert.equal(resources.applyAuthorized,false);
+ assert.equal(resources.projectId,'raytech-3d');
+ assert.equal(resources.projectNumber,number);
+ assert.equal(iam.applyAuthorized,false);
+ assert.equal(monitoring.applyAuthorized,false);
+ assert.equal(monitoring.computeProject,'raytech-3d');
+ assert.equal(iam.firebaseProject,'gen-lang-client-0593667072');
  assert.equal(resources.firebaseProject,'gen-lang-client-0593667072');
  assert.equal(resources.network.privateGoogleAccess,true);
  assert.equal(resources.secretManager.gatewayAccess,false);
@@ -40,6 +47,39 @@ test('offline rendering pins compute project, immutable image, VPC and disabled 
  await assert.rejects(prepare({...input,image:'image:latest'}));
  await assert.rejects(prepare({...input,origin:'http://example.invalid'}));
  await assert.rejects(prepare({...input,secretVersion:'latest'}));
+});
+
+test('renderer rejects a different compute target, registry or official app origin',async()=>{
+ const image='us-central1-docker.pkg.dev/raytech-3d/raytech-smart-ai/candidate@sha256:'+'a'.repeat(64);
+ const fixed={projectNumber:number,origin,secretVersion:'1',image};
+ for(const invalid of [{projectNumber:'123456789012'},{projectId:'raytech-cg-producao'},
+  {projectId:'gen-lang-client-0593667072'},{image:image.replace('raytech-3d','raytech-cg-homologacao')},
+  {origin:'https://matos40.github.io'},{origin:'https://raytech-cg-homologacao.web.app'},
+  {origin:'https://raytech-3d.web.app'}])await assert.rejects(prepare({...fixed,...invalid}),/INVALID_ISOLATED_INPUTS/);
+});
+
+test('disabled manifests pin IAM identities, private audience and a dormant finance guard',async()=>{
+ const {backend,gateway,resources,iam}=await prepare({projectNumber:number,origin,secretVersion:'1',
+  image:'us-central1-docker.pkg.dev/raytech-3d/raytech-smart-ai/candidate@sha256:'+'a'.repeat(64)});
+ assert.equal(audience,'https://raytech-smart-ai-exp-761761828111.us-central1.run.app');
+ assert.equal(backend.spec.template.spec.serviceAccountName,'raytech-ai-runtime@raytech-3d.iam.gserviceaccount.com');
+ assert.equal(gateway.spec.template.spec.serviceAccountName,'raytech-ai-gateway@raytech-3d.iam.gserviceaccount.com');
+ assert.equal(iam.invoker.public,false);
+ assert.equal(resources.budgetPush.enabled,false);
+ assert.equal(resources.budgetPush.audience,audience);
+ assert.equal(resources.budgetPush.subscription,'projects/raytech-3d/subscriptions/raytech-budget-push');
+ assert.throws(()=>backendAudience('123456789012'));
+ for(const service of [backend,gateway])assert.equal(service.metadata.annotations['run.googleapis.com/invoker-iam-disabled'],'false');
+});
+
+test('backend rejects authentication projects outside the isolated Firebase before accessing credentials',async()=>{
+ const noNetwork=()=>assert.fail('external access attempted');
+ const handler=createCloudRunHandler(noNetwork,{connect:noNetwork});
+ for(const id of ['raytech-3d','raytech-cg-producao','raytech-cg-homologacao']){
+  const response=await handler.fetch(new Request('https://synthetic.invalid/v1/credits'),{FIREBASE_PROJECT_ID:id});
+  assert.equal(response.status,503);
+  assert.equal((await response.json()).error,'EXPERIMENT_UNAVAILABLE');
+ }
 });
 
 test('gateway metadata credential is minted for the exact internal service audience',async()=>{

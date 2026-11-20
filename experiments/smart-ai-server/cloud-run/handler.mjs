@@ -12,9 +12,9 @@ import {trustedOrigin} from './cors.mjs';
 import {startObservation} from './telemetry.mjs';
 import {createPushVerifier,invalidLimiter} from './security-guard.mjs';
 import {parseBudgetPush,recordBudgetPush} from './finance-guard.mjs';
+import {BACKEND_AUDIENCE,COMPUTE_PROJECT,FIREBASE_PROJECT as experimentProject,PUSH_IDENTITY} from './projects.mjs';
 
 const requestCap = 4 * Math.ceil(MAX_BYTES / 3) + 1024;
-const experimentProject = 'gen-lang-client-0593667072';
 const binaryTypes = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/webp']);
 const reply = (status, body) => Response.json(body, {status, headers:{
   'cache-control':'no-store', 'x-content-type-options':'nosniff',
@@ -145,22 +145,21 @@ export function createCloudRunHandler(transport = fetch,{connect,verifyPush=crea
       let budgetEvent;
       if(finance){
         if(env.SMART_AI_FINANCE_PUSH_ENABLED!=='true')return send(503,{error:'EXPERIMENT_UNAVAILABLE'});
-        const project='raytech-ai-run-exp-v350';
         const audience=env.SMART_AI_PUSH_AUDIENCE;
-        if(!/^https:\/\/raytech-smart-ai-exp-\d{6,18}\.us-central1\.run\.app$/.test(audience??'')||
+        if(audience!==BACKEND_AUDIENCE||
            !/^\d{6,24}$/.test(env.SMART_AI_PUSH_SUBJECT??''))return send(503,{error:'EXPERIMENT_UNAVAILABLE'});
         const bearer=request.headers.get('authorization');
         try{
           if(!bearer?.startsWith('Bearer '))throw Error('INVALID_PUSH_IDENTITY');
           await verifyPush(bearer.slice(7),{audience,subject:env.SMART_AI_PUSH_SUBJECT,
-           email:'raytech-budget-push@'+project+'.iam.gserviceaccount.com'},counted,deadline);
+           email:PUSH_IDENTITY},counted,deadline);
         }catch(err){
           security({event:'smart_ai_security',code:'BUDGET_PUSH_DENIED'});
           return send(err.message==='PUSH_AUTH_UNAVAILABLE'?503:401,{error:'ACCESS_DENIED'});
         }
         try{
           budgetEvent=parseBudgetPush(await boundedJson(request,deadline,16384),{
-           subscription:'projects/'+project+'/subscriptions/raytech-budget-push',
+           subscription:'projects/'+COMPUTE_PROJECT+'/subscriptions/raytech-budget-push',
            budgetId:env.SMART_AI_BUDGET_ID,billingAccount:env.SMART_AI_BILLING_ACCOUNT_ID,
           },Date.now());
         }catch{
