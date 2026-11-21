@@ -151,3 +151,24 @@ test('trial transaction adapter rejects forged document refs before storage IO',
  assert.throws(()=>createIsolatedTrialRestStore({database,accessToken:async()=> 'x',
   emulatorBase:'http://127.0.0.1:18080/v1/projects/gen-lang-client-0593667072/databases/(default)/documents'}),/DB_MISMATCH/);
 });
+
+test('job waits for the independently pinned approval when the control document is not yet created',async()=>{
+ const deadline=Date.now()+60000;
+ const approved={executionId:'exec-late',jobName:'test-job',jobEmail:'trial-job-once@raytech-3d.iam.gserviceaccount.com',
+  executionUid:'00000000-0000-4000-8000-000000000864',runId:'late-test-run',
+  requestId:'00000000-0000-4000-8000-000000000864',absoluteDeadline:deadline,
+  endpoint:'https://private-control.run.app/internal/smart-ai/trial-control'};
+ let reads=0;
+ const state={phase:'initializing',runId:approved.runId,requestId:approved.requestId,
+  absoluteDeadline:deadline,revision:1,admitted:false,
+  executionApproval:{...approved,verifiedAt:Date.now()}};
+ const bound=await createBoundTrialJob({
+  env:{CLOUD_RUN_EXECUTION:approved.executionId,CLOUD_RUN_JOB:approved.jobName},
+  approved,
+  metadataAccess:()=>async()=> 'test-token',
+  identity:async()=> 'test-service-token',
+  transport:async()=>Response.json({state:++reads===1?null:state}),
+ });
+ assert.equal(reads,2);
+ assert.equal((await bound.gate.read()).phase,'initializing');
+});
