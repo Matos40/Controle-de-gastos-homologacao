@@ -1,7 +1,7 @@
 import {createServer} from 'node:http';
 import {Readable} from 'node:stream';
 import {pathToFileURL} from 'node:url';
-import {createRestStore} from '../../firestore.mjs';
+import {isolatedControlDatabase,createIsolatedTrialRestStore,APPROVED_REMOTE_CONTROL_PROJECTS} from './trial-db-isolation.mjs';
 import {createMetadataAccess} from '../runtime.mjs';
 import {COMPUTE_PROJECT,FIREBASE_PROJECT} from '../projects.mjs';
 import {createAuthenticatedTrialChannel,createFirestoreTrialControlStore,TRIAL_PATH} from './trial-control-channel.mjs';
@@ -16,7 +16,7 @@ const envKey=(env,key)=>{const value=env[key];if(typeof value!=='string'||!value
 // The controller must pin an execution ID obtained independently from Cloud Run,
 // and the job must use a dedicated, single-execution service account.
 // An execution ID supplied only by the job is NOT sufficient proof.
-export function trialControlConfig(env){
+export function trialControlConfig(env,{allowedProjects=APPROVED_REMOTE_CONTROL_PROJECTS}={}){
  if(env.SMART_AI_TRIAL_CONTROL_ENABLED!=='true')throw Error('TRIAL_CONTROL_DISABLED');
  if(env.FIRESTORE_EMULATOR_HOST||env.FIREBASE_AUTH_EMULATOR_HOST||env.GOOGLE_APPLICATION_CREDENTIALS||
     env.FIREBASE_PROJECT_ID!==FIREBASE_PROJECT||env.GOOGLE_CLOUD_PROJECT!==COMPUTE_PROJECT)
@@ -29,19 +29,20 @@ export function trialControlConfig(env){
  const jobSub=envKey(env,'SMART_AI_TRIAL_JOB_SUB');
  const executionId=envKey(env,'SMART_AI_TRIAL_EXECUTION_ID');
  const absoluteDeadline=Number(envKey(env,'SMART_AI_TRIAL_ABSOLUTE_DEADLINE'));
- const project=envKey(env,'SMART_AI_TRIAL_FIRESTORE_PROJECT');
+ const projectId=envKey(env,'SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID');
+ const databaseId=envKey(env,'SMART_AI_TRIAL_CONTROL_FIRESTORE_DATABASE_ID');
+ const database=isolatedControlDatabase({projectId,databaseId,allowedProjects});
  const run=envKey(env,'SMART_AI_TRIAL_RUN_ID'),requestId=envKey(env,'SMART_AI_TRIAL_REQUEST_ID');
  if(!principal(controllerEmail)||!principal(jobEmail)||!principal(self)||
     controllerEmail===jobEmail||controllerEmail===self||jobEmail===self||
     !subject(controllerSub)||!subject(jobSub)||controllerSub===jobSub||
-    !runId(run)||!runId(executionId)||!/^projects\/[^/]+\/databases\/\(default\)$/.test(project)||
-    project!=='projects/'+FIREBASE_PROJECT+'/databases/(default)'||
+    !runId(run)||!runId(executionId)||
     !/^https:\/\/[a-zA-Z0-9.-]+$/.test(audience)||
     !Number.isSafeInteger(absoluteDeadline)||absoluteDeadline<=Date.now())
   throw Error('TRIAL_CONTROL_CONFIGURATION');
  return {audience,controller:{email:controllerEmail,subject:controllerSub,audience},
   job:{email:jobEmail,subject:jobSub,audience},self,executionId,absoluteDeadline,
-  project,runId:run,requestId};
+  database,runId:run,requestId};
 }
 
 export function makeTrialControlServer({handler,enabled=false}={}){
@@ -75,8 +76,8 @@ if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url){
  }else{
   const config=trialControlConfig(env);
   const access=createMetadataAccess(config.self);
-  const base='https://firestore.googleapis.com/v1/'+config.project+'/documents';
-  const db=createRestStore(config.project,base,()=>access(fetch,AbortSignal.timeout(9000)),undefined,fetch,{abortedRetries:3});
+  const db=createIsolatedTrialRestStore({database:config.database,
+   accessToken:()=>access(fetch,AbortSignal.timeout(9000))});
   const handler=createTrialControlHandler({config,db});
   makeTrialControlServer({handler,enabled:true}).listen(Number(env.PORT??8080),'0.0.0.0');
  }
