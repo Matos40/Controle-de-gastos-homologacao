@@ -1,23 +1,28 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {assertLocalEmulators} from '../../legacy/emulator-guard.mjs';
-import {createRestStore} from '../../firestore.mjs';
+import {isolatedControlDatabase,createIsolatedTrialRestStore} from './trial-db-isolation.mjs';
 import {createTrialGate,recoverClosedTrial} from './trial-readiness.mjs';
 import {createFirestoreTrialControlStore,createAuthenticatedTrialChannel,
  createRemoteTrialControlStore,TRIAL_COLLECTION,TRIAL_PATH} from './trial-control-channel.mjs';
 
 assertLocalEmulators();
-const project='projects/demo-raytech-v340/databases/(default)';
-const target='http://127.0.0.1:18080/v1/'+project+'/documents';
+const database=isolatedControlDatabase({projectId:'demo-raytech-control',
+ allowedProjects:['demo-raytech-control']});
+const target='http://127.0.0.1:18080/v1/'+database.resource+'/documents';
 const runId='trial'+randomUUID().replaceAll('-','');
 const requestId=randomUUID();
 const executionId='synthetic-execution-'+randomUUID().replaceAll('-','');
 let now=Date.now();
 const absoluteDeadline=now+180000;
-const db=()=>createRestStore(project,target,async()=>'owner',AbortSignal.timeout(25000),fetch,{abortedRetries:4});
+const db=()=>createIsolatedTrialRestStore({database,accessToken:async()=>'owner',
+ signal:AbortSignal.timeout(25000),transport:fetch,retries:4,emulatorBase:target});
 const controller={email:'controller@demo-project.iam.gserviceaccount.com',subject:'111',audience:'https://trial.internal.invalid'};
 const job={email:'job@demo-project.iam.gserviceaccount.com',subject:'222',audience:'https://trial.internal.invalid'};
 const store=createFirestoreTrialControlStore(db(),{runId});
+for(const forbidden of ['raytechV345Accounts','raytechLabCommercialV350',
+ 'raytechLabCommercialGlobalV350','raytechLabCommercialAuditV350'])
+ assert.throws(()=>db().collection(forbidden),/TRIAL_CONTROL_COLLECTION_DENIED/);
 const auth=async (token,expected)=>{
  const candidate=token==='proof-controller'?controller:token==='proof-job'?job:null;
  if(!candidate||candidate.email!==expected.email||candidate.subject!==expected.subject||
@@ -65,4 +70,4 @@ assert.equal(recovery.phase,'reversed');
 await recoverClosedTrial({gate:gate('controller','proof-controller'),ops,signal:AbortSignal.timeout(10000)});
 assert.deepEqual([drained,reconciled,restored],[1,1,1],'recovery is idempotent');
 assert.equal(await j.claim(executionId),null);
-console.log('08.6.4.2 Firestore Emulator: CAS concorrente, isolado, reinicio, cancelamento e reversao aprovados. Nenhum dado financeiro modificado.');
+console.log('08.6.4.4 Firestore Emulator: projeto de controle separado, ledger negado, CAS concorrente, reinicio, cancelamento e reversao aprovados.');
