@@ -31,7 +31,7 @@ test('same controller authorizes once, observes simulated result and reverses',a
  assert.ok(await h.controller.initializing(h.proof));
  let extracts=0;
  const coordinator=runPinnedTrialController({gate:h.controller,proof:h.proof,
-  pollMs:2,verifySyntheticPreflight:async()=>true});
+  pollMs:2,cleanupReserveMs:1000,verifySyntheticPreflight:async()=>true});
  const worker=runControlledClient({gate:h.worker,executionId:h.proof.executionId,
   identify:async()=> 'synthetic-user',checkPrivate:async()=>true,
   extract:async()=>{extracts++;return {state:'synthetic'};},
@@ -48,7 +48,7 @@ test('controller cancellation before identity closes permit and reverses',async(
  const h=harness();await h.controller.initializing(h.proof);
  const stop=new AbortController();
  const coordinator=runPinnedTrialController({gate:h.controller,proof:h.proof,
-  pollMs:2,signal:stop.signal,verifySyntheticPreflight:async()=>true});
+  pollMs:2,cleanupReserveMs:1000,signal:stop.signal,verifySyntheticPreflight:async()=>true});
  setTimeout(()=>stop.abort(Error('OPERATOR_CANCELLED')),20);
  await assert.rejects(coordinator,/OPERATOR_CANCELLED/);
  assert.equal(h.state().phase,'reversed');
@@ -56,7 +56,7 @@ test('controller cancellation before identity closes permit and reverses',async(
 });
 test('preflight refusal blocks simulated dispatch and leaves closed state',async()=>{
  const h=harness();await h.controller.initializing(h.proof);
- const coordinator=runPinnedTrialController({gate:h.controller,proof:h.proof,pollMs:2,
+ const coordinator=runPinnedTrialController({gate:h.controller,proof:h.proof,pollMs:2,cleanupReserveMs:1000,
   verifySyntheticPreflight:async()=>false});
  const worker=runControlledClient({gate:h.worker,executionId:h.proof.executionId,
   identify:async()=> 'synthetic-user',checkPrivate:async()=>true,
@@ -69,7 +69,7 @@ test('preflight refusal blocks simulated dispatch and leaves closed state',async
 });
 test('stalled claimed dispatch cannot be marked reversed without reconciliation',async()=>{
  const h=harness();await h.controller.initializing(h.proof);
- const coordinator=runPinnedTrialController({gate:h.controller,proof:h.proof,pollMs:2,
+ const coordinator=runPinnedTrialController({gate:h.controller,proof:h.proof,pollMs:2,cleanupReserveMs:1000,
   dispatchWindowMs:30,verifySyntheticPreflight:async()=>true});
  const worker=runControlledClient({gate:h.worker,executionId:h.proof.executionId,
   identify:async()=> 'synthetic-user',checkPrivate:async()=>true,
