@@ -54,10 +54,25 @@ test('controller verifies Cloud Run Admin v2, binds immutable UID and persists o
  await assert.rejects(run(),/TRIAL_APPROVAL_ALREADY_USED/);
  assert.equal(h.calls.pin,2);
 });
+test('Cloud Run v2 accepts the exact short parent Job observed by the operator',async()=>{
+ const h=harness({remote:{...result(),job:'raytech-test-job'}});
+ const proof=await verifyAndPinCloudRunExecution({approved:h.record,gate:h.gate,
+  accessToken:h.accessToken,transport:h.transport,clock:()=>now});
+ assert.equal(proof.executionId,'synthetic-exec-001');
+ assert.equal(proof.jobName,'raytech-test-job');
+ assert.equal(h.pinned.executionUid,h.record.executionUid);
+ assert.deepEqual([h.calls.get,h.calls.pin,h.calls.tokens],[1,1,1]);
+});
 test('Cloud Run rejects spoofed execution name, job, UID, service account or task shape',async()=>{
  const mutations=[
   {name:'projects/elsewhere/locations/us-central1/jobs/raytech-test-job/executions/synthetic-exec-001'},
   {job:'projects/raytech-3d/locations/us-central1/jobs/another-job'},
+  {job:'projects/other-project/locations/us-central1/jobs/raytech-test-job'},
+  {job:'projects/raytech-3d/locations/us-east1/jobs/raytech-test-job'},
+  {job:'raytech-test-job-other'},
+  {job:'jobs/raytech-test-job'},
+  {job:'other-raytech-test-job'},
+  {job:''},
   {uid:'00000000-0000-4000-8000-000000000888'},
   {template:{serviceAccount:'wrong@raytech-3d.iam.gserviceaccount.com'}},
   {template:{}},{taskCount:2},{parallelism:2},{taskCount:0},

@@ -56,7 +56,11 @@ export async function verifyAndPinCloudRunExecution({approved,gate,accessToken,
  if(!response.ok)throw Error('TRIAL_EXECUTION_UNVERIFIED');
  const execution=await response.json();
  const created=Date.parse(execution?.createTime);
- if(execution?.name!==name||execution.job!==job||
+ // Cloud Run v2 can return the parent Job as either its short name or
+ // canonical path. Only these two exact representations are accepted.
+ // The execution resource name remains strictly checked in full.
+ const parentJobMatches=execution?.job===job||execution?.job===approved.jobName;
+ if(execution?.name!==name||!parentJobMatches||
     execution.uid!==approved.executionUid||
     execution.template?.serviceAccount!==approved.jobEmail||
     execution.taskCount!==1||execution.parallelism!==1||
