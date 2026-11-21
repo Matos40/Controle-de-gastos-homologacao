@@ -21,3 +21,9 @@ Anteriormente `verifyApproval` era somente um callback injetável em testes e o 
 **Importante:** a aprovação de código, o vínculo administrativo e a execução remota são três coisas distintas. Fase A: 8 negações HTTP 403 registradas pelo Codex, código de saída zero; IAM temporário removido. Nenhuma nova concessão Cloud Run foi aplicada.
 
 Proibido: Gemini, faturamento novo, créditos comerciais, merges, publicação, produção, homologação, bancos financeiros ou alteração do tópico `raytech-budget-push`.
+
+
+## 08.6.4.8: ciclo completo do controlador (somente código local)
+A partir de `fcf30af5a1d36b7df90756108c405749f0fce95e`, o mesmo processo `trial-execution-approval.mjs` deixa de encerrar após o vínculo: executa `runPinnedTrialController` na identidade do job controlador. Exige `SMART_AI_TRIAL_SYNTHETIC_ONLY=true` para executar a coordenação; verifica `identity-ready`, `private-ready`, preflight sintético, autorização transitória, resultado sintético, bloqueio e reversão do **gate**. Um despacho já admitido e sem resultado reconciliado permanece em `reconciling`, sem registrar reversão falsa.
+
+**Atenção:** `gate.phase=reversed` significa apenas bloqueio lógico do despacho. Não comprova que a revisão Cloud Run foi configurada como `SMART_AI_TRIAL_CONTROL_ENABLED=false`. O Codex deve restaurar e verificar a configuração remota separadamente, com IAM autorizado. Não assumir que o preflight sintético confirma Finance Guard externo; Codex verifica o receptor real antes de qualquer execução. Nenhuma chamada Gemini, fatura real ou crédito comercial foi implementada aqui.

@@ -4,6 +4,7 @@ import {requestIdentity} from '../gateway.mjs';
 import {COMPUTE_PROJECT,REGION} from '../projects.mjs';
 import {createRemoteTrialControlStore,TRIAL_PATH} from './trial-control-channel.mjs';
 import {createTrialGate} from './trial-readiness.mjs';
+import {runPinnedTrialController} from './trial-controller-lifecycle.mjs';
 import {pathToFileURL} from 'node:url';
 
 // Controller-only, independently pinned approval. The job must never supply
@@ -70,7 +71,7 @@ export async function verifyAndPinCloudRunExecution({approved,gate,accessToken,
 
 // Runnable controller adapter. The approval JSON must be pinned by the trusted
 // operator AFTER observing the Admin API UID, never populated from job env.
-export async function bindControllerFromEnv({env=process.env,transport=fetch,
+export async function createControllerSessionFromEnv({env=process.env,transport=fetch,
  clock=Date.now}={}){
  if(env.SMART_AI_TRIAL_CONTROLLER_ENABLED!=='true')
   throw Error('TRIAL_CONTROLLER_DISABLED');
@@ -89,13 +90,24 @@ export async function bindControllerFromEnv({env=process.env,transport=fetch,
   role:'controller',transport,identity:(audience,signal)=>requestIdentity(audience,transport,signal)});
  const gate=createTrialGate({store,runId:approved.runId,requestId:approved.requestId,
   absoluteDeadline:approved.absoluteDeadline,clock});
- return verifyAndPinCloudRunExecution({approved,gate,accessToken,transport,clock});
+ const proof=await verifyAndPinCloudRunExecution({approved,gate,accessToken,transport,clock});
+ return {proof,gate};
 }
-
+export async function bindControllerFromEnv(options){
+ return (await createControllerSessionFromEnv(options)).proof;
+}
+export async function runControllerFromEnv({env=process.env,transport=fetch,
+ clock=Date.now,signal}={}){
+ // This is ONLY a synthetic trial, never a financial operation.
+ if(env.SMART_AI_TRIAL_SYNTHETIC_ONLY!=='true')throw Error('TRIAL_SYNTHETIC_ONLY_REQUIRED');
+ const session=await createControllerSessionFromEnv({env,transport,clock});
+ return runPinnedTrialController({gate:session.gate,proof:session.proof,clock,signal,
+  verifySyntheticPreflight:async()=>env.SMART_AI_TRIAL_SYNTHETIC_ONLY==='true'});
+}
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url){
- bindControllerFromEnv().then(proof=>{
-  console.log(JSON.stringify({result:'TRIAL_EXECUTION_BOUND',executionId:proof.executionId,
-   executionUid:proof.executionUid,jobName:proof.jobName}));
+ runControllerFromEnv().then(outcome=>{
+  console.log(JSON.stringify({result:'TRIAL_CONTROLLER_REVERSED',executionId:outcome.executionId,
+   phase:outcome.phase,synthetic:outcome.synthetic}));
  }).catch(error=>{
   process.stderr.write('TRIAL_CONTROLLER_STOPPED: '+error.message+'\n');
   process.exitCode=1;
