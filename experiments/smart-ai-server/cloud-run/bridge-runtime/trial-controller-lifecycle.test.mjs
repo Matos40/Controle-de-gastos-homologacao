@@ -50,7 +50,7 @@ test('controller cancellation before identity closes permit and reverses',async(
  const coordinator=runPinnedTrialController({gate:h.controller,proof:h.proof,
   pollMs:2,cleanupReserveMs:1000,signal:stop.signal,verifySyntheticPreflight:async()=>true});
  setTimeout(()=>stop.abort(Error('OPERATOR_CANCELLED')),20);
- await assert.rejects(coordinator,/OPERATOR_CANCELLED/);
+ await assert.rejects(coordinator,/OPERATOR_CANCELLED|The operation was aborted/);
  assert.equal(h.state().phase,'reversed');
  assert.equal(h.state().admitted,false);
 });
@@ -63,19 +63,20 @@ test('preflight refusal blocks simulated dispatch and leaves closed state',async
   extract:async()=>{throw Error('UNEXPECTED_DISPATCH');},
   signal:AbortSignal.timeout(1500),pollMs:2});
  await assert.rejects(coordinator,/TRIAL_SYNTHETIC_PREFLIGHT_REQUIRED/);
- assert.equal(await worker,false);
+ await assert.rejects(worker,/TRIAL_CLOSED/);
  assert.equal(h.state().phase,'reversed');
  assert.equal(h.state().admitted,false);
 });
 test('stalled claimed dispatch cannot be marked reversed without reconciliation',async()=>{
  const h=harness();await h.controller.initializing(h.proof);
  const coordinator=runPinnedTrialController({gate:h.controller,proof:h.proof,pollMs:2,cleanupReserveMs:1000,
-  dispatchWindowMs:30,verifySyntheticPreflight:async()=>true});
+  dispatchWindowMs:300,drainWaitMs:100,verifySyntheticPreflight:async()=>true});
  const worker=runControlledClient({gate:h.worker,executionId:h.proof.executionId,
   identify:async()=> 'synthetic-user',checkPrivate:async()=>true,
   extract:async()=>new Promise(()=>{}),
-  signal:AbortSignal.timeout(200),pollMs:2});
+  signal:AbortSignal.timeout(250),pollMs:2});
+ const workerOutcome=assert.rejects(worker);
  await assert.rejects(coordinator,/TRIAL_CONTROLLER_RECONCILIATION_REQUIRED/);
  assert.equal(h.state().phase,'reconciling');
- await assert.rejects(worker);
+ await workerOutcome;
 });

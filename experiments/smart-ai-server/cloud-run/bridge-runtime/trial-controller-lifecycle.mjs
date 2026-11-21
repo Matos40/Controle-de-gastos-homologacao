@@ -16,12 +16,14 @@ async function waitFor(gate,predicate,{signal,clock,deadline,pollMs}){
 }
 export async function runPinnedTrialController({gate,proof,
  verifySyntheticPreflight,clock=Date.now,signal,
- pollMs=200,dispatchWindowMs=15000,cleanupReserveMs=15000}={}){
+ pollMs=200,dispatchWindowMs=15000,cleanupReserveMs=15000,
+ drainWaitMs=7000}={}){
  if(!gate||typeof gate.read!=='function'||typeof verifySyntheticPreflight!=='function'||
     !validExecutionApproval(proof,{clock})||
     !Number.isSafeInteger(pollMs)||pollMs<1||pollMs>2000||
     !Number.isSafeInteger(dispatchWindowMs)||dispatchWindowMs<1||
-    !Number.isSafeInteger(cleanupReserveMs)||cleanupReserveMs<1)
+    !Number.isSafeInteger(cleanupReserveMs)||cleanupReserveMs<1||
+    !Number.isSafeInteger(drainWaitMs)||drainWaitMs<1||drainWaitMs>7000)
   throw Error('TRIAL_CONTROLLER_CONFIGURATION');
  const first=await gate.read(signal);
  if(first.phase!=='initializing'||!matchesStoredExecutionApproval(first.executionApproval,proof,{clock}))
@@ -52,7 +54,7 @@ export async function runPinnedTrialController({gate,proof,
  try{
   state=await gate.block(recovery)??await gate.read(recovery);
   if(state?.admitted&&!state?.dispatchFinished){
-   const deadline=Date.now()+7000;
+   const deadline=Date.now()+drainWaitMs;
    while(Date.now()<deadline){
     await delay(pollMs,undefined,{signal:recovery});
     state=await gate.read(recovery);
