@@ -26,7 +26,8 @@ function harness(){
  const job={email:'job@example.iam.gserviceaccount.com',subject:'67890',audience:'https://private.test'};
  const verifyGoogle=async(token,expected)=>{
   const known=token==='controller-proof'?controller:token==='job-proof'?job:null;
-  if(!known||JSON.stringify(known)!==JSON.stringify(expected))throw Error('UNAUTHORIZED');
+  if(!known||known.email!==expected.email||known.subject!==expected.subject||
+   known.audience!==expected.audience)throw Error('UNAUTHORIZED');
  };
  const handler=createAuthenticatedTrialChannel({store,runId,requestId:uuid,absoluteDeadline,
   executionId,controller,job,verifyGoogle,clock:()=>now});
