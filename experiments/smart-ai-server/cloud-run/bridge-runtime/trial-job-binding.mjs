@@ -11,7 +11,8 @@ const id=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(x);
 // Cloud Run Execution description, NOT from job-provided environment alone.
 // A dedicated per-execution SA + Cloud Run IAM is required to bind proof to run.
 export async function createBoundTrialJob({env,approved,verifyApproval,
- transport=fetch,identity=requestIdentity,metadataAccess=createMetadataAccess}={}){
+ transport=fetch,identity=requestIdentity,metadataAccess=createMetadataAccess,
+ clock=Date.now}={}){
  if(!approved)throw Error('TRIAL_EXECUTION_UNVERIFIED');
  const executionId=env?.CLOUD_RUN_EXECUTION,jobName=env?.CLOUD_RUN_JOB;
  if(!id(executionId)||!id(jobName)||executionId!==approved.executionId||
@@ -31,11 +32,13 @@ export async function createBoundTrialJob({env,approved,verifyApproval,
  // The job is never allowed to self-certify: only the controller can persist
  // this immutable binding after its independently authenticated Admin API GET.
  let state;
- const deadline=Math.min(approved.absoluteDeadline,Date.now()+8000);
+ // A separate controller job can cold-start after this worker job.
+ // Bound the wait by the absolute trial deadline and a 2-minute maximum.
+ const deadline=Math.min(approved.absoluteDeadline,clock()+120000);
  for(;;){
   state=await store.read(AbortSignal.timeout(4000));
   if(state?.phase==='initializing'&&matchesStoredExecutionApproval(state.executionApproval,approved))break;
-  if((state!==null&&state?.phase!=='provisioning')||Date.now()>=deadline)
+  if((state!==null&&state?.phase!=='provisioning')||clock()>=deadline)
    throw Error('TRIAL_EXECUTION_UNVERIFIED');
   await delay(100);
  }

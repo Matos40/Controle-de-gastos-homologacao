@@ -172,3 +172,22 @@ test('job waits for the independently pinned approval when the control document 
  assert.equal(reads,2);
  assert.equal((await bound.gate.read()).phase,'initializing');
 });
+
+test('job permits a separately started controller to pin approval after the old eight-second window',async()=>{
+ const anchor=Date.now();let clock=anchor,reads=0;
+ const approved={executionId:'exec-controller-later',jobName:'test-job',
+  jobEmail:'trial-job-once@raytech-3d.iam.gserviceaccount.com',
+  executionUid:'00000000-0000-4000-8000-000000000864',runId:'later-controller-run',
+  requestId:'00000000-0000-4000-8000-000000000864',absoluteDeadline:anchor+150000,
+  endpoint:'https://private-control.run.app/internal/smart-ai/trial-control'};
+ const saved={phase:'initializing',runId:approved.runId,requestId:approved.requestId,
+  absoluteDeadline:approved.absoluteDeadline,revision:1,admitted:false,
+  executionApproval:{...approved,verifiedAt:anchor}};
+ const bound=await createBoundTrialJob({env:{CLOUD_RUN_EXECUTION:approved.executionId,CLOUD_RUN_JOB:approved.jobName},
+  approved,clock:()=>clock,
+  metadataAccess:()=>async()=> 'synthetic-access-token',identity:async()=> 'synthetic-service-token',
+  transport:async()=>{reads++;clock+=3000;return Response.json({state:reads<5?null:saved});}});
+ assert.ok(clock-anchor>8000,'controller started after the old deadline');
+ assert.equal(reads,5);
+ assert.equal((await bound.gate.read()).phase,'initializing');
+});

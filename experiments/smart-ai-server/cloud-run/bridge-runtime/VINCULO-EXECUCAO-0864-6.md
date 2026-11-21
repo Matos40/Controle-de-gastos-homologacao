@@ -14,7 +14,7 @@ Anteriormente `verifyApproval` era somente um callback injetável em testes e o 
 - Operador coleta UID real pelo Cloud Run API e o fixa em `SMART_AI_TRIAL_OPERATOR_APPROVAL_JSON` no ambiente **exclusivo do controlador**. JSON não deve vir do job; configurar com identificadores sintéticos, prazo curto e URL Cloud Run privada real.
 - Executar `trial-execution-approval.mjs` sob a identidade `raytech-ai-controller` com `SMART_AI_TRIAL_CONTROLLER_ENABLED=true`, `SMART_AI_TRIAL_CONTROLLER_IDENTITY` explícito, `GOOGLE_CLOUD_PROJECT=raytech-3d`; requer somente `run.executions.get` restrito ao job/execução e `roles/run.invoker` restrito ao serviço de controle. Nenhum acesso Firestore direto para controlador.
 - Serviço de controle já exige `SMART_AI_TRIAL_JOB_NAME`, `SMART_AI_TRIAL_EXECUTION_ID`, identidades e valores corretos de run/solicitação. Iniciar `trial-control-runtime.mjs` **separadamente** do bridge comercial; o Dockerfile existente ainda inicia `server.mjs` por padrão.
-- O job inicia com `createBoundTrialJob` e aguarda **somente a prova durável**, no máximo oito segundos ou o deadline. Não confiar em variáveis do próprio job, nem em callbacks simulados.
+- O job inicia com `createBoundTrialJob` e aguarda **somente a prova durável**, no máximo 120 segundos ou o deadline absoluto. Não confiar em variáveis do próprio job, nem em callbacks simulados.
 - O orquestrador `createControlledTrial` exige `ops.verifyExecution` que chame o controlador para **gravar a aprovação** antes de devolver o manifesto. Simplesmente retornar um objeto sem prova persistida será rejeitado.
 - **Não existe ainda autorização de implantação** nesta etapa, nem comprovação remota deste novo código. CI valida apenas testes sintéticos/Firestore Emulator.
 
