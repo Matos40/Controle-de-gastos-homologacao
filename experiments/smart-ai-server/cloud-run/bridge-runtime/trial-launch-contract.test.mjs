@@ -9,7 +9,8 @@ const contract=JSON.parse(readFileSync(resolve(home,'trial-launch-contract.json'
 const expected={
  service:['trial-control-runtime.mjs','trialControlConfig'],
  worker:['trial-job-runtime.mjs','runSyntheticTrialJob'],
- controller:['trial-execution-approval.mjs','runControllerFromEnv']
+ controller:['trial-execution-approval.mjs','runControllerFromEnv'],
+ workerProbe:['trial-auth-probe.mjs','runSingleReadProbe']
 };
 for(const [role,[file,entry]] of Object.entries(expected)){
  test('08.6.4.11: '+role+' is a real file-backed ESM entrypoint',async()=>{
@@ -32,5 +33,5 @@ test('08.6.4.11: execution contract prohibits inline JS, data URLs and eval',()=
  assert.ok(!text.includes('--input-type'));
  assert.ok(!text.includes(' -e '));
  assert.deepEqual(Object.keys(contract).filter(k=>k!=='description').sort(),
-  ['controller','service','worker']);
+  ['controller','service','worker','workerProbe']);
 });

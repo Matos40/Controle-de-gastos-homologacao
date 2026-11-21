@@ -22,7 +22,7 @@ jobs:
           node-version: '22'
       - run: node --test experiments/smart-ai-server/cloud-run/integration/private-diagnostic.test.mjs experiments/smart-ai-server/cloud-run/integration/bridge-runtime.test.mjs experiments/smart-ai-server/cloud-run/integration/integration.test.mjs experiments/smart-ai-server/cloud-run/commercial.test.mjs experiments/smart-ai-server/cloud-run/invoice-contract.test.mjs experiments/smart-ai-server/cloud-run/infra/infra.test.mjs experiments/smart-ai-server/cloud-run/infra/operations.test.mjs experiments/smart-ai-server/remote/worker.test.mjs experiments/smart-ai-server/legacy/invoice.test.mjs
       - run: node --test experiments/smart-ai-server/cloud-run/integration/diagnostic-runtime.test.mjs
-      - run: node --test experiments/smart-ai-server/cloud-run/bridge-runtime/trial-readiness.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-control-channel.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-control-runtime.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-execution-approval.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-controller-lifecycle.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-job-runtime.test.mjs
+      - run: node --test experiments/smart-ai-server/cloud-run/bridge-runtime/trial-readiness.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-control-channel.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-control-runtime.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-execution-approval.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-controller-lifecycle.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-job-runtime.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-auth-probe.test.mjs
       - name: Verify private trial control using Firestore Emulator only
         timeout-minutes: 5
         env:
@@ -82,10 +82,10 @@ jobs:
           set -euo pipefail
           image=smart-ai-bridge-candidate
           home=/app/experiments/smart-ai-server/cloud-run/bridge-runtime
-          for entry in trial-control-runtime.mjs trial-job-runtime.mjs trial-execution-approval.mjs; do
+          for entry in trial-control-runtime.mjs trial-job-runtime.mjs trial-execution-approval.mjs trial-auth-probe.mjs; do
             docker run --rm --network none --entrypoint node "$image" --check "$home/$entry"
           done
-          for spec in 'trial-job-runtime.mjs:TRIAL_WORKER_CONFIGURATION' 'trial-execution-approval.mjs:TRIAL_SYNTHETIC_ONLY_REQUIRED'; do
+          for spec in 'trial-job-runtime.mjs:TRIAL_WORKER_CONFIGURATION' 'trial-execution-approval.mjs:TRIAL_SYNTHETIC_ONLY_REQUIRED' 'trial-auth-probe.mjs:TRIAL_PROBE_CONFIGURATION'; do
             entry="${spec%%:*}"
             expected="${spec#*:}"
             set +e
