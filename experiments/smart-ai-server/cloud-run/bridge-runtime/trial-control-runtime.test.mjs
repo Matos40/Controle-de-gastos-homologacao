@@ -77,7 +77,9 @@ test('job binding requires independently confirmed execution and dedicated metad
   verifyApproval:async binding=>{verified=true;return binding===approved;},
   metadataAccess:email=>{assert.equal(email,approved.jobEmail);return async()=>{metadata=true;return 'fake-access-token';};},
   identity:async()=> 'fake-service-token',
-  transport:async()=>Response.json({state:{phase:'initializing',executionApproval:{...approved,verifiedAt:Date.now()}}})};
+  transport:async()=>Response.json({state:{phase:'initializing',runId:approved.runId,
+   requestId:approved.requestId,absoluteDeadline:approved.absoluteDeadline,revision:1,
+   admitted:false,executionApproval:{...approved,verifiedAt:Date.now()}}})};
  await assert.rejects(createBoundTrialJob({...options,verifyApproval:async()=>false}),/TRIAL_EXECUTION_UNVERIFIED/);
  await assert.rejects(createBoundTrialJob({...options,transport:async()=>Response.json({state:{phase:'initializing',executionApproval:{...approved,executionUid:'00000000-0000-4000-8000-000000000999',verifiedAt:Date.now()}}})}),/TRIAL_EXECUTION_UNVERIFIED/);
  await assert.rejects(createBoundTrialJob({...options,env:{...env,CLOUD_RUN_EXECUTION:'other-execution'}}),/TRIAL_EXECUTION_MISMATCH/);
@@ -85,7 +87,7 @@ test('job binding requires independently confirmed execution and dedicated metad
  const bound=await createBoundTrialJob(options);
  assert.equal(bound.executionId,approved.executionId);
  assert.equal(verified,true);assert.equal(metadata,true);
- assert.equal((await bound.gate.read()).phase,'provisioning');
+ assert.equal((await bound.gate.read()).phase,'initializing');
 });
 
 test('named Firestore candidate requires an exact code-pinned database, never default or financial projects',()=>{
