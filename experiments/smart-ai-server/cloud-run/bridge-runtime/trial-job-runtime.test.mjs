@@ -18,9 +18,9 @@ test('real channel protocol: controller stays through single simulated worker jo
  };
  let record=null,serial=Promise.resolve();
  const backing={read:async()=>structuredClone(record),
-  async compareAndSet(revision,next){
+  async compareAndSet(revision,next,guard){
    const task=serial.then(()=>{
-    if((record?.revision??0)!==revision)return false;
+    if((record?.revision??0)!==revision||!guard(record,next))return false;
     record=structuredClone(next);return true;
    });serial=task.catch(()=>{});return task;
   }};
