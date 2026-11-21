@@ -35,7 +35,7 @@ export async function createBoundTrialJob({env,approved,verifyApproval,
  for(;;){
   state=await store.read(AbortSignal.timeout(4000));
   if(state?.phase==='initializing'&&matchesStoredExecutionApproval(state.executionApproval,approved))break;
-  if(state?.phase!=='provisioning'||Date.now()>=deadline)
+  if((state!==null&&state?.phase!=='provisioning')||Date.now()>=deadline)
    throw Error('TRIAL_EXECUTION_UNVERIFIED');
   await delay(100);
  }
