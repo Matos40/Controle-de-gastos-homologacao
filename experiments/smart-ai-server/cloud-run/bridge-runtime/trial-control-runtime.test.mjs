@@ -65,7 +65,7 @@ test('job binding requires independently confirmed execution and dedicated metad
   metadataAccess:email=>{assert.equal(email,approved.jobEmail);return async()=>{metadata=true;return 'fake-access-token';};},
   identity:async()=> 'fake-service-token',
   transport:async()=>Response.json({state:null})};
- assert.rejects(createBoundTrialJob({...options,verifyApproval:async()=>false}),/TRIAL_EXECUTION_UNVERIFIED/);
+ await assert.rejects(createBoundTrialJob({...options,verifyApproval:async()=>false}),/TRIAL_EXECUTION_UNVERIFIED/);
  await assert.rejects(createBoundTrialJob({...options,env:{...env,CLOUD_RUN_EXECUTION:'other-execution'}}),/TRIAL_EXECUTION_MISMATCH/);
  assert.equal(metadata,false);
  const bound=await createBoundTrialJob(options);
