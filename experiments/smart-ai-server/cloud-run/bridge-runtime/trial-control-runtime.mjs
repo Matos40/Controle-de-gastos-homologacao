@@ -76,7 +76,7 @@ if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url){
   const config=trialControlConfig(env);
   const access=createMetadataAccess(config.self);
   const base='https://firestore.googleapis.com/v1/'+config.project+'/documents';
-  const db=createRestStore(config.project,base,()=>access(fetch,AbortSignal.timeout(9000)),AbortSignal.timeout(9000),fetch,{abortedRetries:3});
+  const db=createRestStore(config.project,base,()=>access(fetch,AbortSignal.timeout(9000)),undefined,fetch,{abortedRetries:3});
   const handler=createTrialControlHandler({config,db});
   makeTrialControlServer({handler,enabled:true}).listen(Number(env.PORT??8080),'0.0.0.0');
  }
