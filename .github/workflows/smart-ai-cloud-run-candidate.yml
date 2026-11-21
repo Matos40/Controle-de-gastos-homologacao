@@ -22,7 +22,7 @@ jobs:
           node-version: '22'
       - run: node --test experiments/smart-ai-server/cloud-run/integration/private-diagnostic.test.mjs experiments/smart-ai-server/cloud-run/integration/bridge-runtime.test.mjs experiments/smart-ai-server/cloud-run/integration/integration.test.mjs experiments/smart-ai-server/cloud-run/commercial.test.mjs experiments/smart-ai-server/cloud-run/invoice-contract.test.mjs experiments/smart-ai-server/cloud-run/infra/infra.test.mjs experiments/smart-ai-server/cloud-run/infra/operations.test.mjs experiments/smart-ai-server/remote/worker.test.mjs experiments/smart-ai-server/legacy/invoice.test.mjs
       - run: node --test experiments/smart-ai-server/cloud-run/integration/diagnostic-runtime.test.mjs
-      - run: node --test experiments/smart-ai-server/cloud-run/bridge-runtime/trial-readiness.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-control-channel.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-control-runtime.test.mjs
+      - run: node --test experiments/smart-ai-server/cloud-run/bridge-runtime/trial-readiness.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-control-channel.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-control-runtime.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-execution-approval.test.mjs
       - name: Verify private trial control using Firestore Emulator only
         timeout-minutes: 5
         env:

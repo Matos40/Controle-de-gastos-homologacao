@@ -27,11 +27,11 @@ function setup({work=500,cleanup=500,executionMs=30,clock=Date.now}={}){
  const ops={
   async provision(){events.push('provision');},
   async start(){started.resolve();return executionId;},
-  async verifyExecution(id){assert.equal(id,executionId);return {
+  async verifyExecution(id){assert.equal(id,executionId);const proof={
    executionId:id,jobName:'test-job',jobEmail:'job@demo-project.iam.gserviceaccount.com',
    executionUid:'00000000-0000-4000-8000-000000000864',runId:'synthetic-run',requestId,
    absoluteDeadline,endpoint:'https://trial.internal.invalid/internal/smart-ai/trial-control',verifiedAt:clock()
-  };},
+  };assert.ok(await gate.initializing(proof));return proof;},
   async prepareIdentity(){events.push('profile');},
   async verifyFinance(){events.push('finance');return true;},
   async blockAdmissions(){events.push('blocked');return true;},

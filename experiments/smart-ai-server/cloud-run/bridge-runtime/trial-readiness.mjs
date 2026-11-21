@@ -1,6 +1,6 @@
 import {setTimeout as delay} from 'node:timers/promises';
 import {validRequestId} from '../../legacy/usage.mjs';
-import {validExecutionApproval} from './trial-execution-approval.mjs';
+import {validExecutionApproval,matchesStoredExecutionApproval} from './trial-execution-approval.mjs';
 
 // The gate is scoped to one run. In separate processes the store must provide a
 // durable compare-and-set, with the client bound to the actual execution identity.
@@ -103,7 +103,11 @@ export function createControlledTrial({gate,ops,absoluteDeadline,cleanupReserveM
    if(typeof ops.verifyExecution!=='function')throw Error('TRIAL_EXECUTION_UNVERIFIED');
    const proof=await bounded(s=>ops.verifyExecution(executionId,s),prepare);
    if(!validExecutionApproval(proof,{executionId,clock}))throw Error('TRIAL_EXECUTION_UNVERIFIED');
-   if(!await bounded(s=>gate.initializing(proof,s),prepare))throw Error('TRIAL_CLOSED');
+   // verifyExecution must persist an approval via the trusted controller.
+   // It is not sufficient to return an untrusted object supplied by a job.
+   const pinned=await bounded(s=>gate.read(s),prepare);
+   if(pinned.phase!=='initializing'||!matchesStoredExecutionApproval(pinned.executionApproval,proof))
+    throw Error('TRIAL_EXECUTION_UNVERIFIED');
    const identity=await waitPhase(gate,s=>s.phase==='identity-ready',prepare,pollMs);
    if(!executionId||identity.executionId!==executionId)throw Error('EXECUTION_MISMATCH');
    await bounded(s=>ops.prepareIdentity(identity,s),prepare);
@@ -122,7 +126,13 @@ export function createControlledTrial({gate,ops,absoluteDeadline,cleanupReserveM
 
 export async function runControlledClient({gate,executionId,identify,checkPrivate,extract,signal,clock=Date.now,pollMs=250}){
  const uid=await bounded(identify,signal);
- if(!/^[A-Za-z0-9_-]{1,128}$/.test(uid)||!await bounded(s=>gate.identityReady(executionId,uid,s),signal))return false;
+ if(!/^[A-Za-z0-9_-]{1,128}$/.test(uid))return false;
+ // The job can start before Cloud Run's Admin API confirms the execution.
+ // Wait only for the controller's durable approval; cancellation stays final.
+ try{await waitPhase(gate,s=>s.phase==='initializing'&&
+   validExecutionApproval(s.executionApproval,{executionId,clock}),signal,pollMs);}
+ catch(error){if(error.message==='TRIAL_CLOSED')return false;throw error;}
+ if(!await bounded(s=>gate.identityReady(executionId,uid,s),signal))return false;
  await waitPhase(gate,s=>s.phase==='identity-ready'&&s.profilePrepared&&s.executionId===executionId,signal,pollMs);
  if(!await bounded(s=>checkPrivate(uid,s),signal))throw Error('PRIVATE_PATH_NOT_READY');
  if(!await bounded(s=>gate.privateReady(executionId,s),signal))return false;

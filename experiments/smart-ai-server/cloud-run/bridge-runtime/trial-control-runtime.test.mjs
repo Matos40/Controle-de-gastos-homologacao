@@ -81,7 +81,7 @@ test('job binding requires independently confirmed execution and dedicated metad
  await assert.rejects(createBoundTrialJob({...options,verifyApproval:async()=>false}),/TRIAL_EXECUTION_UNVERIFIED/);
  await assert.rejects(createBoundTrialJob({...options,transport:async()=>Response.json({state:{phase:'initializing',executionApproval:{...approved,executionUid:'00000000-0000-4000-8000-000000000999',verifiedAt:Date.now()}}})}),/TRIAL_EXECUTION_UNVERIFIED/);
  await assert.rejects(createBoundTrialJob({...options,env:{...env,CLOUD_RUN_EXECUTION:'other-execution'}}),/TRIAL_EXECUTION_MISMATCH/);
- assert.equal(metadata,false);
+ assert.equal(metadata,true); // expected metadata identity checked before the optional veto
  const bound=await createBoundTrialJob(options);
  assert.equal(bound.executionId,approved.executionId);
  assert.equal(verified,true);assert.equal(metadata,true);
