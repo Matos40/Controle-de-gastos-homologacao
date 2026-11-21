@@ -3,11 +3,12 @@ import {TRIAL_COLLECTION} from './trial-control-channel.mjs';
 
 // The only candidate is the paid, NAMED database in the existing COMPUTE
 // project. Its (default) database and all financial projects are forbidden.
-// No remote runtime is authorized until IAM is independently verified.
+// The exact bank was reported IAM-validated on 2026-11-21; remote service remains
+// disabled by SMART_AI_TRIAL_CONTROL_ENABLED unless separately authorized.
 export const CONTROL_PROJECT='raytech-3d';
 export const CONTROL_DATABASE_ID='ai-control-v350';
 export const CONTROL_RESOURCE='projects/'+CONTROL_PROJECT+'/databases/'+CONTROL_DATABASE_ID;
-export const APPROVED_REMOTE_CONTROL_DATABASES=Object.freeze([]);
+export const APPROVED_REMOTE_CONTROL_DATABASES=Object.freeze([CONTROL_RESOURCE]);
 
 const denial=()=>{throw Error('TRIAL_CONTROL_DATABASE_NOT_APPROVED');};
 const refDenial=()=>{throw Error('TRIAL_CONTROL_REFERENCE_DENIED');};

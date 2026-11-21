@@ -23,8 +23,8 @@ const listen=server=>new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const close=server=>new Promise(resolve=>server.close(resolve));
 test('configuration fails closed for missing flag, emulator, shared identity and wrong project',()=>{
  const valid=base();const allow={allowedDatabases:[CONTROL_RESOURCE]};
- assert.equal(APPROVED_REMOTE_CONTROL_DATABASES.length,0);
- assert.throws(()=>trialControlConfig(valid),/TRIAL_CONTROL_DATABASE_NOT_APPROVED/);
+ assert.deepEqual(APPROVED_REMOTE_CONTROL_DATABASES,[CONTROL_RESOURCE]);
+ assert.equal(trialControlConfig(valid).database.resource,CONTROL_RESOURCE);
  assert.equal(trialControlConfig(valid,allow).executionId,'test-exec-123');
  for(const edit of [
   {SMART_AI_TRIAL_CONTROL_ENABLED:'false'},
@@ -89,8 +89,8 @@ test('job binding requires independently confirmed execution and dedicated metad
 test('named Firestore candidate requires an exact code-pinned database, never default or financial projects',()=>{
  const candidate={projectId:CONTROL_PROJECT,databaseId:CONTROL_DATABASE_ID};
  const allow=[CONTROL_RESOURCE];
- assert.equal(APPROVED_REMOTE_CONTROL_DATABASES.length,0,'remote activation must remain off');
- assert.throws(()=>isolatedControlDatabase(candidate),/DATABASE_NOT_APPROVED/);
+ assert.deepEqual(APPROVED_REMOTE_CONTROL_DATABASES,[CONTROL_RESOURCE]);
+ assert.equal(isolatedControlDatabase(candidate).resource,CONTROL_RESOURCE);
  assert.equal(isolatedControlDatabase({...candidate,allowedDatabases:allow}).resource,
   'projects/raytech-3d/databases/ai-control-v350');
  const forbidden=[
