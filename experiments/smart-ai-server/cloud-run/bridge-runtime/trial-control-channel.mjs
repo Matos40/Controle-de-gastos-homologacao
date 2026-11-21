@@ -69,9 +69,12 @@ export function createFirestoreTrialControlStore(db,{runId}={}){
  if(!id(runId))throw Error('INVALID_TRIAL_RUN');
  const ref=db.collection(TRIAL_COLLECTION).doc(runId);
  return {
-  async read(){const snap=await ref.get();return snap.exists?snap.data():null;},
-  async compareAndSet(revision,next,guard){
-   return db.runTransaction(async tx=>{
+  async read(signal){signal?.throwIfAborted();return db.runTransaction(async tx=>{
+   signal?.throwIfAborted();const snap=await tx.get(ref);return snap.exists?snap.data():null;
+  },{readOnly:true});},
+  async compareAndSet(revision,next,guard,signal){
+   signal?.throwIfAborted();return db.runTransaction(async tx=>{
+    signal?.throwIfAborted();
     const snap=await tx.get(ref),before=snap.exists?snap.data():null;
     if((before?.revision??0)!==revision||!guard(before,next))return false;
     if(before)tx.set(ref,next);else tx.create(ref,next);
