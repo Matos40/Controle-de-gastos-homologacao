@@ -1,5 +1,6 @@
 import {setTimeout as delay} from 'node:timers/promises';
 import {validRequestId} from '../../legacy/usage.mjs';
+import {validExecutionApproval} from './trial-execution-approval.mjs';
 
 // The gate is scoped to one run. In separate processes the store must provide a
 // durable compare-and-set, with the client bound to the actual execution identity.
@@ -28,7 +29,8 @@ export function createTrialGate({store,runId,requestId,absoluteDeadline,clock=Da
  }
  return {
   read,
-  initializing:(signal)=>advance('provisioning','initializing',{},signal),
+  initializing:(approval,signal)=>validExecutionApproval(approval,{runId,requestId,absoluteDeadline,clock})
+   ?advance('provisioning','initializing',{executionApproval:approval},signal):Promise.resolve(null),
   identityReady:(executionId,uid,signal)=>advance('initializing','identity-ready',{executionId,uid},signal),
   profilePrepared:(executionId,signal)=>change(s=>
    s.phase==='identity-ready'&&s.executionId===executionId&&clock()<absoluteDeadline?{profilePrepared:true}:null,signal),
@@ -97,8 +99,11 @@ export function createControlledTrial({gate,ops,absoluteDeadline,cleanupReserveM
   let result;
   try{
    await bounded(s=>ops.provision(s),prepare);
-   if(!await bounded(s=>gate.initializing(s),prepare))throw Error('TRIAL_CLOSED');
    const executionId=await bounded(s=>ops.start(s),prepare);
+   if(typeof ops.verifyExecution!=='function')throw Error('TRIAL_EXECUTION_UNVERIFIED');
+   const proof=await bounded(s=>ops.verifyExecution(executionId,s),prepare);
+   if(!validExecutionApproval(proof,{executionId,clock}))throw Error('TRIAL_EXECUTION_UNVERIFIED');
+   if(!await bounded(s=>gate.initializing(proof,s),prepare))throw Error('TRIAL_CLOSED');
    const identity=await waitPhase(gate,s=>s.phase==='identity-ready',prepare,pollMs);
    if(!executionId||identity.executionId!==executionId)throw Error('EXECUTION_MISMATCH');
    await bounded(s=>ops.prepareIdentity(identity,s),prepare);

@@ -28,6 +28,7 @@ export function trialControlConfig(env,{allowedDatabases=APPROVED_REMOTE_CONTROL
  const controllerSub=envKey(env,'SMART_AI_TRIAL_CONTROLLER_SUB');
  const jobSub=envKey(env,'SMART_AI_TRIAL_JOB_SUB');
  const executionId=envKey(env,'SMART_AI_TRIAL_EXECUTION_ID');
+ const jobName=envKey(env,'SMART_AI_TRIAL_JOB_NAME');
  const absoluteDeadline=Number(envKey(env,'SMART_AI_TRIAL_ABSOLUTE_DEADLINE'));
  const projectId=envKey(env,'SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID');
  const databaseId=envKey(env,'SMART_AI_TRIAL_CONTROL_FIRESTORE_DATABASE_ID');
@@ -36,12 +37,12 @@ export function trialControlConfig(env,{allowedDatabases=APPROVED_REMOTE_CONTROL
  if(!principal(controllerEmail)||!principal(jobEmail)||!principal(self)||
     controllerEmail===jobEmail||controllerEmail===self||jobEmail===self||
     !subject(controllerSub)||!subject(jobSub)||controllerSub===jobSub||
-    !runId(run)||!runId(executionId)||
+    !runId(run)||!runId(executionId)||!runId(jobName)||
     !/^https:\/\/[a-zA-Z0-9.-]+$/.test(audience)||
     !Number.isSafeInteger(absoluteDeadline)||absoluteDeadline<=Date.now())
   throw Error('TRIAL_CONTROL_CONFIGURATION');
  return {audience,controller:{email:controllerEmail,subject:controllerSub,audience},
-  job:{email:jobEmail,subject:jobSub,audience},self,executionId,absoluteDeadline,
+  job:{email:jobEmail,subject:jobSub,audience},self,executionId,jobName,absoluteDeadline,
   database,runId:run,requestId};
 }
 
@@ -66,7 +67,7 @@ export function createTrialControlHandler({config,db,verifyGoogle,transport=fetc
  const store=createFirestoreTrialControlStore(db,{runId:config.runId});
  return createAuthenticatedTrialChannel({store,runId:config.runId,requestId:config.requestId,
   absoluteDeadline:config.absoluteDeadline,controller:config.controller,job:config.job,
-  executionId:config.executionId,verifyGoogle,transport,clock});
+  executionId:config.executionId,jobName:config.jobName,verifyGoogle,transport,clock});
 }
 
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url){

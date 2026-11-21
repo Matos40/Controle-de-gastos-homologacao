@@ -1,5 +1,6 @@
 import {validRequestId} from '../../legacy/usage.mjs';
 import {createPushVerifier} from '../security-guard.mjs';
+import {validExecutionApproval} from './trial-execution-approval.mjs';
 
 export const TRIAL_COLLECTION='raytechLabTrialControlV350';
 export const TRIAL_PATH='/internal/smart-ai/trial-control';
@@ -21,15 +22,21 @@ function validState(s,runId,requestId,deadline){
 }
 
 // Caller identity is verified separately; role is never inferred from client-supplied claims.
-export function authorizeTransition(before,next,{role,executionId,clock=Date.now}){
+export function authorizeTransition(before,next,{role,executionId,jobName,jobEmail,clock=Date.now}){
  if(!next||!Number.isSafeInteger(next.revision)||next.revision!==(before?.revision??0)+1)return false;
+ if(!validExecutionApproval(next.executionApproval,{runId:next.runId,
+  requestId:next.requestId,absoluteDeadline:next.absoluteDeadline,
+  executionId,jobName,jobEmail,clock}))return false;
  if(next.admitted===true&&role!=='job'&&before?.admitted!==true)return false;
  if(before&&(!validState(before,next.runId,next.requestId,next.absoluteDeadline)||
    !only(before,next,['phase','revision','executionId','uid','profilePrepared','until','admitted','dispatchFinished','result'])))return false;
  if(!before)return role==='controller'&&next.phase==='initializing'&&next.admitted===false&&
   next.profilePrepared===undefined&&next.until===undefined&&next.executionId===undefined&&
   only({runId:next.runId,requestId:next.requestId,absoluteDeadline:next.absoluteDeadline,
-   phase:'provisioning',revision:0,admitted:false},next,['phase','revision']);
+   phase:'provisioning',revision:0,admitted:false},next,['phase','revision','executionApproval']);
+ if(!validExecutionApproval(before.executionApproval,{runId:before.runId,
+  requestId:before.requestId,absoluteDeadline:before.absoluteDeadline,
+  executionId,jobName,jobEmail,clock}))return false;
  if(end.has(before.phase)&&role==='job')return false;
  const now=clock();
  if(role==='controller'){
@@ -87,9 +94,9 @@ export function createFirestoreTrialControlStore(db,{runId}={}){
 // Must be mounted behind private Cloud Run IAM. verifyGoogle validates a signed
 // audience-bound ID token and returns the verified service account principal.
 export function createAuthenticatedTrialChannel({store,runId,requestId,absoluteDeadline,
-  controller,job,executionId,verifyGoogle=createPushVerifier(),transport=fetch,clock=Date.now}={}){
+  controller,job,jobName,executionId,verifyGoogle=createPushVerifier(),transport=fetch,clock=Date.now}={}){
  if(!id(runId)||!validRequestId(requestId)||!Number.isSafeInteger(absoluteDeadline)||
-  !id(executionId)||!controller?.email||!controller?.subject||!job?.email||!job?.subject||
+  !id(executionId)||!id(jobName)||!controller?.email||!controller?.subject||!job?.email||!job?.subject||
   typeof verifyGoogle!=='function')throw Error('INVALID_TRIAL_CHANNEL');
  const expected={controller,job};
  return async function handle(request){
@@ -128,7 +135,7 @@ export function createAuthenticatedTrialChannel({store,runId,requestId,absoluteD
     !validState(command.next,runId,requestId,absoluteDeadline))
     return reject(400,'INVALID_REQUEST');
    const applied=await store.compareAndSet(command.revision,command.next,
-    (before,next)=>authorizeTransition(before,next,{role,executionId,clock}));
+    (before,next)=>authorizeTransition(before,next,{role,executionId,jobName,jobEmail:job.email,clock}));
    return Response.json({applied},{headers:{'cache-control':'no-store'}});
   }catch{return reject(503,'TRIAL_STORE_UNAVAILABLE');}
  };

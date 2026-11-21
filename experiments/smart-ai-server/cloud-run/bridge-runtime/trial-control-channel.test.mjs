@@ -30,7 +30,7 @@ function harness(){
    known.audience!==expected.audience)throw Error('UNAUTHORIZED');
  };
  const handler=createAuthenticatedTrialChannel({store,runId,requestId:uuid,absoluteDeadline,
-  executionId,controller,job,verifyGoogle,clock:()=>now});
+  executionId,jobName:'test-job',controller,job,verifyGoogle,clock:()=>now});
  const endpoint='https://private.test'+TRIAL_PATH;
  const transport=(url,options)=>handler(new Request(url,options));
  function client(role,identity){
@@ -43,7 +43,10 @@ function harness(){
 }
 test('private transaction: authenticated controller and job claim exactly once',async()=>{
  const h=harness(),c=h.controller,j=h.job;
- assert.ok(await c.initializing());
+ assert.ok(await c.initializing({executionId:h.executionId,jobName:'test-job',
+  jobEmail:'job@example.iam.gserviceaccount.com',executionUid:'00000000-0000-4000-8000-000000000864',
+  runId:h.runId,requestId:uuid,absoluteDeadline:h.absoluteDeadline,
+  endpoint:h.endpoint,verifiedAt:1_000_000}));
  assert.ok(await j.identityReady(h.executionId,'synthetic-user'));
  assert.ok(await c.profilePrepared(h.executionId));
  assert.ok(await j.privateReady(h.executionId));
@@ -76,7 +79,10 @@ test('false principal, wrong role and arbitrary financial command are rejected',
 });
 test('expired permit and late client cannot dispatch after cancellation',async()=>{
  const h=harness(),c=h.controller,j=h.job;
- await c.initializing();
+ await c.initializing({executionId:h.executionId,jobName:'test-job',
+  jobEmail:'job@example.iam.gserviceaccount.com',executionUid:'00000000-0000-4000-8000-000000000864',
+  runId:h.runId,requestId:uuid,absoluteDeadline:h.absoluteDeadline,
+  endpoint:h.endpoint,verifiedAt:1_000_000});
  await j.identityReady(h.executionId,'synthetic-user');
  await c.profilePrepared(h.executionId);
  await j.privateReady(h.executionId);
@@ -90,7 +96,10 @@ test('expired permit and late client cannot dispatch after cancellation',async()
 });
 test('controller can persist recovery and rollback after absolute deadline',async()=>{
  const h=harness(),c=h.controller,j=h.job;
- await c.initializing();
+ await c.initializing({executionId:h.executionId,jobName:'test-job',
+  jobEmail:'job@example.iam.gserviceaccount.com',executionUid:'00000000-0000-4000-8000-000000000864',
+  runId:h.runId,requestId:uuid,absoluteDeadline:h.absoluteDeadline,
+  endpoint:h.endpoint,verifiedAt:1_000_000});
  await j.identityReady(h.executionId,'synthetic-user');
  h.setTime(h.absoluteDeadline+1);
  assert.ok(await c.block());
@@ -101,7 +110,10 @@ test('controller can persist recovery and rollback after absolute deadline',asyn
 });
 test('durable read survives new controller instances; a forged second dispatch is refused',async()=>{
  const h=harness(),c=h.controller,j=h.job;
- await c.initializing();
+ await c.initializing({executionId:h.executionId,jobName:'test-job',
+  jobEmail:'job@example.iam.gserviceaccount.com',executionUid:'00000000-0000-4000-8000-000000000864',
+  runId:h.runId,requestId:uuid,absoluteDeadline:h.absoluteDeadline,
+  endpoint:h.endpoint,verifiedAt:1_000_000});
  const first=await c.read();
  assert.equal(first.phase,'initializing');
  assert.ok(await j.identityReady(h.executionId,'synthetic-user'));

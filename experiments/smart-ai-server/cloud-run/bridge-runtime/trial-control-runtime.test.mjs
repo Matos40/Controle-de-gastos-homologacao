@@ -12,7 +12,7 @@ const base=()=>({
  SMART_AI_TRIAL_JOB_EMAIL:'trial-job-once@raytech-3d.iam.gserviceaccount.com',
  SMART_AI_TRIAL_CONTROL_IDENTITY:'trial-control@raytech-3d.iam.gserviceaccount.com',
  SMART_AI_TRIAL_CONTROLLER_SUB:'111111',SMART_AI_TRIAL_JOB_SUB:'222222',
- SMART_AI_TRIAL_EXECUTION_ID:'test-exec-123',
+ SMART_AI_TRIAL_EXECUTION_ID:'test-exec-123',SMART_AI_TRIAL_JOB_NAME:'test-job',
  SMART_AI_TRIAL_ABSOLUTE_DEADLINE:String(Date.now()+600000),
  SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID:CONTROL_PROJECT,
  SMART_AI_TRIAL_CONTROL_FIRESTORE_DATABASE_ID:CONTROL_DATABASE_ID,
@@ -67,6 +67,7 @@ test('enabled candidate allows ONLY the control route and delegates without comm
 });
 test('job binding requires independently confirmed execution and dedicated metadata identity',async()=>{
  const approved={executionId:'test-exec-123',jobName:'test-job',runId:'test-run-123',
+ executionUid:'00000000-0000-4000-8000-000000000864',
  requestId:'00000000-0000-4000-8000-000000000864',jobEmail:'trial-job-once@raytech-3d.iam.gserviceaccount.com',
  endpoint:'https://private-control.run.app/internal/smart-ai/trial-control',
  absoluteDeadline:Date.now()+600000};
@@ -76,8 +77,9 @@ test('job binding requires independently confirmed execution and dedicated metad
   verifyApproval:async binding=>{verified=true;return binding===approved;},
   metadataAccess:email=>{assert.equal(email,approved.jobEmail);return async()=>{metadata=true;return 'fake-access-token';};},
   identity:async()=> 'fake-service-token',
-  transport:async()=>Response.json({state:null})};
+  transport:async()=>Response.json({state:{phase:'initializing',executionApproval:{...approved,verifiedAt:Date.now()}}})};
  await assert.rejects(createBoundTrialJob({...options,verifyApproval:async()=>false}),/TRIAL_EXECUTION_UNVERIFIED/);
+ await assert.rejects(createBoundTrialJob({...options,transport:async()=>Response.json({state:{phase:'initializing',executionApproval:{...approved,executionUid:'00000000-0000-4000-8000-000000000999',verifiedAt:Date.now()}}})}),/TRIAL_EXECUTION_UNVERIFIED/);
  await assert.rejects(createBoundTrialJob({...options,env:{...env,CLOUD_RUN_EXECUTION:'other-execution'}}),/TRIAL_EXECUTION_MISMATCH/);
  assert.equal(metadata,false);
  const bound=await createBoundTrialJob(options);

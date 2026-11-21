@@ -30,7 +30,7 @@ const auth=async (token,expected)=>{
 };
 const endpoint='https://trial.internal.invalid'+TRIAL_PATH;
 const handler=createAuthenticatedTrialChannel({store,runId,requestId,absoluteDeadline,
- executionId,controller,job,verifyGoogle:auth,clock:()=>now});
+ executionId,jobName:'test-job',controller,job,verifyGoogle:auth,clock:()=>now});
 const transport=(url,options)=>handler(new Request(url,options));
 function gate(role,token){
  return createTrialGate({store:createRemoteTrialControlStore({endpoint,role,
@@ -44,7 +44,8 @@ const checkCollections=async()=>{
 };
 
 assert.equal(await c.read().then(s=>s.phase),'provisioning');
-assert.ok(await c.initializing());
+assert.ok(await c.initializing({executionId,jobName:'test-job',jobEmail:job.email,
+ executionUid:randomUUID(),runId,requestId,absoluteDeadline,endpoint,verifiedAt:now}));
 assert.ok(await j.identityReady(executionId,'synthetic-user'));
 assert.ok(await c.profilePrepared(executionId));
 assert.ok(await j.privateReady(executionId));
