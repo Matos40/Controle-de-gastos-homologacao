@@ -23,7 +23,7 @@ const listen=server=>new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const close=server=>new Promise(resolve=>server.close(resolve));
 test('configuration fails closed for missing flag, emulator, shared identity and wrong project',()=>{
  const valid=base();const allow={allowedDatabases:[CONTROL_RESOURCE]};
- assert.equal(APPROVED_REMOTE_CONTROL_PROJECTS.length,0);
+ assert.equal(APPROVED_REMOTE_CONTROL_DATABASES.length,0);
  assert.throws(()=>trialControlConfig(valid),/TRIAL_CONTROL_DATABASE_NOT_APPROVED/);
  assert.equal(trialControlConfig(valid,allow).executionId,'test-exec-123');
  for(const edit of [
