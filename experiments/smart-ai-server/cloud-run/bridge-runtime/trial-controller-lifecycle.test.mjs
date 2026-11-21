@@ -14,6 +14,12 @@ function harness(){
  const proof=original();
  let state=null,chain=Promise.resolve();
  const store={read:async()=>structuredClone(state),
+  async attemptLateClaim(executionId){
+   if(state?.phase!=='reconciling'||state.executionId!==executionId||
+      state.dispatchFinished!==true||state.lateClaimRejected===true)return false;
+   return store.compareAndSet(state.revision,{...state,lateClaimRejected:true,
+    revision:state.revision+1});
+  },
   async compareAndSet(revision,next){
    const task=chain.then(()=>{
     if((state?.revision??0)!==revision)return false;
@@ -32,16 +38,22 @@ test('same controller authorizes once, observes simulated result and reverses',a
  let extracts=0;
  const coordinator=runPinnedTrialController({gate:h.controller,proof:h.proof,
   pollMs:2,cleanupReserveMs:1000,verifySyntheticPreflight:async()=>true});
- const worker=runControlledClient({gate:h.worker,executionId:h.proof.executionId,
+ const worker=(async()=>{const done=await runControlledClient({gate:h.worker,executionId:h.proof.executionId,
   identify:async()=> 'synthetic-user',checkPrivate:async()=>true,
   extract:async()=>{extracts++;return {state:'synthetic'};},
   signal:AbortSignal.timeout(2000),pollMs:2});
+  while(h.state()?.phase!=='reconciling')await new Promise(resolve=>setTimeout(resolve,2));
+  assert.equal(await h.worker.claim(h.proof.executionId),null);
+  assert.equal(await h.worker.attemptLateClaim(h.proof.executionId),true);
+  return done;})();
  const [ctrl,ran]=await Promise.all([coordinator,worker]);
  assert.equal(ctrl.phase,'reversed');
  assert.equal(ctrl.synthetic,true);
+ assert.equal(ctrl.lateClaimRejected,true);
  assert.equal(ran,true);
  assert.equal(extracts,1);
  assert.equal(h.state().phase,'reversed');
+ assert.equal(h.state().lateClaimRejected,true);
  assert.equal(await h.worker.claim(h.proof.executionId),null);
 });
 test('controller cancellation before identity closes permit and reverses',async()=>{

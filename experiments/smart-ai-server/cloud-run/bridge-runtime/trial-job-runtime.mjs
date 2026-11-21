@@ -64,7 +64,16 @@ export async function runSyntheticTrialJob({env=process.env,transport=fetch,
  if(Number(Boolean(first))+Number(Boolean(second))!==1)
   throw Error('TRIAL_DOUBLE_CLAIM_INTEGRITY');
  if(!await gate.report(executionId,{state:'synthetic'}))throw Error('TRIAL_REPORT_UNCONFIRMED');
- return {state:'synthetic',executionId,accepted:1,rejected:1};
+ // Remain in this very same Cloud Run execution until the controller closes
+ // admissions. The authenticated service handles the late claim atomically.
+ await maxWait(s=>s.phase==='reconciling');
+ if(!await gate.attemptLateClaim(executionId))
+  throw Error('TRIAL_LATE_REJECTION_UNCONFIRMED');
+ const closed=await gate.read(AbortSignal.timeout(4000));
+ if(closed.lateClaimRejected!==true||closed.executionId!==executionId||
+    closed.requestId!==approved.requestId)
+  throw Error('TRIAL_LATE_REJECTION_UNCONFIRMED');
+ return {state:'synthetic',executionId,accepted:1,rejected:1,lateClaimRejected:true};
 }
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url){
  runSyntheticTrialJob().then(outcome=>{

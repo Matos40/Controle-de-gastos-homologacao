@@ -55,9 +55,14 @@ test('private transaction: authenticated controller and job claim exactly once',
  const [a,b]=await Promise.all([j.claim(h.executionId),j.claim(h.executionId)]);
  assert.equal(Number(!!a)+Number(!!b),1);
  assert.equal((await c.read()).admitted,true);
- assert.ok(await j.report(h.executionId,{state:'completed'}));
+ assert.ok(await j.report(h.executionId,{state:'synthetic'}));
+ await assert.rejects(j.attemptLateClaim(h.executionId),/TRIAL_CHANNEL_UNAVAILABLE/);
  assert.ok(await c.block());
  assert.equal(await j.claim(h.executionId),null);
+ assert.equal(await j.attemptLateClaim(h.executionId),true);
+ assert.equal((await c.read()).lateClaimRejected,true);
+ await assert.rejects(j.attemptLateClaim(h.executionId),/TRIAL_CHANNEL_UNAVAILABLE/);
+ await assert.rejects(c.attemptLateClaim(h.executionId),/TRIAL_CHANNEL_UNAVAILABLE/);
  assert.ok(await c.reversing());
  assert.ok(await c.reversed());
  assert.equal((await c.read()).phase,'reversed');

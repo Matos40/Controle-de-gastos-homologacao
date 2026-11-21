@@ -18,7 +18,8 @@ function validState(s,runId,requestId,deadline){
  phases.has(s.phase)&&typeof s.admitted==='boolean'&&
  (s.executionId===undefined||id(s.executionId))&&
  (s.uid===undefined||id(s.uid))&&
- (s.until===undefined||Number.isSafeInteger(s.until));
+ (s.until===undefined||Number.isSafeInteger(s.until))&&
+ (s.lateClaimRejected===undefined||s.lateClaimRejected===true);
 }
 
 // Caller identity is verified separately; role is never inferred from client-supplied claims.
@@ -29,7 +30,7 @@ export function authorizeTransition(before,next,{role,executionId,jobName,jobEma
   executionId,jobName,jobEmail,clock}))return false;
  if(next.admitted===true&&role!=='job'&&before?.admitted!==true)return false;
  if(before&&(!validState(before,next.runId,next.requestId,next.absoluteDeadline)||
-   !only(before,next,['phase','revision','executionId','uid','profilePrepared','until','admitted','dispatchFinished','result'])))return false;
+   !only(before,next,['phase','revision','executionId','uid','profilePrepared','until','admitted','dispatchFinished','result','lateClaimRejected'])))return false;
  if(!before)return role==='controller'&&next.phase==='initializing'&&next.admitted===false&&
   next.profilePrepared===undefined&&next.until===undefined&&next.executionId===undefined&&
   only({runId:next.runId,requestId:next.requestId,absoluteDeadline:next.absoluteDeadline,
@@ -37,6 +38,14 @@ export function authorizeTransition(before,next,{role,executionId,jobName,jobEma
  if(!validExecutionApproval(before.executionApproval,{runId:before.runId,
   requestId:before.requestId,absoluteDeadline:before.absoluteDeadline,
   executionId,jobName,jobEmail,clock}))return false;
+ // The late request is an actual rejected claim recorded inside this gate.
+ // Only the same authenticated job can attempt it, after the controller closed
+ // admissions and after the original synthetic dispatch was reported.
+ if(role==='job'&&before.phase==='reconciling'&&next.phase==='reconciling'&&
+    before.executionId===executionId&&before.admitted===true&&
+    before.dispatchFinished===true&&before.result?.state==='synthetic'&&
+    before.lateClaimRejected!==true&&next.lateClaimRejected===true)
+  return only(before,next,['revision','lateClaimRejected']);
  if(end.has(before.phase)&&role==='job')return false;
  const now=clock();
  if(role==='controller'){
@@ -119,7 +128,7 @@ export function createAuthenticatedTrialChannel({store,runId,requestId,absoluteD
    if(raw.length>8192)throw Error('TOO_LARGE');
    command=JSON.parse(raw);
   }catch{return reject(400,'INVALID_REQUEST');}
-  if(!command||typeof command!=='object'||Array.isArray(command)||!['read','cas'].includes(command.action))
+  if(!command||typeof command!=='object'||Array.isArray(command)||!['read','cas','late-claim'].includes(command.action))
    return reject(400,'INVALID_REQUEST');
   if(clock()>=absoluteDeadline&&command.action==='cas'&&
      !end.has(command.next?.phase))
@@ -129,6 +138,27 @@ export function createAuthenticatedTrialChannel({store,runId,requestId,absoluteD
     if(Object.keys(command).length!==1)return reject(400,'INVALID_REQUEST');
     const state=await store.read();
     return Response.json({state},{headers:{'cache-control':'no-store'}});
+   }
+   if(command.action==='late-claim'){
+    if(role!=='job')return reject(403,'ACCESS_DENIED');
+    if(Object.keys(command).sort().join(',')!=='action,executionId'||
+       command.executionId!==executionId)return reject(400,'INVALID_REQUEST');
+    // This is a real attempt against the closed control gate, not an
+    // unaudited job-side boolean. A successful attempt is never accepted.
+    for(let attempt=0;attempt<8;attempt++){
+     const before=await store.read();
+     if(!before||before.phase!=='reconciling'||before.admitted!==true||
+        before.dispatchFinished!==true||before.result?.state!=='synthetic'||
+        before.executionId!==executionId||before.lateClaimRejected===true)
+      return reject(409,'TRIAL_LATE_CLAIM_NOT_ELIGIBLE');
+     const next={...before,lateClaimRejected:true,revision:before.revision+1};
+     if(await store.compareAndSet(before.revision,next,
+       (previous,candidate)=>authorizeTransition(previous,candidate,{
+        role,executionId,jobName,jobEmail:job.email,clock})))
+      return Response.json({accepted:false,rejectionRecorded:true},
+       {headers:{'cache-control':'no-store'}});
+    }
+    return reject(409,'TRIAL_LATE_CLAIM_CONFLICT');
    }
    if(Object.keys(command).sort().join(',')!=='action,next,revision'||
     !Number.isSafeInteger(command.revision)||command.revision<0||
@@ -159,6 +189,10 @@ export function createRemoteTrialControlStore({endpoint,role,identity,transport=
   async read(signal){return (await call({action:'read'},signal)).state;},
   async compareAndSet(revision,next,signal){
    return (await call({action:'cas',revision,next},signal)).applied===true;
+  },
+  async attemptLateClaim(executionId,signal){
+   const outcome=await call({action:'late-claim',executionId},signal);
+   return outcome.accepted===false&&outcome.rejectionRecorded===true;
   },
  };
 }

@@ -64,6 +64,17 @@ export async function runPinnedTrialController({gate,proof,
   }
   if(state?.admitted&&state.result?.state!=='synthetic')
    throw Error('TRIAL_SYNTHETIC_RECONCILIATION_UNCONFIRMED');
+  // Do not reverse until the SAME worker execution has really attempted
+  // and been rejected by the closed private channel.
+  if(state?.admitted){
+   const deadline=Date.now()+drainWaitMs;
+   while(state.lateClaimRejected!==true&&Date.now()<deadline){
+    await delay(pollMs,undefined,{signal:recovery});
+    state=await gate.read(recovery);
+   }
+   if(state.lateClaimRejected!==true)
+    throw Error('TRIAL_LATE_REJECTION_UNCONFIRMED');
+  }
   if(state.phase!=='reversing'&&state.phase!=='reversed'&&!await gate.reversing(recovery))
    throw Error('TRIAL_REVERSING_UNCONFIRMED');
   if(state.phase!=='reversed'&&!await gate.reversed(recovery))
@@ -75,5 +86,5 @@ export async function runPinnedTrialController({gate,proof,
  }
  if(failed)throw failed;
  return {executionId:proof.executionId,phase:'reversed',synthetic:verified,
-  result:result.result};
+  lateClaimRejected:state.lateClaimRejected===true,result:result.result};
 }

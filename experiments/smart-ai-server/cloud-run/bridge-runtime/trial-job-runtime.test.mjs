@@ -53,8 +53,11 @@ test('real channel protocol: controller stays through single simulated worker jo
  assert.equal(c.phase,'reversed');
  assert.equal(w.state,'synthetic');
  assert.deepEqual([w.accepted,w.rejected],[1,1]);
+ assert.equal(w.lateClaimRejected,true);
+ assert.equal(c.lateClaimRejected,true);
  assert.equal(record.phase,'reversed');
  assert.equal(record.dispatchFinished,true);
+ assert.equal(record.lateClaimRejected,true);
 });
 test('synthetic worker refuses missing project, target and synthetic-only flag',async()=>{
  for(const patch of [{SMART_AI_TRIAL_SYNTHETIC_ONLY:'false'},

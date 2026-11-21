@@ -41,6 +41,8 @@ export function createTrialGate({store,runId,requestId,absoluteDeadline,clock=Da
    s.phase==='finance-verified'&&clock()<until&&until<=absoluteDeadline?{phase:'authorized',until}:null,signal),
   claim:(executionId,signal)=>change(s=>
    s.phase==='authorized'&&s.executionId===executionId&&clock()<s.until?{phase:'executing',admitted:true}:null,signal),
+  attemptLateClaim:(executionId,signal)=>typeof store.attemptLateClaim==='function'&&
+   store.attemptLateClaim(executionId,signal),
   report:(executionId,result,signal)=>change(s=>
    ['executing','reconciling'].includes(s.phase)&&s.admitted&&s.executionId===executionId&&!s.dispatchFinished
     ?{dispatchFinished:true,result}:null,signal),

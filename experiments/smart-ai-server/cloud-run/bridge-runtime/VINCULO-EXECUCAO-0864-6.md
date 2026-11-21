@@ -31,3 +31,9 @@ A partir de `fcf30af5a1d36b7df90756108c405749f0fce95e`, o mesmo processo `trial-
 
 ## Job de trabalho de ponta a ponta (08.6.4.8)
 Novo entrypoint `trial-job-runtime.mjs`: obtém exclusivamente do canal privado o vínculo persistido pelo controlador, comprova identidade de serviço via `createBoundTrialJob`, progride `identity-ready` e `private-ready`, disputa em paralelo duas chamadas CAS de despacho e grava somente `{state:'synthetic'}`. Não importa Gemini, Finance Guard nem repositórios financeiros. Requer `SMART_AI_TRIAL_SYNTHETIC_ONLY=true`, ID da execução real, job, requestId/runId, deadline e URL privada. A imagem de bridge continua com `CMD server.mjs` por padrão; o Codex deve selecionar o entrypoint do job explicitamente e não reutilizar serviço comercial.
+
+
+## 08.6.4.9 — prova tardia na mesma execução (CI local)
+O job de trabalho **não encerra após o despacho sintético**. Aguarda o controlador fechar admissões (`reconciling`) e faz uma chamada autenticada `late-claim` ao mesmo canal privado, com o ID da execução original. A transação do serviço atesta a recusa, grava `lateClaimRejected=true` no **mesmo** documento CAS e devolve `accepted:false,rejectionRecorded:true`. Não se abre outro Cloud Run Job, nem se autoriza segundo despacho. A transição é válida exclusivamente para a identidade do job, a execução vinculada, um resultado sintético já registrado e gate fechado, e somente uma vez.
+
+O controlador espera a prova persistida antes de registrar `reversed`. Se o job desaparecer ou a rejeição não puder ser confirmada, mantém `reconciling` e reporta erro, sem falsa aprovação. O reset real do serviço para `SMART_AI_TRIAL_CONTROL_ENABLED=false` permanece responsabilidade operacional do Codex, separado do fechamento lógico.
