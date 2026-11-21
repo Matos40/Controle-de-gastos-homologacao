@@ -57,6 +57,8 @@ jobs:
               node --test --test-timeout=65000 experiments/smart-ai-server/cloud-run/ux/smart-ai.browser.test.mjs experiments/smart-ai-server/cloud-run/integration/integration.browser.test.mjs
             '
       - run: docker build -f experiments/smart-ai-server/cloud-run/Dockerfile -t smart-ai-candidate .
+      - name: Validate file-based Cloud Run v2 trial launch contract
+        run: node --test experiments/smart-ai-server/cloud-run/bridge-runtime/trial-launch-contract.test.mjs
       - name: Build and verify disabled bridge without external network
         run: |
           docker build -f experiments/smart-ai-server/cloud-run/bridge-runtime/Dockerfile -t smart-ai-bridge-candidate .
@@ -75,6 +77,28 @@ jobs:
           done
           docker logs "$container"
           exit 1
+      - name: Smoke-test actual trial entrypoints inside isolated image (no network)
+        run: |
+          set -euo pipefail
+          image=smart-ai-bridge-candidate
+          home=/app/experiments/smart-ai-server/cloud-run/bridge-runtime
+          for entry in trial-control-runtime.mjs trial-job-runtime.mjs trial-execution-approval.mjs; do
+            docker run --rm --network none --entrypoint node "$image" --check "$home/$entry"
+          done
+          for spec in 'trial-job-runtime.mjs:TRIAL_WORKER_CONFIGURATION' 'trial-execution-approval.mjs:TRIAL_SYNTHETIC_ONLY_REQUIRED'; do
+            entry="${spec%%:*}"
+            expected="${spec#*:}"
+            set +e
+            output=$(docker run --rm --network none --entrypoint node "$image" "$home/$entry" 2>&1)
+            status=$?
+            set -e
+            test "$status" -ne 0
+            printf '%s\n' "$output" | grep -F "$expected"
+            if printf '%s\n' "$output" | grep -Eq 'ERR_UNSUPPORTED_RESOLVE_REQUEST|ERR_MODULE_NOT_FOUND'; then
+              echo 'File-backed Node bootstrap unexpectedly failed to resolve local imports'
+              exit 1
+            fi
+          done
       - name: Verify disabled container without external network
         run: |
           container=$(docker run --detach --network none smart-ai-candidate)

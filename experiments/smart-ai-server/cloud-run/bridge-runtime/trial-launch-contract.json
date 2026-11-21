@@ -1,0 +1,27 @@
+{
+  "description": "Cloud Run v2 explicit container command/args; execute Node ESM files from the image filesystem, not from data: URLs, shell eval or inline JS",
+  "service": {
+    "command": [
+      "node"
+    ],
+    "args": [
+      "/app/experiments/smart-ai-server/cloud-run/bridge-runtime/trial-control-runtime.mjs"
+    ]
+  },
+  "worker": {
+    "command": [
+      "node"
+    ],
+    "args": [
+      "/app/experiments/smart-ai-server/cloud-run/bridge-runtime/trial-job-runtime.mjs"
+    ]
+  },
+  "controller": {
+    "command": [
+      "node"
+    ],
+    "args": [
+      "/app/experiments/smart-ai-server/cloud-run/bridge-runtime/trial-execution-approval.mjs"
+    ]
+  }
+}
