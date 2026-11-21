@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {assertLocalEmulators} from '../../legacy/emulator-guard.mjs';
-import {isolatedControlDatabase,createIsolatedTrialRestStore} from './trial-db-isolation.mjs';
+import {isolatedControlDatabase,createIsolatedTrialRestStore,CONTROL_RESOURCE,CONTROL_PROJECT,CONTROL_DATABASE_ID} from './trial-db-isolation.mjs';
 import {createTrialGate,recoverClosedTrial} from './trial-readiness.mjs';
 import {createFirestoreTrialControlStore,createAuthenticatedTrialChannel,
  createRemoteTrialControlStore,TRIAL_COLLECTION,TRIAL_PATH} from './trial-control-channel.mjs';
 
 assertLocalEmulators();
-const database=isolatedControlDatabase({projectId:'demo-raytech-control',
- allowedProjects:['demo-raytech-control']});
+const database=isolatedControlDatabase({projectId:CONTROL_PROJECT,databaseId:CONTROL_DATABASE_ID,
+ allowedDatabases:[CONTROL_RESOURCE]});
 const target='http://127.0.0.1:18080/v1/'+database.resource+'/documents';
 const runId='trial'+randomUUID().replaceAll('-','');
 const requestId=randomUUID();
@@ -70,4 +70,16 @@ assert.equal(recovery.phase,'reversed');
 await recoverClosedTrial({gate:gate('controller','proof-controller'),ops,signal:AbortSignal.timeout(10000)});
 assert.deepEqual([drained,reconciled,restored],[1,1,1],'recovery is idempotent');
 assert.equal(await j.claim(executionId),null);
-console.log('08.6.4.4 Firestore Emulator: projeto de controle separado, ledger negado, CAS concorrente, reinicio, cancelamento e reversao aprovados.');
+// Inspect only the LOCAL EMULATOR. These checks are NOT an IAM claim.
+// No trial doc may have been persisted to (default) or financial projects.
+for(const unwanted of [
+ 'projects/raytech-3d/databases/(default)',
+ 'projects/gen-lang-client-0593667072/databases/(default)',
+ 'projects/raytech-cg-homologacao/databases/(default)',
+ 'projects/raytech-cg-producao/databases/(default)',
+]) {
+ const url='http://127.0.0.1:18080/v1/'+unwanted+'/documents/'+TRIAL_COLLECTION+'/'+runId;
+ const response=await fetch(url,{headers:{authorization:'Bearer owner'}});
+ assert.equal(response.status,404,'control document must not exist outside named control bank');
+}
+console.log('08.6.4.5 Firestore Emulator: banco nomeado ai-control-v350, (default) e ledgers nao tocados, CAS concorrente, reinicio, cancelamento e reversao aprovados. IAM real continua pendente.');

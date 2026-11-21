@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createBoundTrialJob} from './trial-job-binding.mjs';
 import {makeTrialControlServer,trialControlConfig} from './trial-control-runtime.mjs';
-import {isolatedControlDatabase,isolatedTrialDb,createIsolatedTrialRestStore,APPROVED_REMOTE_CONTROL_PROJECTS} from './trial-db-isolation.mjs';
+import {isolatedControlDatabase,isolatedTrialDb,createIsolatedTrialRestStore,APPROVED_REMOTE_CONTROL_DATABASES,CONTROL_RESOURCE,CONTROL_PROJECT,CONTROL_DATABASE_ID} from './trial-db-isolation.mjs';
 
 const base=()=>({
  SMART_AI_TRIAL_CONTROL_ENABLED:'true',
@@ -14,15 +14,15 @@ const base=()=>({
  SMART_AI_TRIAL_CONTROLLER_SUB:'111111',SMART_AI_TRIAL_JOB_SUB:'222222',
  SMART_AI_TRIAL_EXECUTION_ID:'test-exec-123',
  SMART_AI_TRIAL_ABSOLUTE_DEADLINE:String(Date.now()+600000),
- SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID:'raytech-trial-control-fixture',
- SMART_AI_TRIAL_CONTROL_FIRESTORE_DATABASE_ID:'(default)',
+ SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID:CONTROL_PROJECT,
+ SMART_AI_TRIAL_CONTROL_FIRESTORE_DATABASE_ID:CONTROL_DATABASE_ID,
  SMART_AI_TRIAL_RUN_ID:'test-run-123',
  SMART_AI_TRIAL_REQUEST_ID:'00000000-0000-4000-8000-000000000864'
 });
 const listen=server=>new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const close=server=>new Promise(resolve=>server.close(resolve));
 test('configuration fails closed for missing flag, emulator, shared identity and wrong project',()=>{
- const valid=base();const allow={allowedProjects:['raytech-trial-control-fixture']};
+ const valid=base();const allow={allowedDatabases:[CONTROL_RESOURCE]};
  assert.equal(APPROVED_REMOTE_CONTROL_PROJECTS.length,0);
  assert.throws(()=>trialControlConfig(valid),/TRIAL_CONTROL_DATABASE_NOT_APPROVED/);
  assert.equal(trialControlConfig(valid,allow).executionId,'test-exec-123');
@@ -34,9 +34,11 @@ test('configuration fails closed for missing flag, emulator, shared identity and
   {SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID:'gen-lang-client-0593667072'},
   {SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID:'raytech-cg-producao'},
   {SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID:'raytech-cg-homologacao'},
-  {SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID:'raytech-3d'},
+  {SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID:'raytech-3d',SMART_AI_TRIAL_CONTROL_FIRESTORE_DATABASE_ID:'(default)'},
   {SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID:'another-control-project'},
   {SMART_AI_TRIAL_CONTROL_FIRESTORE_DATABASE_ID:'finance'},
+  {SMART_AI_TRIAL_CONTROL_FIRESTORE_DATABASE_ID:'(default)'},
+  {SMART_AI_TRIAL_CONTROL_FIRESTORE_DATABASE_ID:'ai-control-v350/../../(default)'},
   {SMART_AI_TRIAL_EXECUTION_ID:''},
   {SMART_AI_TRIAL_ABSOLUTE_DEADLINE:String(Date.now()-2000)}
  ])assert.throws(()=>trialControlConfig({...valid,...edit},allow),/TRIAL_CONTROL/);
@@ -84,21 +86,64 @@ test('job binding requires independently confirmed execution and dedicated metad
  assert.equal((await bound.gate.read()).phase,'provisioning');
 });
 
-test('only explicitly pinned separate control project may be selected',()=>{
- const approved=['raytech-trial-control-fixture'];
- const db=isolatedControlDatabase({projectId:approved[0],allowedProjects:approved});
- assert.equal(db.resource,'projects/raytech-trial-control-fixture/databases/(default)');
- for(const p of ['gen-lang-client-0593667072','raytech-cg-homologacao','raytech-cg-producao',
-  'raytech-3d','unapproved-project'])
-  assert.throws(()=>isolatedControlDatabase({projectId:p,allowedProjects:[approved[0]]}),
+test('named Firestore candidate requires an exact code-pinned database, never default or financial projects',()=>{
+ const candidate={projectId:CONTROL_PROJECT,databaseId:CONTROL_DATABASE_ID};
+ const allow=[CONTROL_RESOURCE];
+ assert.equal(APPROVED_REMOTE_CONTROL_DATABASES.length,0,'remote activation must remain off');
+ assert.throws(()=>isolatedControlDatabase(candidate),/DATABASE_NOT_APPROVED/);
+ assert.equal(isolatedControlDatabase({...candidate,allowedDatabases:allow}).resource,
+  'projects/raytech-3d/databases/ai-control-v350');
+ const forbidden=[
+  {...candidate,databaseId:'(default)'},
+  {...candidate,databaseId:'another-bank'},
+  {...candidate,projectId:'gen-lang-client-0593667072',databaseId:'(default)'},
+  {...candidate,projectId:'raytech-cg-homologacao',databaseId:'(default)'},
+  {...candidate,projectId:'raytech-cg-producao',databaseId:'(default)'},
+  {...candidate,projectId:'raytech-3d',databaseId:'(default)'},
+  {...candidate,allowedDatabases:['projects/raytech-3d/databases/(default)']},
+  {...candidate,allowedDatabases:[CONTROL_RESOURCE,CONTROL_RESOURCE]},
+  {...candidate,allowedDatabases:[]},
+ ];
+ for(const combo of forbidden)
+  assert.throws(()=>isolatedControlDatabase({...candidate,allowedDatabases:allow,...combo}),
    /TRIAL_CONTROL_DATABASE_NOT_APPROVED/);
- assert.throws(()=>isolatedControlDatabase({projectId:approved[0],allowedProjects:[]}),/NOT_APPROVED/);
- assert.throws(()=>isolatedControlDatabase({projectId:approved[0],allowedProjects:approved,
-  databaseId:'(default)/documents/finance'}),/NOT_APPROVED/);
- const wrapped=isolatedTrialDb({collection:name=>({name}),runTransaction:async()=>true});
- assert.equal(wrapped.collection('raytechLabTrialControlV350').name,'raytechLabTrialControlV350');
- for(const name of ['raytechLabCommercialV350','raytechV345Accounts','raytechLabCommercialGlobalV350'])
-  assert.throws(()=>wrapped.collection(name),/COLLECTION_DENIED/);
- assert.throws(()=>createIsolatedTrialRestStore({database:db,accessToken:async()=> 'x',
-  emulatorBase:'http://127.0.0.1:18080/v1/projects/demo-raytech-v340/databases/(default)/documents'}),/DB_MISMATCH/);
+});
+
+test('trial transaction adapter rejects forged document refs before storage IO',async()=>{
+ const database=isolatedControlDatabase({projectId:CONTROL_PROJECT,
+  databaseId:CONTROL_DATABASE_ID,allowedDatabases:[CONTROL_RESOURCE]});
+ let reads=0,writes=0;
+ const raw={
+  collection:name=>({doc:id=>({name:CONTROL_RESOURCE+'/documents/'+name+'/'+id})}),
+  async runTransaction(callback){
+   return callback({get:async()=>{reads++;return {exists:false};},
+    set:()=>{writes++;},create:()=>{writes++;}});
+  },
+ };
+ const protectedDb=isolatedTrialDb(raw,{database});
+ assert.equal((await protectedDb.runTransaction(tx=>tx.get(protectedDb.collection('raytechLabTrialControlV350').doc('safe')))).exists,false);
+ assert.equal(reads,1);
+ for(const path of [
+  'projects/raytech-3d/databases/(default)/documents/raytechLabTrialControlV350/safe',
+  'projects/gen-lang-client-0593667072/databases/(default)/documents/raytechV345Accounts/safe',
+  'projects/raytech-cg-homologacao/databases/(default)/documents/raytechLabTrialControlV350/safe',
+  'projects/raytech-cg-producao/databases/(default)/documents/raytechLabTrialControlV350/safe',
+  CONTROL_RESOURCE+'/documents/raytechV345Accounts/safe',
+  CONTROL_RESOURCE+'/documents/raytechLabCommercialV350/safe',
+  CONTROL_RESOURCE+'/documents/raytechLabTrialControlV350/safe/other',
+ ]) {
+  await assert.rejects(protectedDb.runTransaction(tx=>tx.get({name:path})),/REFERENCE_DENIED/);
+  await assert.rejects(protectedDb.runTransaction(tx=>tx.set({name:path},{})),/REFERENCE_DENIED/);
+  await assert.rejects(protectedDb.runTransaction(tx=>tx.create({name:path},{})),/REFERENCE_DENIED/);
+ }
+ assert.deepEqual([reads,writes],[1,0],'forged document refs never reach the REST adapter');
+ for(const forbidden of ['raytechV345Accounts','raytechLabCommercialV350','raytechLabCommercialGlobalV350'])
+  assert.throws(()=>protectedDb.collection(forbidden),/COLLECTION_DENIED/);
+ assert.throws(()=>protectedDb.collection('raytechLabTrialControlV350').doc('../finance'),/REFERENCE_DENIED/);
+ assert.throws(()=>createIsolatedTrialRestStore({database:{...database,
+  resource:'projects/raytech-3d/databases/(default)'},accessToken:async()=> 'x'}),/NOT_APPROVED/);
+ assert.throws(()=>createIsolatedTrialRestStore({database,accessToken:async()=> 'x',
+  emulatorBase:'http://127.0.0.1:18080/v1/projects/raytech-3d/databases/(default)/documents'}),/DB_MISMATCH/);
+ assert.throws(()=>createIsolatedTrialRestStore({database,accessToken:async()=> 'x',
+  emulatorBase:'http://127.0.0.1:18080/v1/projects/gen-lang-client-0593667072/databases/(default)/documents'}),/DB_MISMATCH/);
 });

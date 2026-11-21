@@ -1,7 +1,7 @@
 import {createServer} from 'node:http';
 import {Readable} from 'node:stream';
 import {pathToFileURL} from 'node:url';
-import {isolatedControlDatabase,createIsolatedTrialRestStore,APPROVED_REMOTE_CONTROL_PROJECTS} from './trial-db-isolation.mjs';
+import {isolatedControlDatabase,createIsolatedTrialRestStore,APPROVED_REMOTE_CONTROL_DATABASES} from './trial-db-isolation.mjs';
 import {createMetadataAccess} from '../runtime.mjs';
 import {COMPUTE_PROJECT,FIREBASE_PROJECT} from '../projects.mjs';
 import {createAuthenticatedTrialChannel,createFirestoreTrialControlStore,TRIAL_PATH} from './trial-control-channel.mjs';
@@ -16,7 +16,7 @@ const envKey=(env,key)=>{const value=env[key];if(typeof value!=='string'||!value
 // The controller must pin an execution ID obtained independently from Cloud Run,
 // and the job must use a dedicated, single-execution service account.
 // An execution ID supplied only by the job is NOT sufficient proof.
-export function trialControlConfig(env,{allowedProjects=APPROVED_REMOTE_CONTROL_PROJECTS}={}){
+export function trialControlConfig(env,{allowedDatabases=APPROVED_REMOTE_CONTROL_DATABASES}={}){
  if(env.SMART_AI_TRIAL_CONTROL_ENABLED!=='true')throw Error('TRIAL_CONTROL_DISABLED');
  if(env.FIRESTORE_EMULATOR_HOST||env.FIREBASE_AUTH_EMULATOR_HOST||env.GOOGLE_APPLICATION_CREDENTIALS||
     env.FIREBASE_PROJECT_ID!==FIREBASE_PROJECT||env.GOOGLE_CLOUD_PROJECT!==COMPUTE_PROJECT)
@@ -31,7 +31,7 @@ export function trialControlConfig(env,{allowedProjects=APPROVED_REMOTE_CONTROL_
  const absoluteDeadline=Number(envKey(env,'SMART_AI_TRIAL_ABSOLUTE_DEADLINE'));
  const projectId=envKey(env,'SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID');
  const databaseId=envKey(env,'SMART_AI_TRIAL_CONTROL_FIRESTORE_DATABASE_ID');
- const database=isolatedControlDatabase({projectId,databaseId,allowedProjects});
+ const database=isolatedControlDatabase({projectId,databaseId,allowedDatabases});
  const run=envKey(env,'SMART_AI_TRIAL_RUN_ID'),requestId=envKey(env,'SMART_AI_TRIAL_REQUEST_ID');
  if(!principal(controllerEmail)||!principal(jobEmail)||!principal(self)||
     controllerEmail===jobEmail||controllerEmail===self||jobEmail===self||
