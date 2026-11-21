@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createBoundTrialJob} from './trial-job-binding.mjs';
 import {makeTrialControlServer,trialControlConfig} from './trial-control-runtime.mjs';
+import {isolatedControlDatabase,isolatedTrialDb,createIsolatedTrialRestStore,APPROVED_REMOTE_CONTROL_PROJECTS} from './trial-db-isolation.mjs';
 
 const base=()=>({
  SMART_AI_TRIAL_CONTROL_ENABLED:'true',
@@ -13,23 +14,32 @@ const base=()=>({
  SMART_AI_TRIAL_CONTROLLER_SUB:'111111',SMART_AI_TRIAL_JOB_SUB:'222222',
  SMART_AI_TRIAL_EXECUTION_ID:'test-exec-123',
  SMART_AI_TRIAL_ABSOLUTE_DEADLINE:String(Date.now()+600000),
- SMART_AI_TRIAL_FIRESTORE_PROJECT:'projects/gen-lang-client-0593667072/databases/(default)',
+ SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID:'raytech-trial-control-fixture',
+ SMART_AI_TRIAL_CONTROL_FIRESTORE_DATABASE_ID:'(default)',
  SMART_AI_TRIAL_RUN_ID:'test-run-123',
  SMART_AI_TRIAL_REQUEST_ID:'00000000-0000-4000-8000-000000000864'
 });
 const listen=server=>new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const close=server=>new Promise(resolve=>server.close(resolve));
 test('configuration fails closed for missing flag, emulator, shared identity and wrong project',()=>{
- const valid=base();assert.equal(trialControlConfig(valid).executionId,'test-exec-123');
+ const valid=base();const allow={allowedProjects:['raytech-trial-control-fixture']};
+ assert.equal(APPROVED_REMOTE_CONTROL_PROJECTS.length,0);
+ assert.throws(()=>trialControlConfig(valid),/TRIAL_CONTROL_DATABASE_NOT_APPROVED/);
+ assert.equal(trialControlConfig(valid,allow).executionId,'test-exec-123');
  for(const edit of [
   {SMART_AI_TRIAL_CONTROL_ENABLED:'false'},
   {FIRESTORE_EMULATOR_HOST:'127.0.0.1:18080'},
   {SMART_AI_TRIAL_JOB_EMAIL:valid.SMART_AI_TRIAL_CONTROLLER_EMAIL},
   {SMART_AI_TRIAL_JOB_SUB:valid.SMART_AI_TRIAL_CONTROLLER_SUB},
-  {SMART_AI_TRIAL_FIRESTORE_PROJECT:'projects/other-project/databases/(default)'},
+  {SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID:'gen-lang-client-0593667072'},
+  {SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID:'raytech-cg-producao'},
+  {SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID:'raytech-cg-homologacao'},
+  {SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID:'raytech-3d'},
+  {SMART_AI_TRIAL_CONTROL_FIRESTORE_PROJECT_ID:'another-control-project'},
+  {SMART_AI_TRIAL_CONTROL_FIRESTORE_DATABASE_ID:'finance'},
   {SMART_AI_TRIAL_EXECUTION_ID:''},
   {SMART_AI_TRIAL_ABSOLUTE_DEADLINE:String(Date.now()-2000)}
- ])assert.throws(()=>trialControlConfig({...valid,...edit}),/TRIAL_CONTROL/);
+ ])assert.throws(()=>trialControlConfig({...valid,...edit},allow),/TRIAL_CONTROL/);
 });
 test('isolated control entrypoint is disabled and exposes no commercial routes',async()=>{
  const server=makeTrialControlServer();
@@ -72,4 +82,23 @@ test('job binding requires independently confirmed execution and dedicated metad
  assert.equal(bound.executionId,approved.executionId);
  assert.equal(verified,true);assert.equal(metadata,true);
  assert.equal((await bound.gate.read()).phase,'provisioning');
+});
+
+test('only explicitly pinned separate control project may be selected',()=>{
+ const approved=['raytech-trial-control-fixture'];
+ const db=isolatedControlDatabase({projectId:approved[0],allowedProjects:approved});
+ assert.equal(db.resource,'projects/raytech-trial-control-fixture/databases/(default)');
+ for(const p of ['gen-lang-client-0593667072','raytech-cg-homologacao','raytech-cg-producao',
+  'raytech-3d','unapproved-project'])
+  assert.throws(()=>isolatedControlDatabase({projectId:p,allowedProjects:[approved[0]]}),
+   /TRIAL_CONTROL_DATABASE_NOT_APPROVED/);
+ assert.throws(()=>isolatedControlDatabase({projectId:approved[0],allowedProjects:[]}),/NOT_APPROVED/);
+ assert.throws(()=>isolatedControlDatabase({projectId:approved[0],allowedProjects:approved,
+  databaseId:'(default)/documents/finance'}),/NOT_APPROVED/);
+ const wrapped=isolatedTrialDb({collection:name=>({name}),runTransaction:async()=>true});
+ assert.equal(wrapped.collection('raytechLabTrialControlV350').name,'raytechLabTrialControlV350');
+ for(const name of ['raytechLabCommercialV350','raytechV345Accounts','raytechLabCommercialGlobalV350'])
+  assert.throws(()=>wrapped.collection(name),/COLLECTION_DENIED/);
+ assert.throws(()=>createIsolatedTrialRestStore({database:db,accessToken:async()=> 'x',
+  emulatorBase:'http://127.0.0.1:18080/v1/projects/demo-raytech-v340/databases/(default)/documents'}),/DB_MISMATCH/);
 });
