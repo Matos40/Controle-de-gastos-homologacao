@@ -23,6 +23,15 @@ jobs:
       - run: node --test experiments/smart-ai-server/cloud-run/integration/private-diagnostic.test.mjs experiments/smart-ai-server/cloud-run/integration/bridge-runtime.test.mjs experiments/smart-ai-server/cloud-run/integration/integration.test.mjs experiments/smart-ai-server/cloud-run/commercial.test.mjs experiments/smart-ai-server/cloud-run/invoice-contract.test.mjs experiments/smart-ai-server/cloud-run/infra/infra.test.mjs experiments/smart-ai-server/cloud-run/infra/operations.test.mjs experiments/smart-ai-server/remote/worker.test.mjs experiments/smart-ai-server/legacy/invoice.test.mjs
       - run: node --test experiments/smart-ai-server/cloud-run/integration/diagnostic-runtime.test.mjs
       - run: node --test experiments/smart-ai-server/cloud-run/bridge-runtime/trial-readiness.test.mjs experiments/smart-ai-server/cloud-run/bridge-runtime/trial-control-channel.test.mjs
+      - name: Verify private trial control using Firestore Emulator only
+        timeout-minutes: 5
+        env:
+          GCLOUD_PROJECT: demo-raytech-v340
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:19099
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:18080
+        run: |
+          npx --yes firebase-tools@14.25.1 emulators:exec --only firestore --project demo-raytech-v340 --config experiments/smart-ai-server/firebase.json \
+            'node experiments/smart-ai-server/cloud-run/bridge-runtime/trial-control-emulator.mjs'
       - name: Obtain the pinned V34.7.4.5 reference
         run: |
           git init "$RUNNER_TEMP/raytech-reference"
